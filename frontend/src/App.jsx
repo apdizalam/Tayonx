@@ -497,6 +497,8 @@ function RequestForm({ onClose, onCreated }) {
 
 function SignInPage() {
   const [message, setMessage] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   async function handleSubmit(event) {
@@ -508,20 +510,23 @@ function SignInPage() {
       const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: event.currentTarget.elements.email.value,
-          password: event.currentTarget.elements.password.value,
-        }),
+        body: JSON.stringify({ email, password }),
       });
       const result = await response.json();
 
       if (!response.ok) {
-        setMessage(result.error || 'Sign-in failed. Check your credentials and try again.');
+        setMessage(result.message || result.error || 'Sign-in failed. Check your credentials and try again.');
+        return;
+      }
+
+      if (typeof result.token !== 'string' || !result.token || !result.user || typeof result.user !== 'object') {
+        setMessage('The account service returned an invalid sign-in response. Please try again.');
         return;
       }
 
       localStorage.setItem('token', result.token);
-      window.location.href = '/';
+      localStorage.setItem('user', JSON.stringify(result.user));
+      window.location.href = '/dashboard';
     } catch {
       setMessage('Cannot reach the account service. Check that the backend is running.');
     } finally {
@@ -536,11 +541,11 @@ function SignInPage() {
         <p className="eyebrow">SECURE ACCOUNT</p>
         <h1>Welcome back</h1>
         <p className="page-description">Sign in to continue to your Tayonx workspace.</p>
-        <label htmlFor="signin-email">Email address<input autoComplete="email" id="signin-email" name="email" placeholder="you@example.com" required type="email" /></label>
-        <label htmlFor="signin-password">Password<input autoComplete="current-password" id="signin-password" name="password" placeholder="Enter your password" required type="password" /></label>
+        <label htmlFor="signin-email">Email address<input autoComplete="email" id="signin-email" name="email" onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" required type="email" value={email} /></label>
+        <label htmlFor="signin-password">Password<input autoComplete="current-password" id="signin-password" name="password" onChange={(event) => setPassword(event.target.value)} placeholder="Enter your password" required type="password" value={password} /></label>
         <button className="primary-button full-button" disabled={isSubmitting} type="submit">{isSubmitting ? 'Signing in…' : 'Sign in'}</button>
         <a className="secondary-button full-button auth-link-button" href="/register">Create an account</a>
-        <p className="signin-message" aria-live="polite">{message}</p>
+        <p className="signin-message" aria-live="polite" role={message ? 'alert' : undefined}>{message}</p>
       </form>
       <p className="signin-footnote">Connect · Request · Chat · Get it done</p>
     </main>
