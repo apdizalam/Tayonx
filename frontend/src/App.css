@@ -2388,6 +2388,11 @@ button {
   background: #1559e0;
 }
 
+.signup-submit:disabled {
+  cursor: wait;
+  opacity: 0.75;
+}
+
 .signup-legal {
   margin-top: -6px;
   text-align: center;

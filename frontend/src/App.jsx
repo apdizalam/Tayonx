@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import logo from './assets/tayonx-logo.png';
 import './App.css';
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+
 const roles = {
   customer: {
     label: 'Customer',
@@ -495,10 +497,41 @@ function RequestForm({ onClose, onCreated }) {
 
 function SignInPage() {
   const [message, setMessage] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
-    setMessage('Sign-in is not connected yet. Your account session was cleared.');
+    setMessage('');
+    setIsSubmitting(true);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+      const result = await response.json();
+
+      if (!response.ok) {
+        setMessage(result.message || result.error || 'Sign-in failed. Check your email and password.');
+        return;
+      }
+
+      if (typeof result.token !== 'string' || !result.token || !result.user || typeof result.user !== 'object') {
+        setMessage('The account service returned an invalid sign-in response. Please try again.');
+        return;
+      }
+
+      localStorage.setItem('token', result.token);
+      localStorage.setItem('user', JSON.stringify(result.user));
+      window.location.href = '/dashboard';
+    } catch {
+      setMessage('Cannot reach the account service. Check that the backend is running.');
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -507,12 +540,12 @@ function SignInPage() {
       <form className="signin-card" onSubmit={handleSubmit}>
         <p className="eyebrow">CUSTOMER PORTAL</p>
         <h1>Welcome back</h1>
-        <p className="page-description">You have been signed out. Sign in to continue to your Tayonx workspace.</p>
-        <label htmlFor="signin-email">Email address<input autoComplete="email" id="signin-email" name="email" placeholder="you@example.com" required type="email" /></label>
-        <label htmlFor="signin-password">Password<input autoComplete="current-password" id="signin-password" name="password" placeholder="Enter your password" required type="password" /></label>
-        <button className="primary-button full-button" type="submit">Sign in</button>
+        <p className="page-description">Sign in to continue to your Tayonx workspace.</p>
+        <label htmlFor="signin-email">Email address<input autoComplete="email" id="signin-email" name="email" onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" required type="email" value={email} /></label>
+        <label htmlFor="signin-password">Password<input autoComplete="current-password" id="signin-password" name="password" onChange={(event) => setPassword(event.target.value)} placeholder="Enter your password" required type="password" value={password} /></label>
+        <button className="primary-button full-button" disabled={isSubmitting} type="submit">{isSubmitting ? 'Signing in…' : 'Sign in'}</button>
         <a className="secondary-button full-button auth-link-button" href="/register">Create an account</a>
-        <p className="signin-message" aria-live="polite">{message}</p>
+        <p className="signin-message" aria-live="polite" role={message ? 'alert' : undefined}>{message}</p>
       </form>
       <p className="signin-footnote">Connect · Request · Chat · Get it done</p>
     </main>
@@ -521,14 +554,43 @@ function SignInPage() {
 
 function RegisterPage() {
   const [message, setMessage] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [role, setRole] = useState('customer');
   const [country, setCountry] = useState('Somaliland');
   const isCustomer = role === 'customer';
   const countries = isCustomer ? ['Somaliland', 'Somalia', 'Other'] : ['China', 'Turkey'];
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
-    setMessage('Registration is ready. Account creation is not connected yet.');
+    setIsSubmitting(true);
+    setMessage('');
+
+    const formData = new FormData(event.currentTarget);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: formData.get('name'),
+          email: formData.get('email'),
+          password: formData.get('password'),
+          role: isCustomer ? 'customer' : 'cargo_provider',
+          country,
+        }),
+      });
+      const result = await response.json();
+
+      if (!response.ok) {
+        setMessage(result.message || result.error || 'Account creation failed. Please check your details and try again.');
+        return;
+      }
+
+      window.location.href = '/login';
+    } catch {
+      setMessage('Cannot reach the account service. Check that the backend is running.');
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -603,6 +665,7 @@ function RegisterPage() {
                 name="name"
                 placeholder={isCustomer ? 'Abdi Hassan' : 'Global Cargo Ltd'}
                 required
+                maxLength={100}
               />
             </label>
             <label htmlFor="register-country">
@@ -618,13 +681,13 @@ function RegisterPage() {
             </label>
           </div>
 
-          <label htmlFor="register-contact">
-            Phone or email
-            <input id="register-contact" name="contact" placeholder="+252 63 … or name@email.com" required />
+          <label htmlFor="register-email">
+            Email address
+            <input autoComplete="email" id="register-email" name="email" placeholder="you@example.com" required type="email" />
           </label>
           <label htmlFor="register-password">
             Password
-            <input autoComplete="new-password" id="register-password" minLength={8} name="password" placeholder="At least 8 characters" required type="password" />
+            <input autoComplete="new-password" id="register-password" minLength={8} maxLength={72} name="password" placeholder="At least 8 characters" required type="password" />
           </label>
 
           {!isCustomer && (
@@ -634,9 +697,9 @@ function RegisterPage() {
             </div>
           )}
 
-          <button className="primary-button signup-submit" type="submit">Create account</button>
+          <button className="primary-button signup-submit" disabled={isSubmitting} type="submit">{isSubmitting ? 'Creating account…' : 'Create account'}</button>
           <p className="signup-legal">By continuing you agree to the <a href="#terms">terms</a> and <a href="#privacy">privacy policy</a>.</p>
-          <p className="signin-message" aria-live="polite">{message}</p>
+          <p className="signin-message" aria-live="polite" role={message ? 'alert' : undefined}>{message}</p>
         </form>
       </section>
     </main>
