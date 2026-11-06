@@ -1971,6 +1971,73 @@ button {
   box-shadow: 0 6px 24px rgba(10, 26, 51, 0.06);
 }
 
+.signin-card .primary-button {
+  min-height: 42px;
+  color: #fff;
+  background: #1f6bff;
+}
+
+.signin-card .primary-button:hover:not(:disabled) {
+  background: #1559e0;
+}
+
+.signin-card .primary-button:disabled {
+  cursor: wait;
+  opacity: 0.75;
+}
+
+.auth-link-button {
+  min-height: 42px;
+  border-color: #dbe2ec;
+  color: #263750;
+  background: #fff;
+  text-decoration: none;
+}
+
+.auth-link-button:hover {
+  border-color: #b5c3d6;
+  background: #f8faff;
+}
+
+.auth-switch {
+  margin: 0;
+  color: #64728a;
+  font-size: 11px;
+  text-align: center;
+}
+
+.auth-switch a {
+  color: #1559e0;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.register-card {
+  gap: 13px;
+}
+
+.register-card .eyebrow {
+  margin-bottom: -9px;
+}
+
+.register-card select {
+  height: 42px;
+  padding: 0 11px;
+  border: 1px solid #cbd4e1;
+  border-radius: 5px;
+  outline: 0;
+  color: #263750;
+  background: #fff;
+  font: inherit;
+  font-size: 11px;
+}
+
+.register-card select:focus {
+  border-color: #1f6bff;
+  box-shadow: 0 0 0 2px #e5eeff;
+}
+
 .signin-card .eyebrow {
   margin-bottom: -11px;
   color: #1559e0;
