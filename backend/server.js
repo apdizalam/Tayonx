@@ -9,13 +9,17 @@ const app = express();
 const server = http.createServer(app);
 
 // Express Middleware
-app.use(cors());
+app.use(cors({
+  origin: "http://localhost:5173",
+  methods: ["GET", "POST"],
+  credentials: true
+}));
 app.use(express.json());
 
-// Socket.io Setup (Real-Time Chat)
+// Socket.io Setup (Real-Time)
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:5173", // ama Port-ka uu React ku shaqaynayo
+    origin: "http://localhost:5173",
     methods: ["GET", "POST"]
   }
 });
