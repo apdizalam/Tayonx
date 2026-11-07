@@ -2,6 +2,8 @@ import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import logo from '../assets/tayonx-logo.png';
 import Icon from './Icon.jsx';
+import AdminChats from './AdminChats.jsx';
+import AdminSettings from './AdminSettings.jsx';
 import Chat from './Chat.jsx';
 import {
   apiRequest,
@@ -714,7 +716,7 @@ export default function DashboardWorkspace({ initialRole }) {
       return <Card><CardHeading title="Orders & shipping" subtitle="Accepted offers and their live shipment status." />{loading ? <p className="empty-table" role="status">Loading accepted orders…</p> : orders.length ? <OffersTable offers={orders} role="provider" busyId={busyId} onEdit={(offer) => { setEditingOffer(offer); setOfferRequest(null); setFormError(''); }} onDelete={deleteCargoOffer} onStatusChange={handleStatusChange} /> : <div className="empty-state"><strong>No accepted orders yet</strong><p>When a customer accepts one of your offers, the order and shipping progress will appear here.</p><button className="small-primary" onClick={() => setSection('opportunities')}>Browse requests</button></div>}</Card>;
     }
 
-    if (section === 'messages' && user) {
+    if (section === 'messages' && user && !adminMode) {
       return <Card className="messages-card live-chat-card"><Chat user={user} /></Card>;
     }
 
@@ -767,7 +769,11 @@ export default function DashboardWorkspace({ initialRole }) {
     }
 
     if (adminMode && section === 'settings') {
-      return <Card><CardHeading title="Admin settings" /><div className="admin-unavailable-state"><strong>Admin settings are not connected yet</strong><p>The current backend does not provide admin settings endpoints. No sample records are shown here.</p></div></Card>;
+      return <AdminSettings />;
+    }
+
+    if (adminMode && section === 'messages') {
+      return <AdminChats />;
     }
 
     if (customerMode && section === 'companies') {

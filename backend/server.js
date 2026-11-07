@@ -8,6 +8,7 @@ const authRoutes = require('./routes/auth');
 const requestRoutes = require('./routes/requests');
 const userRoutes = require('./routes/users');
 const chatRoutes = require('./routes/chats');
+const adminRoutes = require('./routes/admin');
 const registerChatSocket = require('./socket');
 
 const app = express();
@@ -29,6 +30,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/requests', requestRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/chats', chatRoutes.router);
+app.use('/api/admin', adminRoutes);
 
 // Socket.io Setup (Real-Time)
 const io = new Server(server, {
