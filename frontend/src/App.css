@@ -4411,6 +4411,53 @@ button.admin-kpi:hover {
   font-size: 11px;
 }
 
+.admin-users-card .card-heading {
+  align-items: center;
+}
+
+.admin-users-table {
+  min-width: 760px;
+}
+
+.admin-users-table th:last-child,
+.admin-users-table td:last-child {
+  text-align: right;
+}
+
+.admin-user-role {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  color: #36506f;
+  background: #eef3f8;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.admin-user-role-admin {
+  color: #573d9b;
+  background: #f0ebff;
+}
+
+.admin-user-role-cargo_provider,
+.admin-user-role-individual_cargo {
+  color: #14674d;
+  background: #e7f6ef;
+}
+
+.admin-users-table .table-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.user-modal {
+  max-height: min(90vh, 760px);
+  overflow-y: auto;
+}
+
 @media (max-width: 800px) {
   .admin-insights-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));

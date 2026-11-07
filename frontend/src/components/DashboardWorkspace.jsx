@@ -6,15 +6,19 @@ import {
   apiRequest,
   createOffer,
   createRequest,
+  createUser,
   declineRequest,
   deleteOffer,
   deleteRequest,
+  deleteUser,
   getOffers,
   getRequests,
+  getUsers,
   respondToOffer,
   updateOffer,
   updateRequest,
   updateShipmentStatus,
+  updateUser,
 } from '../lib/api.js';
 import '../App.css';
 
@@ -60,6 +64,11 @@ const roleConfig = {
 };
 
 const shipmentStatuses = ['open', 'offers_received', 'in_progress', 'purchased', 'shipping', 'delivered', 'cancelled'];
+const managedUserRoles = [
+  ['customer', 'Customer'],
+  ['cargo_provider', 'Cargo provider'],
+  ['individual_cargo', 'Individual cargo'],
+];
 const dashboardLoadedAt = Date.now();
 
 function statusLabel(status) {
@@ -80,6 +89,15 @@ function formatRelativeTime(value, referenceTime) {
 
 function StatusBadge({ children }) {
   return <span className={`status-badge status-${statusLabel(children).toLowerCase().replaceAll(' ', '-')}`}>{statusLabel(children)}</span>;
+}
+
+function userRoleLabel(role) {
+  return {
+    customer: 'Customer',
+    cargo_provider: 'Cargo provider',
+    individual_cargo: 'Individual cargo',
+    admin: 'Administrator',
+  }[role] || role;
 }
 
 function Card({ children, className = '' }) {
@@ -238,13 +256,49 @@ function OfferForm({ request, offer, saving, error, onSubmit, onClose }) {
   );
 }
 
+function UserForm({ user, saving, error, onSubmit, onClose }) {
+  const [values, setValues] = useState({
+    name: user?.name || '',
+    email: user?.email || '',
+    country: user?.country || 'Somaliland',
+    role: user?.role || 'customer',
+    password: '',
+  });
+  function change(event) {
+    setValues((current) => ({ ...current, [event.target.name]: event.target.value }));
+  }
+
+  return (
+    <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+      <form className="request-modal user-modal" onSubmit={(event) => { event.preventDefault(); onSubmit(values); }}>
+        <div className="modal-heading"><div><p className="eyebrow">{user ? 'EDIT ACCOUNT' : 'NEW ACCOUNT'}</p><h2>{user ? 'Update user' : 'Create user'}</h2></div><button type="button" className="icon-button" aria-label="Close dialog" onClick={onClose}><Icon name="close" /></button></div>
+        <label>Full name<input autoComplete="name" name="name" value={values.name} onChange={change} maxLength="100" required /></label>
+        <label>Email address<input autoComplete="email" name="email" type="email" value={values.email} onChange={change} maxLength="254" required /></label>
+        <div className="form-row">
+          <label>Account role<select name="role" value={values.role} onChange={change} required>
+            {managedUserRoles.map(([role, label]) => <option value={role} key={role}>{label}</option>)}
+            {user?.role === 'admin' && <option value="admin">Administrator</option>}
+          </select></label>
+          <label>Country<input name="country" value={values.country} onChange={change} maxLength="100" /></label>
+        </div>
+        <label>{user ? 'New password (optional)' : 'Temporary password'}<input autoComplete="new-password" name="password" type="password" value={values.password} onChange={change} minLength="8" maxLength="72" required={!user} placeholder={user ? 'Leave blank to keep current password' : 'At least 8 characters'} /></label>
+        {error && <p className="signin-message" role="alert">{error}</p>}
+        <button className="primary-button full-button" disabled={saving} type="submit">{saving ? 'Saving…' : user ? 'Save changes' : 'Create user'}</button>
+      </form>
+    </div>
+  );
+}
+
 export default function DashboardWorkspace({ initialRole }) {
   const navigate = useNavigate();
   const [section, setSection] = useState('overview');
   const [user, setUser] = useState(null);
   const [requests, setRequests] = useState([]);
   const [offers, setOffers] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [usersError, setUsersError] = useState('');
   const [loading, setLoading] = useState(true);
+  const [usersLoading, setUsersLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState('');
   const [error, setError] = useState('');
@@ -257,6 +311,8 @@ export default function DashboardWorkspace({ initialRole }) {
   const [formError, setFormError] = useState('');
   const [selectedRequestId, setSelectedRequestId] = useState('');
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [userModalOpen, setUserModalOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState(null);
   const [adminPeriod, setAdminPeriod] = useState('30 days');
   const [currentTime, setCurrentTime] = useState(dashboardLoadedAt);
   const [providerCountryFilter, setProviderCountryFilter] = useState('All');
@@ -333,16 +389,6 @@ export default function DashboardWorkspace({ initialRole }) {
     companies.set(providerId, company);
     return companies;
   }, new Map()).values()].sort((first, second) => second.offers - first.offers);
-  const adminUserRows = [
-    ...adminCustomerIds.map((id) => {
-      const request = adminRequests.find((item) => String(item.customer?._id || item.customer?.id) === id);
-      return { id, name: request?.customer?.name || 'Customer', type: 'Customer', activity: adminRequests.filter((item) => String(item.customer?._id || item.customer?.id) === id).length };
-    }),
-    ...adminProviderIds.map((id) => {
-      const offer = adminOffers.find((item) => String(item.provider?._id || item.provider?.id) === id);
-      return { id, name: offer?.provider?.name || 'Cargo provider', type: 'Cargo company', activity: adminOffers.filter((item) => String(item.provider?._id || item.provider?.id) === id).length };
-    }),
-  ].sort((first, second) => first.name.localeCompare(second.name));
   const adminPendingOffers = adminOffers.filter((offer) => offer.status === 'pending');
   const adminRecentRequests = [...adminRequests]
     .sort((first, second) => new Date(second.createdAt || 0) - new Date(first.createdAt || 0))
@@ -397,9 +443,9 @@ export default function DashboardWorkspace({ initialRole }) {
     const controller = new AbortController();
     apiRequest('/api/auth/me', { signal: controller.signal })
       .then(({ user: account }) => {
-        const accountRole = account.role === 'cargo_provider' ? 'provider' : account.role;
+        const accountRole = ['cargo_provider', 'individual_cargo'].includes(account.role) ? 'provider' : account.role;
         if (accountRole !== initialRole) {
-          navigate(account.role === 'cargo_provider' ? '/cargo/dashboard' : `/${account.role}/dashboard`, { replace: true });
+          navigate(['cargo_provider', 'individual_cargo'].includes(account.role) ? '/cargo/dashboard' : `/${account.role}/dashboard`, { replace: true });
           return;
         }
         setUser(account);
@@ -438,6 +484,23 @@ export default function DashboardWorkspace({ initialRole }) {
     return () => controller.abort();
   }, [user, providerMode]);
 
+  useEffect(() => {
+    if (!adminMode || section !== 'users') return undefined;
+    const controller = new AbortController();
+    getUsers({ signal: controller.signal })
+      .then(({ users: registeredUsers }) => setUsers(registeredUsers || []))
+      .catch((requestError) => {
+        if (requestError.name !== 'AbortError') {
+          setUsersError(requestError.message);
+          setError(requestError.message);
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setUsersLoading(false);
+      });
+    return () => controller.abort();
+  }, [adminMode, section]);
+
   async function refreshData() {
     const [requestResult, offerResult] = await Promise.all([
       getRequests(providerMode ? 'opportunities' : undefined),
@@ -445,6 +508,20 @@ export default function DashboardWorkspace({ initialRole }) {
     ]);
     setRequests(requestResult.requests || []);
     setOffers(offerResult.offers || []);
+  }
+
+  async function refreshUsers() {
+    setUsersLoading(true);
+    setUsersError('');
+    try {
+      const { users: registeredUsers } = await getUsers();
+      setUsers(registeredUsers || []);
+    } catch (requestError) {
+      setUsersError(requestError.message);
+      setError(requestError.message);
+    } finally {
+      setUsersLoading(false);
+    }
   }
 
   async function performMutation(id, action, successMessage) {
@@ -501,6 +578,53 @@ export default function DashboardWorkspace({ initialRole }) {
     } finally {
       setSaving(false);
     }
+  }
+
+  async function saveUser(values) {
+    setSaving(true);
+    setFormError('');
+    setError('');
+    setMessage('');
+    const payload = {
+      name: values.name.trim(),
+      email: values.email.trim(),
+      country: values.country.trim(),
+      role: values.role,
+    };
+    if (!editingUser || values.password) payload.password = values.password;
+    try {
+      const result = editingUser
+        ? await updateUser(editingUser.id, payload)
+        : await createUser(payload);
+      setUsers((current) => editingUser
+        ? current.map((account) => account.id === result.user.id ? result.user : account)
+        : [result.user, ...current]);
+      setUserModalOpen(false);
+      setEditingUser(null);
+      setMessage(editingUser ? 'User updated successfully.' : 'User created successfully.');
+    } catch (requestError) {
+      setFormError(requestError.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function removeUser(account) {
+    if (account.id === user?.id) {
+      setError('You cannot delete your own administrator account.');
+      return;
+    }
+    if (!window.confirm(`Delete user "${account.name}"? This cannot be undone.`)) return;
+    setBusyId(account.id);
+    setError('');
+    setMessage('');
+    deleteUser(account.id)
+      .then(() => {
+        setUsers((current) => current.filter((item) => item.id !== account.id));
+        setMessage('User deleted successfully.');
+      })
+      .catch((requestError) => setError(requestError.message))
+      .finally(() => setBusyId(''));
   }
 
   function deleteShippingRequest(request) {
@@ -607,7 +731,22 @@ export default function DashboardWorkspace({ initialRole }) {
     }
 
     if (adminMode && section === 'users') {
-      return <Card><CardHeading title="Users" subtitle="Customers and providers seen in live shipping activity." />{loading ? <p className="empty-table" role="status">Loading user activity…</p> : <div className="table-scroll"><table className="data-table"><thead><tr><th>Name</th><th>Account type</th><th>Activity in period</th></tr></thead><tbody>{adminUserRows.map((account) => <tr key={`${account.type}-${account.id}`}><td>{account.name}</td><td>{account.type}</td><td>{account.activity}</td></tr>)}{!adminUserRows.length && <tr><td className="empty-table" colSpan="3">No user activity in this period.</td></tr>}</tbody></table></div>}</Card>;
+      return <Card className="admin-users-card"><CardHeading title="Users" subtitle={`${users.length} registered account${users.length === 1 ? '' : 's'}`} action={<button className="primary-button" onClick={() => { setEditingUser(null); setFormError(''); setUserModalOpen(true); }}><Icon name="plus" size={15} />Create user</button>} />
+        {usersLoading ? <p className="empty-table" role="status">Loading registered users…</p> : usersError ? <div className="empty-state"><strong>Could not load registered users</strong><p>{usersError}</p><button className="small-primary" onClick={refreshUsers}>Try again</button></div> : <div className="table-scroll"><table className="data-table admin-users-table"><thead><tr><th>User</th><th>Email</th><th>Role</th><th>Country</th><th>Joined</th><th>Actions</th></tr></thead><tbody>
+          {users.map((account) => <tr key={account.id}>
+            <td><span className="table-primary">{account.name}</span></td>
+            <td>{account.email}</td>
+            <td><span className={`admin-user-role admin-user-role-${account.role}`}>{userRoleLabel(account.role)}</span></td>
+            <td>{account.country || '—'}</td>
+            <td>{account.createdAt ? new Date(account.createdAt).toLocaleDateString() : '—'}</td>
+            <td><div className="table-buttons">
+              <button className="icon-button table-action" aria-label={`Edit ${account.name}`} disabled={busyId === account.id} onClick={() => { setEditingUser(account); setFormError(''); setUserModalOpen(true); }}><Icon name="edit" size={16} /></button>
+              <button className="icon-button table-action" aria-label={`Delete ${account.name}`} disabled={busyId === account.id || account.id === user?.id} onClick={() => removeUser(account)}><Icon name="trash" size={16} /></button>
+            </div></td>
+          </tr>)}
+          {!users.length && <tr><td className="empty-table" colSpan="6">No registered users found.</td></tr>}
+        </tbody></table></div>}
+      </Card>;
     }
 
     if (adminMode && section === 'analytics') {
@@ -823,6 +962,10 @@ export default function DashboardWorkspace({ initialRole }) {
                   setMobileNavOpen(false);
                   return;
                 }
+                if (sectionId === 'users' && section !== 'users') {
+                  setUsersLoading(true);
+                  setUsersError('');
+                }
                 setSection(sectionId);
                 setSearch('');
                 setSelectedRequestId('');
@@ -875,6 +1018,7 @@ export default function DashboardWorkspace({ initialRole }) {
 
       {requestModalOpen && <RequestForm request={editingRequest} saving={saving} error={formError} onSubmit={saveRequest} onClose={() => { setRequestModalOpen(false); setEditingRequest(null); setFormError(''); }} />}
       {(offerRequest || editingOffer) && <OfferForm request={offerRequest || editingOffer?.request} offer={editingOffer} saving={saving} error={formError} onSubmit={saveOffer} onClose={() => { setOfferRequest(null); setEditingOffer(null); setFormError(''); }} />}
+      {userModalOpen && <UserForm user={editingUser} saving={saving} error={formError} onSubmit={saveUser} onClose={() => { setUserModalOpen(false); setEditingUser(null); setFormError(''); }} />}
     </div>
   );
 }

@@ -6,6 +6,7 @@ const { Server } = require('socket.io');
 require('dotenv').config();
 const authRoutes = require('./routes/auth');
 const requestRoutes = require('./routes/requests');
+const userRoutes = require('./routes/users');
 
 const app = express();
 const server = http.createServer(app);
@@ -24,6 +25,7 @@ app.use(cors({
 app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/requests', requestRoutes);
+app.use('/api/users', userRoutes);
 
 // Socket.io Setup (Real-Time)
 const io = new Server(server, {
