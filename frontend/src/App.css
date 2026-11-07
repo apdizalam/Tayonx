@@ -3646,6 +3646,15 @@ a:focus-visible {
   gap: 2px;
 }
 
+.admin-shell .sidebar-section-label {
+  margin: 13px 0 5px;
+  padding-left: 8px;
+  color: #7889a1;
+  font-family: var(--font-display);
+  font-size: 7px;
+  letter-spacing: 0.1em;
+}
+
 .admin-shell .nav-item {
   min-height: 27px;
   gap: 8px;
@@ -3697,7 +3706,7 @@ a:focus-visible {
 }
 
 .admin-shell .topbar-actions {
-  gap: 9px;
+  gap: 8px;
 }
 
 .admin-shell .customer-topbar-title strong {
@@ -3728,15 +3737,15 @@ a:focus-visible {
 }
 
 .admin-period-switch button {
-  min-height: 23px;
-  padding: 0 8px;
+  min-height: 26px;
+  padding: 0 10px;
   border: 0;
   border-radius: 3px;
   color: #64728a;
   background: transparent;
   cursor: pointer;
   font: inherit;
-  font-size: 8px;
+  font-size: 9px;
   font-weight: 600;
   white-space: nowrap;
 }
@@ -3749,7 +3758,7 @@ a:focus-visible {
 
 .admin-export-button {
   display: inline-flex;
-  min-height: 25px;
+  min-height: 29px;
   align-items: center;
   gap: 5px;
   padding: 0 8px;
@@ -3759,7 +3768,7 @@ a:focus-visible {
   background: #fff;
   cursor: pointer;
   font: inherit;
-  font-size: 8px;
+  font-size: 9px;
   font-weight: 600;
 }
 
@@ -3770,7 +3779,7 @@ a:focus-visible {
 
 .admin-dashboard-main {
   max-width: 1460px;
-  padding: 18px 18px 16px;
+  padding: 16px 18px 16px;
 }
 
 .admin-dashboard-content {
@@ -3783,6 +3792,36 @@ a:focus-visible {
   gap: 16px;
 }
 
+.admin-analytics-view {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.admin-unavailable-state {
+  display: flex;
+  min-height: 190px;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 8px;
+  padding: 24px;
+  text-align: center;
+}
+
+.admin-unavailable-state strong {
+  color: #0a1a33;
+  font-size: 13px;
+}
+
+.admin-unavailable-state p {
+  max-width: 460px;
+  margin: 0;
+  color: #64728a;
+  font-size: 10px;
+  line-height: 16px;
+}
+
 .admin-kpi-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -3792,7 +3831,7 @@ a:focus-visible {
 .admin-kpi {
   display: flex;
   min-width: 0;
-  min-height: 72px;
+  min-height: 86px;
   align-items: center;
   gap: 10px;
   padding: 10px 12px;
@@ -3925,7 +3964,12 @@ button.admin-kpi:hover {
   flex: none;
   place-items: center;
   border-radius: 50%;
-  background: conic-gradient(#10b981 0 53%, #1f6bff 53% 86%, #c2261c 86% 100%);
+  background: conic-gradient(
+    #10b981 0 var(--admin-request-complete, 0%),
+    #1f6bff var(--admin-request-complete, 0%) calc(var(--admin-request-complete, 0%) + var(--admin-request-open, 0%)),
+    #c2261c calc(var(--admin-request-complete, 0%) + var(--admin-request-open, 0%)) calc(var(--admin-request-complete, 0%) + var(--admin-request-open, 0%) + var(--admin-request-cancelled, 0%)),
+    #d5ddea calc(var(--admin-request-complete, 0%) + var(--admin-request-open, 0%) + var(--admin-request-cancelled, 0%)) 100%
+  );
 }
 
 .admin-donut > span {
@@ -3971,6 +4015,10 @@ button.admin-kpi:hover {
 
 .admin-legend > div > i.cancelled {
   background: #c2261c;
+}
+
+.admin-legend > div > i.progress {
+  background: #9daFCC;
 }
 
 .admin-legend > div > strong {
@@ -4126,6 +4174,38 @@ button.admin-kpi:hover {
   gap: 16px;
 }
 
+.admin-attention-count {
+  min-width: 20px;
+  padding: 3px 6px;
+  border-radius: 3px;
+  color: #c2261c;
+  background: #fde8e6;
+  font-size: 8px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.admin-attention-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.admin-attention-list .admin-attention-item {
+  align-items: center;
+}
+
+.admin-attention-list .admin-attention-item > .icon {
+  color: #a15c07;
+}
+
+.admin-empty-note {
+  margin: 0;
+  padding: 14px 11px;
+  color: #64728a;
+  font-size: 9px;
+  line-height: 14px;
+}
+
 .admin-latest-table th {
   padding: 8px 7px;
   background: #e9eef7;
@@ -4139,7 +4219,7 @@ button.admin-kpi:hover {
 }
 
 .admin-latest-table tbody tr {
-  cursor: pointer;
+  cursor: default;
 }
 
 .admin-latest-table tbody tr:hover {
@@ -4230,20 +4310,6 @@ button.admin-kpi:hover {
   color: #1559e0;
 }
 
-.admin-sample-note {
-  color: #64728a;
-  font-family: var(--font-mono);
-  font-size: 8px;
-  line-height: 12px;
-}
-
-.admin-sample-note > span {
-  padding: 2px 5px;
-  border-radius: 2px;
-  color: #7a450a;
-  background: #fef3dc;
-}
-
 .admin-users-summary {
   display: flex;
   align-items: center;
@@ -4316,13 +4382,13 @@ button.admin-kpi:hover {
     padding: 2px;
   }
 
-  .admin-period-switch button {
+  .admin-shell .topbar .admin-period-switch button {
     min-height: 21px;
     padding: 0 5px;
     font-size: 7px;
   }
 
-  .admin-export-button {
+  .admin-shell .topbar .admin-export-button {
     min-height: 23px;
     padding: 0 5px;
     font-size: 7px;
@@ -4348,6 +4414,10 @@ button.admin-kpi:hover {
     min-height: 62px;
     gap: 6px;
     padding: 6px;
+  }
+
+  .admin-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .admin-kpi-icon {

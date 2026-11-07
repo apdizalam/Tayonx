@@ -38,14 +38,36 @@ const roleConfig = {
   },
   admin: {
     label: 'Admin',
-    sections: [['overview', 'Overview', 'home'], ['requests', 'All requests', 'box'], ['offers', 'All offers', 'mail']],
+    sections: [
+      ['overview', 'Dashboard', 'home'],
+      ['requests', 'Requests', 'box'],
+      ['companies', 'Cargo companies', 'building'],
+      ['offers', 'Offers', 'mail'],
+      ['users', 'Users', 'users'],
+      ['messages', 'Chats & reports', 'chat'],
+      ['analytics', 'Analytics', 'chart'],
+      ['settings', 'Settings', 'user'],
+    ],
   },
 };
 
 const shipmentStatuses = ['open', 'offers_received', 'in_progress', 'purchased', 'shipping', 'delivered', 'cancelled'];
+const dashboardLoadedAt = Date.now();
 
 function statusLabel(status) {
   return status.replaceAll('_', ' ');
+}
+
+function formatRelativeTime(value, referenceTime) {
+  const timestamp = new Date(value || 0).getTime();
+  if (!Number.isFinite(timestamp) || timestamp <= 0) return 'Date unavailable';
+  const elapsedMinutes = Math.max(0, Math.floor((referenceTime - timestamp) / 60000));
+  if (elapsedMinutes < 1) return 'Just now';
+  if (elapsedMinutes < 60) return `${elapsedMinutes} min ago`;
+  const elapsedHours = Math.floor(elapsedMinutes / 60);
+  if (elapsedHours < 24) return `${elapsedHours} hr ago`;
+  const elapsedDays = Math.floor(elapsedHours / 24);
+  return elapsedDays < 7 ? `${elapsedDays} day${elapsedDays === 1 ? '' : 's'} ago` : new Date(timestamp).toLocaleDateString();
 }
 
 function StatusBadge({ children }) {
@@ -227,6 +249,8 @@ export default function DashboardWorkspace({ initialRole }) {
   const [formError, setFormError] = useState('');
   const [selectedRequestId, setSelectedRequestId] = useState('');
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [adminPeriod, setAdminPeriod] = useState('30 days');
+  const [currentTime, setCurrentTime] = useState(dashboardLoadedAt);
   const config = roleConfig[initialRole];
   const displayName = user?.name || config.label;
   const customerMode = initialRole === 'customer';
@@ -241,6 +265,9 @@ export default function DashboardWorkspace({ initialRole }) {
     messages: 'Chat',
     notifications: 'Notifications',
     profile: 'Profile',
+    users: 'Users',
+    analytics: 'Analytics',
+    settings: 'Settings',
   })[section], [section, adminMode, customerMode]);
   const requestStatusCounts = shipmentStatuses.map((status) => ({
     status,
@@ -248,7 +275,74 @@ export default function DashboardWorkspace({ initialRole }) {
   }));
   const activeShipments = requests.filter((request) => ['in_progress', 'purchased', 'shipping'].includes(request.status));
   const pendingOffers = offers.filter((offer) => offer.status === 'pending');
-  const sourceCountries = [...new Set(requests.map((request) => request.sourceCountry).filter(Boolean))];
+  const adminRangeStart = adminPeriod === 'All time'
+    ? 0
+    : currentTime - (adminPeriod === '7 days' ? 7 : 30) * 24 * 60 * 60 * 1000;
+  const adminRequests = adminMode
+    ? requests.filter((request) => new Date(request.createdAt || 0).getTime() >= adminRangeStart)
+    : requests;
+  const adminOffers = adminMode
+    ? offers.filter((offer) => new Date(offer.createdAt || 0).getTime() >= adminRangeStart)
+    : offers;
+  const adminRequestStatusCounts = shipmentStatuses.map((status) => ({
+    status,
+    count: adminRequests.filter((request) => request.status === status).length,
+  }));
+  const adminSourceCountries = [...new Set(adminRequests.map((request) => request.sourceCountry).filter(Boolean))];
+  const adminCustomerIds = [...new Set(adminRequests.map((request) => request.customer?._id || request.customer?.id).filter(Boolean).map(String))];
+  const adminProviderIds = [...new Set(adminOffers.map((offer) => offer.provider?._id || offer.provider?.id).filter(Boolean).map(String))];
+  const adminCustomers = new Set(adminCustomerIds);
+  const adminProviders = new Set(adminProviderIds);
+  const adminCompanyRows = [...adminOffers.reduce((companies, offer) => {
+    const providerId = String(offer.provider?._id || offer.provider?.id || '');
+    if (!providerId) return companies;
+    const company = companies.get(providerId) || {
+      id: providerId,
+      name: offer.provider?.name || 'Cargo company',
+      offers: 0,
+      pending: 0,
+      accepted: 0,
+    };
+    company.offers += 1;
+    if (offer.status === 'pending') company.pending += 1;
+    if (offer.status === 'accepted') company.accepted += 1;
+    companies.set(providerId, company);
+    return companies;
+  }, new Map()).values()].sort((first, second) => second.offers - first.offers);
+  const adminUserRows = [
+    ...adminCustomerIds.map((id) => {
+      const request = adminRequests.find((item) => String(item.customer?._id || item.customer?.id) === id);
+      return { id, name: request?.customer?.name || 'Customer', type: 'Customer', activity: adminRequests.filter((item) => String(item.customer?._id || item.customer?.id) === id).length };
+    }),
+    ...adminProviderIds.map((id) => {
+      const offer = adminOffers.find((item) => String(item.provider?._id || item.provider?.id) === id);
+      return { id, name: offer?.provider?.name || 'Cargo provider', type: 'Cargo company', activity: adminOffers.filter((item) => String(item.provider?._id || item.provider?.id) === id).length };
+    }),
+  ].sort((first, second) => first.name.localeCompare(second.name));
+  const adminPendingOffers = adminOffers.filter((offer) => offer.status === 'pending');
+  const adminRecentRequests = [...adminRequests]
+    .sort((first, second) => new Date(second.createdAt || 0) - new Date(first.createdAt || 0))
+    .slice(0, 4);
+  const adminAttentionRequests = adminRequests.filter((request) => {
+    const requestAge = currentTime - new Date(request.createdAt || currentTime).getTime();
+    return ['open', 'offers_received'].includes(request.status) && !(request.offers?.length) && requestAge >= 3 * 24 * 60 * 60 * 1000;
+  }).slice(0, 4);
+  const adminActivity = [
+    ...adminRequests.map((request) => ({
+      id: `request-${request._id}`,
+      title: `New request · ${request.product} × ${request.quantity}`,
+      detail: `${request.customer?.name || 'Customer'} · ${request.sourceCountry} to ${request.destination}`,
+      timestamp: request.createdAt,
+      tone: 'current',
+    })),
+    ...adminOffers.map((offer) => ({
+      id: `offer-${offer._id}`,
+      title: offer.status === 'accepted' ? `Offer accepted · ${offer.request.product}` : `Offer submitted · ${offer.request.product}`,
+      detail: `${offer.provider?.name || 'Cargo provider'} · ${new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(offer.price)}`,
+      timestamp: offer.status === 'accepted' ? offer.updatedAt || offer.createdAt : offer.createdAt,
+      tone: offer.status === 'accepted' ? 'success' : 'current',
+    })),
+  ].sort((first, second) => new Date(second.timestamp || 0) - new Date(first.timestamp || 0)).slice(0, 4);
   const recentRequests = [...requests]
     .sort((first, second) => new Date(second.createdAt || 0) - new Date(first.createdAt || 0))
     .slice(0, 5);
@@ -410,7 +504,8 @@ export default function DashboardWorkspace({ initialRole }) {
   }
 
   function exportRequests() {
-    const rows = [['ID', 'Customer', 'Product', 'Source', 'Destination', 'Quantity', 'Offers', 'Status'], ...requests.map((request) => [
+    const exportRows = adminMode && section === 'overview' ? adminRequests : requests;
+    const rows = [['ID', 'Customer', 'Product', 'Source', 'Destination', 'Quantity', 'Offers', 'Status'], ...exportRows.map((request) => [
       request._id, request.customer?.name || '', request.product, request.sourceCountry,
       request.destination, request.quantity, request.offers?.length || 0, request.status,
     ])];
@@ -421,7 +516,7 @@ export default function DashboardWorkspace({ initialRole }) {
     link.download = 'tayonx-shipping-requests.csv';
     link.click();
     window.setTimeout(() => URL.revokeObjectURL(url), 0);
-    setMessage(`${requests.length} shipping requests exported.`);
+    setMessage(`${exportRows.length} shipping requests exported.`);
   }
 
   function signOut() {
@@ -467,6 +562,32 @@ export default function DashboardWorkspace({ initialRole }) {
 
     if (section === 'requests') {
       return <Card><CardHeading title={title} subtitle={adminMode ? 'Review and manage requests across the marketplace.' : 'Create, edit, or cancel your shipping requests.'} action={customerMode ? <button className="primary-button" onClick={openCreateRequest}><Icon name="plus" size={16} />New request</button> : null} />{loading ? <p className="empty-table" role="status">Loading shipping requests…</p> : renderRequests(requests)}</Card>;
+    }
+
+    if (adminMode && section === 'companies') {
+      return <Card><CardHeading title="Cargo companies" subtitle="Providers with quotes in the selected dashboard period." />{loading ? <p className="empty-table" role="status">Loading cargo companies…</p> : <div className="table-scroll"><table className="data-table"><thead><tr><th>Company</th><th>Quotes</th><th>Pending</th><th>Accepted</th></tr></thead><tbody>{adminCompanyRows.map((company) => <tr key={company.id}><td><span className="table-primary">{company.name}</span><span className="table-secondary">Verified status is not available in this system.</span></td><td>{company.offers}</td><td>{company.pending}</td><td>{company.accepted}</td></tr>)}{!adminCompanyRows.length && <tr><td className="empty-table" colSpan="4">No cargo companies have submitted quotes in this period.</td></tr>}</tbody></table></div>}</Card>;
+    }
+
+    if (adminMode && section === 'users') {
+      return <Card><CardHeading title="Users" subtitle="Customers and providers seen in live shipping activity." />{loading ? <p className="empty-table" role="status">Loading user activity…</p> : <div className="table-scroll"><table className="data-table"><thead><tr><th>Name</th><th>Account type</th><th>Activity in period</th></tr></thead><tbody>{adminUserRows.map((account) => <tr key={`${account.type}-${account.id}`}><td>{account.name}</td><td>{account.type}</td><td>{account.activity}</td></tr>)}{!adminUserRows.length && <tr><td className="empty-table" colSpan="3">No user activity in this period.</td></tr>}</tbody></table></div>}</Card>;
+    }
+
+    if (adminMode && section === 'analytics') {
+      return <div className="admin-analytics-view"><div className="admin-kpi-grid">
+        <article className="admin-kpi admin-kpi-blue"><span className="admin-kpi-icon"><Icon name="box" size={16} /></span><span className="admin-kpi-content"><strong>{loading ? '—' : adminRequests.length}</strong><span>Requests</span><small>Selected period</small></span></article>
+        <article className="admin-kpi admin-kpi-green"><span className="admin-kpi-icon"><Icon name="check" size={16} /></span><span className="admin-kpi-content"><strong>{loading ? '—' : adminOffers.filter((offer) => offer.status === 'accepted').length}</strong><span>Accepted offers</span><small>Live database total</small></span></article>
+        <article className="admin-kpi admin-kpi-blue"><span className="admin-kpi-icon"><Icon name="mail" size={16} /></span><span className="admin-kpi-content"><strong>{loading ? '—' : adminOffers.length}</strong><span>Offers submitted</span><small>Selected period</small></span></article>
+        <article className="admin-kpi admin-kpi-amber"><span className="admin-kpi-icon"><Icon name="clock" size={16} /></span><span className="admin-kpi-content"><strong>{loading ? '—' : adminPendingOffers.length}</strong><span>Awaiting response</span><small>Live database total</small></span></article>
+      </div><div className="admin-insights-grid">
+        <Card className="admin-insight-card"><CardHeading title="Requests by status" /><div className="admin-source-content">{adminRequestStatusCounts.filter((item) => item.count > 0).map((item) => <div className="admin-source-item" key={item.status}><span>{statusLabel(item.status)}</span><strong>{item.count}</strong><i><b style={{ width: `${adminRequests.length ? (item.count / adminRequests.length) * 100 : 0}%` }} /></i></div>)}{!adminRequests.length && <p>No request activity recorded in this period.</p>}</div></Card>
+        <Card className="admin-insight-card"><CardHeading title="Requests by source" /><div className="admin-source-content">{adminSourceCountries.map((country) => { const count = adminRequests.filter((request) => request.sourceCountry === country).length; return <div className="admin-source-item" key={country}><span>{country}</span><strong>{adminRequests.length ? `${Math.round((count / adminRequests.length) * 100)}%` : '0%'}</strong><i><b style={{ width: `${adminRequests.length ? (count / adminRequests.length) * 100 : 0}%` }} /></i></div>; })}{!adminSourceCountries.length && <p>No source country data in this period.</p>}</div></Card>
+        <Card className="admin-insight-card"><CardHeading title="Offer funnel" /><div className="admin-source-content"><div className="admin-source-item"><span>Requests with offers</span><strong>{adminRequests.filter((request) => request.offers?.length).length}</strong><i><b style={{ width: `${adminRequests.length ? (adminRequests.filter((request) => request.offers?.length).length / adminRequests.length) * 100 : 0}%` }} /></i></div><div className="admin-source-item"><span>Offers accepted</span><strong>{adminOffers.filter((offer) => offer.status === 'accepted').length}</strong><i><b style={{ width: `${adminOffers.length ? (adminOffers.filter((offer) => offer.status === 'accepted').length / adminOffers.length) * 100 : 0}%` }} /></i></div><div className="admin-source-item"><span>Delivered</span><strong>{adminRequestStatusCounts.find((item) => item.status === 'delivered')?.count || 0}</strong></div></div></Card>
+      </div></div>;
+    }
+
+    if (adminMode && ['messages', 'settings'].includes(section)) {
+      const feature = section === 'messages' ? 'Chats and reports' : 'Admin settings';
+      return <Card><CardHeading title={feature} /><div className="admin-unavailable-state"><strong>{feature} are not connected yet</strong><p>The current backend does not provide {section === 'messages' ? 'chat or report-management' : 'admin settings'} endpoints. No sample records are shown here.</p></div></Card>;
     }
 
     if (customerMode && section === 'companies') {
@@ -578,20 +699,46 @@ export default function DashboardWorkspace({ initialRole }) {
       <div className="admin-dashboard">
         <div className="admin-kpi-grid">
           {[
-            ['Total requests', requests.length, 'box', 'admin-kpi-blue'],
-            ['Active shipments', activeShipments.length, 'package', 'admin-kpi-green'],
-            ['Offers submitted', offers.length, 'mail', 'admin-kpi-blue'],
-            ['Awaiting review', pendingOffers.length, 'clock', 'admin-kpi-amber'],
-          ].map(([label, value, icon, tone]) => <article className={`admin-kpi ${tone}`} key={label}><span className="admin-kpi-icon"><Icon name={icon} size={16} /></span><span className="admin-kpi-content"><strong>{value}</strong><span>{label}</span><small>Live database total</small></span></article>)}
+            ['Customers', adminCustomers.size, 'users', 'admin-kpi-blue', 'Customers with requests'],
+            ['Cargo companies', adminProviders.size, 'building', 'admin-kpi-green', 'Companies with quotes'],
+            ['Requests', adminRequests.length, 'box', 'admin-kpi-blue', 'Shipping requests'],
+            ['Awaiting response', adminPendingOffers.length, 'clock', 'admin-kpi-amber', 'Pending offers'],
+          ].map(([label, value, icon, tone, note]) => <article className={`admin-kpi ${tone}`} key={label} aria-busy={loading}><span className="admin-kpi-icon"><Icon name={icon} size={16} /></span><span className="admin-kpi-content"><strong>{loading ? '—' : value}</strong><span>{label}</span><small>{loading ? 'Loading live data…' : note}</small></span></article>)}
         </div>
         <div className="admin-insights-grid">
-          <Card className="admin-insight-card"><CardHeading title="Requests by status" /><div className="admin-source-content">{requestStatusCounts.filter((item) => item.count > 0).map((item) => <div className="admin-source-item" key={item.status}><span>{statusLabel(item.status)}</span><strong>{item.count}</strong><i><b style={{ width: `${requests.length ? (item.count / requests.length) * 100 : 0}%` }} /></i></div>)}{!requests.length && <p>No request activity recorded yet.</p>}</div></Card>
-          <Card className="admin-insight-card"><CardHeading title="Source countries" /><div className="admin-source-content">{sourceCountries.map((country) => <div className="admin-source-item" key={country}><span>{country}</span><strong>{requests.filter((request) => request.sourceCountry === country).length}</strong><i><b style={{ width: `${requests.length ? (requests.filter((request) => request.sourceCountry === country).length / requests.length) * 100 : 0}%` }} /></i></div>)}{!sourceCountries.length && <p>No source country data yet.</p>}</div></Card>
-          <Card className="admin-insight-card"><CardHeading title="Offer decisions" /><div className="admin-source-content"><div className="admin-source-item"><span>Pending</span><strong>{pendingOffers.length}</strong></div><div className="admin-source-item"><span>Accepted</span><strong>{offers.filter((offer) => offer.status === 'accepted').length}</strong></div><div className="admin-source-item"><span>Declined</span><strong>{offers.filter((offer) => offer.status === 'declined').length}</strong></div></div></Card>
+          <Card className="admin-insight-card"><CardHeading title="Requests overview" action={<span className="admin-caption">{loading ? 'Loading…' : `${adminRequests.length} in period`}</span>} /><div className="admin-request-overview">
+            <div className="admin-donut" style={{ '--admin-request-complete': `${adminRequests.length ? ((adminRequestStatusCounts.find((item) => item.status === 'delivered')?.count || 0) / adminRequests.length) * 100 : 0}%`, '--admin-request-open': `${adminRequests.length ? (adminRequestStatusCounts.filter((item) => ['open', 'offers_received'].includes(item.status)).reduce((total, item) => total + item.count, 0) / adminRequests.length) * 100 : 0}%`, '--admin-request-cancelled': `${adminRequests.length ? ((adminRequestStatusCounts.find((item) => item.status === 'cancelled')?.count || 0) / adminRequests.length) * 100 : 0}%` }}>
+              <span>{adminRequests.length ? `${Math.round(((adminRequestStatusCounts.find((item) => item.status === 'delivered')?.count || 0) / adminRequests.length) * 100)}%` : '—'}</span>
+            </div>
+            <div className="admin-legend">
+              <div><i className="complete" />Completed<strong>{adminRequestStatusCounts.find((item) => item.status === 'delivered')?.count || 0}</strong></div>
+              <div><i className="open" />Open<strong>{adminRequestStatusCounts.filter((item) => ['open', 'offers_received'].includes(item.status)).reduce((total, item) => total + item.count, 0)}</strong></div>
+              <div><i className="cancelled" />Cancelled<strong>{adminRequestStatusCounts.find((item) => item.status === 'cancelled')?.count || 0}</strong></div>
+              <div><i className="progress" />In progress<strong>{adminRequestStatusCounts.filter((item) => ['in_progress', 'purchased', 'shipping'].includes(item.status)).reduce((total, item) => total + item.count, 0)}</strong></div>
+            </div>
+          </div></Card>
+          <Card className="admin-insight-card"><CardHeading title="Requests by source" /><div className="admin-source-content">{adminSourceCountries.map((country) => {
+            const count = adminRequests.filter((request) => request.sourceCountry === country).length;
+            const abbreviation = country.split(/\s+/).map((part) => part[0] || '').join('').slice(0, 2).toUpperCase();
+            return <div className="admin-source-item" key={country}><span><b>{abbreviation}</b>{country}</span><strong>{adminRequests.length ? `${Math.round((count / adminRequests.length) * 100)}%` : '0%'}</strong><i><b style={{ width: `${adminRequests.length ? (count / adminRequests.length) * 100 : 0}%` }} /></i></div>;
+          })}{!adminSourceCountries.length && <p>No source country data in this period.</p>}</div></Card>
+          <Card className="admin-insight-card"><CardHeading title="Recent activity" action={<button className="link-button" onClick={() => setSection('requests')}>All <Icon name="arrow" size={14} /></button>} />{loading ? <p className="empty-table" role="status">Loading recent activity…</p> : adminActivity.length ? <ul className="admin-activity-list">{adminActivity.map((activity) => <li className={activity.tone} key={activity.id}><i /><span><strong>{activity.title}</strong><small>{activity.detail} · {formatRelativeTime(activity.timestamp, currentTime)}</small></span></li>)}</ul> : <p className="admin-empty-note">No marketplace activity in this period.</p>}</Card>
         </div>
         <div className="admin-lower-grid">
-          <Card className="admin-latest-card"><CardHeading title="Latest marketplace requests" action={<button className="link-button" onClick={() => setSection('requests')}>View all <Icon name="arrow" size={14} /></button>} />{loading ? <p className="empty-table" role="status">Loading marketplace data…</p> : renderRequests(requests.slice(0, 6))}</Card>
-          <Card className="admin-attention-card"><CardHeading title="Latest offers" action={<button className="link-button" onClick={() => setSection('offers')}>View all <Icon name="arrow" size={14} /></button>} />{loading ? <p className="empty-table" role="status">Loading offers…</p> : <OffersTable offers={offers.slice(0, 4)} role="admin" busyId={busyId} onEdit={(offer) => { setEditingOffer(offer); setOfferRequest(null); setFormError(''); }} onDelete={deleteCargoOffer} onRespond={handleOfferResponse} onStatusChange={handleStatusChange} />}</Card>
+          <Card className="admin-latest-card">
+            <CardHeading title="Latest requests" action={<button className="link-button" onClick={() => setSection('requests')}>View all <Icon name="arrow" size={14} /></button>} />
+            {loading ? <p className="empty-table" role="status">Loading requests…</p> : <div className="table-scroll"><table className="data-table admin-latest-table"><thead><tr><th>ID</th><th>Customer</th><th>Product</th><th>Source</th><th>Offers</th><th>Status</th><th>Actions</th></tr></thead><tbody>
+              {adminRecentRequests.map((request) => <tr key={request._id}>
+                <td className="admin-request-id">REQ-{request._id.slice(-4).toUpperCase()}</td><td>{request.customer?.name || 'Customer'}</td><td>{request.product} · {request.quantity}</td><td>{request.sourceCountry}</td><td>{request.offers?.length || 0}</td><td><StatusBadge>{request.status}</StatusBadge></td>
+                <td><div className="table-buttons"><button className="icon-button table-action" aria-label={`Edit ${request.product}`} onClick={() => { setEditingRequest(request); setRequestModalOpen(true); setFormError(''); }}><Icon name="edit" size={14} /></button><button className="icon-button table-action" aria-label={`Delete ${request.product}`} disabled={busyId === request._id} onClick={() => deleteShippingRequest(request)}><Icon name="trash" size={14} /></button></div></td>
+              </tr>)}
+              {!adminRecentRequests.length && <tr><td className="empty-table" colSpan="7">No requests in this period.</td></tr>}
+            </tbody></table></div>}
+          </Card>
+          <Card className="admin-attention-card">
+            <CardHeading title="Needs attention" action={<span className="admin-attention-count">{loading ? '—' : adminAttentionRequests.length}</span>} />
+            {loading ? <p className="empty-table" role="status">Checking open requests…</p> : adminAttentionRequests.length ? <div className="admin-attention-list">{adminAttentionRequests.map((request) => <div className="admin-attention-item" key={request._id}><Icon name="clock" size={15} /><span><strong>Request without offers for 3+ days</strong><small>{request.product} · {request.sourceCountry} to {request.destination}</small></span><button className="customer-outline-button" onClick={() => { setSearch(request.product); setSection('requests'); }}>Review</button></div>)}</div> : <p className="admin-empty-note">No aged open requests without offers.</p>}
+          </Card>
         </div>
       </div>
     );
@@ -607,6 +754,7 @@ export default function DashboardWorkspace({ initialRole }) {
         <nav className="side-nav" aria-label={`${config.label} navigation`}>
           {config.sections.map(([sectionId, label, icon]) => (
             <Fragment key={sectionId}>
+              {adminMode && sectionId === 'settings' && <span className="sidebar-section-label">SYSTEM</span>}
               <button className={`nav-item${section === sectionId ? ' active' : ''}`} onClick={() => {
                 if (sectionId === 'new-request') {
                   openCreateRequest();
@@ -634,7 +782,18 @@ export default function DashboardWorkspace({ initialRole }) {
           <button className="mobile-menu icon-button" aria-label="Open navigation" onClick={() => setMobileNavOpen(true)}><Icon name="menu" /></button>
           <div className="customer-topbar-title"><strong>{title}</strong><span>Welcome back, {displayName}</span></div>
           <div className="topbar-actions">
-            {adminMode && <button className="admin-export-button" onClick={exportRequests}><Icon name="download" size={13} />Export</button>}
+            {adminMode && section === 'overview' && <div className="admin-period-switch" role="group" aria-label="Filter dashboard period">
+              {['7 days', '30 days', 'All time'].map((period) => <button
+                className={adminPeriod === period ? 'active' : ''}
+                aria-pressed={adminPeriod === period}
+                key={period}
+                onClick={() => {
+                  setCurrentTime(Date.now());
+                  setAdminPeriod(period);
+                }}
+              >{period}</button>)}
+            </div>}
+            {adminMode && <button className="admin-export-button" onClick={exportRequests} disabled={loading}><Icon name="download" size={13} />Export</button>}
             {(section === 'requests' || section === 'opportunities') && <label className="search-box"><Icon name="search" size={17} /><input aria-label="Search requests" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search requests…" /></label>}
             {customerMode && <button className="notification-button" aria-label={`${pendingOffers.length} pending offer notifications`} title="Notifications" onClick={() => setSection('notifications')}><Icon name="bell" size={16} />{pendingOffers.length > 0 && <i />}</button>}
             {customerMode && section === 'overview' && <button className="primary-button" onClick={openCreateRequest}><Icon name="plus" size={16} />New request</button>}
