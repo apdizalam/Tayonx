@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import logo from './assets/tayonx-logo.png';
 import './App.css';
 
@@ -11,11 +11,13 @@ const roles = {
     initials: 'AH',
     descriptor: 'Customer workspace',
     navigation: [
-      ['overview', 'Overview', 'grid'],
+      ['overview', 'Dashboard', 'home'],
       ['requests', 'My requests', 'box'],
-      ['offers', 'Offers to review', 'send'],
-      ['companies', 'Companies', 'building'],
-      ['messages', 'Messages', 'chat'],
+      ['new-request', 'New request', 'plus'],
+      ['companies', 'Cargo companies', 'building'],
+      ['messages', 'Chat', 'chat'],
+      ['notifications', 'Notifications', 'bell'],
+      ['profile', 'Profile', 'user'],
     ],
   },
   provider: {
@@ -81,6 +83,12 @@ function Icon({ name, size = 20 }) {
     shield: <><path d="M12 22s8-4 8-11V5l-8-3-8 3v6c0 7 8 11 8 11Z" /><path d="m9 12 2 2 4-4" /></>,
     chart: <><path d="M3 3v18h18M18 17V9m-5 8V5m-5 12v-5" /></>,
     bell: <><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9m-8 12h4" /></>,
+    home: <><path d="m3 10 9-7 9 7" /><path d="M5 9v11h14V9M9 20v-6h6v6" /></>,
+    user: <><circle cx="12" cy="8" r="4" /><path d="M5 21a7 7 0 0 1 14 0" /></>,
+    laptop: <><path d="M4 5h16v12H4zM2 20h20" /></>,
+    headphones: <><path d="M3 13v-2a9 9 0 0 1 18 0v2" /><path d="M5 13h3v7H6a3 3 0 0 1-3-3v-2a2 2 0 0 1 2-2Zm14 0h-3v7h2a3 3 0 0 0 3-3v-2a2 2 0 0 0-2-2Z" /></>,
+    package: <><path d="M4 7h16v14H4zM3 7l2-4h14l2 4M12 7v14" /></>,
+    mail: <><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 7 9 6 9-6" /></>,
     plus: <><path d="M12 5v14M5 12h14" /></>,
     arrow: <><path d="M5 12h14m-6-6 6 6-6 6" /></>,
     dots: <><circle cx="5" cy="12" r="1" /><circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /></>,
@@ -219,42 +227,113 @@ function OverviewChart() {
   );
 }
 
-function Overview({ role, onNavigate, onAction, search, verifiedCompanies }) {
-  if (role === 'customer') {
-    return (
-      <>
-        <div className="stats-grid">
-          <StatCard label="Active requests" value="3" change="+1 this month" icon="box" />
-          <StatCard label="Offers to review" value="6" change="+2 new today" icon="send" tone="green" />
-          <StatCard label="Orders in progress" value="1" change="On schedule" icon="clock" tone="amber" />
-          <StatCard label="Completed orders" value="12" change="+3 this month" icon="check" tone="navy" />
-        </div>
-        <div className="dashboard-columns">
-          <Card className="wide-card">
-            <CardHeading title="Recent requests" subtitle="Keep track of your sourcing requests" action={<button className="link-button" onClick={() => onNavigate('requests')}>View all <Icon name="arrow" size={16} /></button>} />
-            <RequestTable
-              rows={customerRequests}
-              onSelect={role === 'admin' ? () => onAction('request:details') : onNavigate}
-              search={search}
-            />
-          </Card>
-          <Card>
-            <CardHeading title="Recent activity" action={<button className="icon-button" aria-label="More activity"><Icon name="dots" /></button>} />
-            <ActivityFeed items={[
-              { title: 'New offer received', detail: 'Muna Logistics · TX-2048', time: '12 min', tone: 'blue' },
-              { title: 'Request is now in progress', detail: 'Cotton fabric · TX-2041', time: '2 hr', tone: 'green' },
-              { title: 'Message from Orient Cargo', detail: 'Customs are included in the offer.', time: 'Yesterday', tone: 'amber' },
-            ]} />
-            <button className="secondary-button full-button" onClick={() => onNavigate('messages')}>Open messages <Icon name="arrow" size={16} /></button>
-          </Card>
-        </div>
-        <Card className="welcome-strip">
-          <div className="welcome-mark"><Icon name="globe" size={23} /></div>
-          <div><strong>Ready to source something new?</strong><p>Tell verified cargo companies what you need and compare offers in one place.</p></div>
-          <button className="secondary-button" onClick={() => onAction('new-request')}>Create a request <Icon name="arrow" size={16} /></button>
+function CustomerDashboard({ onNavigate, onAction }) {
+  const requests = [
+    { name: 'Laptops · 50 pcs', detail: 'From China · posted Nov 4, 2026', icon: 'laptop', status: '3 offers', tone: 'info' },
+    { name: 'Wireless earbuds · 200 pcs', detail: 'From China · Oct 30, 2026', icon: 'headphones', status: 'In progress', tone: 'warning' },
+    { name: 'Textiles · 2 rolls', detail: 'From Turkey · Oct 12, 2026', icon: 'package', status: 'Delivered', tone: 'success' },
+  ];
+  const companies = [
+    { initials: 'GC', name: 'Global Cargo Trade', meta: '4.8 (120 reviews) · China', tone: 'navy' },
+    { initials: 'IS', name: 'Istanbul Express Cargo', meta: '4.6 (84 reviews) · Turkey', tone: 'blue' },
+  ];
+  const chats = [
+    { initials: 'GC', name: 'Global Cargo Trade', message: 'Yes! We can help you. Please tell us the model...', time: '10:22', unread: true },
+    { initials: 'IS', name: 'Istanbul Express Cargo', message: 'Fabric samples are ready.', time: 'Yesterday', unread: false },
+  ];
+
+  return (
+    <div className="customer-dashboard">
+      <div className="customer-stats-grid">
+        {[
+          { label: 'Active requests', value: '2', icon: 'box' },
+          { label: 'Offers waiting', value: '3', icon: 'mail' },
+          { label: 'Active chat', value: '1', icon: 'chat' },
+          { label: 'Completed', value: '1', icon: 'check' },
+        ].map((stat) => (
+          <article className="customer-stat-card" key={stat.label}>
+            <span className="customer-stat-icon"><Icon name={stat.icon} size={17} /></span>
+            <div><strong>{stat.value}</strong><span>{stat.label}</span></div>
+          </article>
+        ))}
+      </div>
+
+      <section className="offers-notice">
+        <Icon name="mail" size={18} />
+        <div><strong>3 offers for “50 × laptops”</strong><span>Compare price, delivery time and rating before you accept.</span></div>
+        <button className="small-primary" onClick={() => onNavigate('offers')}>Compare offers</button>
+      </section>
+
+      <div className="customer-dashboard-grid customer-dashboard-grid-main">
+        <Card className="customer-list-card">
+          <CardHeading
+            title="My recent requests"
+            action={<button className="link-button" onClick={() => onNavigate('requests')}>View all <Icon name="arrow" size={15} /></button>}
+          />
+          <div className="customer-request-list">
+            {requests.map((request) => (
+              <button className="customer-request-row" key={request.name} onClick={() => onNavigate('requests')}>
+                <span className="customer-request-icon"><Icon name={request.icon} size={19} /></span>
+                <span className="customer-row-copy"><strong>{request.name}</strong><small>{request.detail}</small></span>
+                <span className={`customer-status customer-status-${request.tone}`}>{request.status}</span>
+              </button>
+            ))}
+          </div>
         </Card>
-      </>
-    );
+
+        <Card className="customer-tracking-card">
+          <CardHeading title="Tracking: earbuds" action={<span className="customer-status customer-status-warning">In progress</span>} />
+          <ol className="shipment-tracking">
+            <li className="complete"><i /><span><strong>Offer accepted</strong><small>Global Cargo Trade · Oct 31</small></span></li>
+            <li className="complete"><i /><span><strong>Goods purchased</strong><small>Shenzhen · Nov 2</small></span></li>
+            <li className="current"><i /><span><strong>Shipping to Berbera</strong><small>Est. arrival · Confirm</small></span></li>
+            <li><i /><span><strong>Delivered to Hargeisa</strong></span></li>
+          </ol>
+        </Card>
+      </div>
+
+      <div className="customer-dashboard-grid customer-dashboard-grid-secondary">
+        <Card className="customer-list-card">
+          <CardHeading
+            title="Top cargo companies"
+            action={<button className="link-button" onClick={() => onNavigate('companies')}>View all <Icon name="arrow" size={15} /></button>}
+          />
+          <div className="customer-compact-list">
+            {companies.map((company) => (
+              <div className="customer-company-row" key={company.name}>
+                <Avatar initials={company.initials} className={`customer-company-avatar ${company.tone}`} />
+                <span className="customer-row-copy"><strong>{company.name} <i>✓ Verified</i></strong><small><b>★</b> {company.meta}</small></span>
+                <button className="customer-outline-button" onClick={() => { onNavigate('messages'); onAction('message:opened'); }}>Chat</button>
+              </div>
+            ))}
+          </div>
+        </Card>
+
+        <Card className="customer-list-card">
+          <CardHeading
+            title="Recent chats"
+            action={<button className="link-button" onClick={() => onNavigate('messages')}>Open chat <Icon name="arrow" size={15} /></button>}
+          />
+          <div className="customer-compact-list">
+            {chats.map((chat) => (
+              <button className="customer-chat-row" key={chat.name} onClick={() => onNavigate('messages')}>
+                <Avatar initials={chat.initials} className={`customer-company-avatar ${chat.initials === 'GC' ? 'navy' : 'blue'}`} />
+                <span className="customer-row-copy"><strong>{chat.name}</strong><small>{chat.message}</small></span>
+                <span className="customer-chat-time">{chat.time}{chat.unread && <i>1</i>}</span>
+              </button>
+            ))}
+          </div>
+        </Card>
+      </div>
+
+      <p className="customer-sample-note">All names and numbers are <span>SAMPLE</span> data from the concept.</p>
+    </div>
+  );
+}
+
+function Overview({ role, onNavigate, onAction, verifiedCompanies }) {
+  if (role === 'customer') {
+    return <CustomerDashboard onNavigate={onNavigate} onAction={onAction} />;
   }
 
   if (role === 'provider') {
@@ -727,7 +806,7 @@ function App() {
   }, [isLoginRoute, isRegisterRoute]);
   const pageDetails = useMemo(() => {
     const titles = {
-      overview: ['Good morning,', 'Here’s what’s happening with your marketplace today.'],
+      overview: ['Dashboard', 'Welcome back, Abdi Hassan'],
       requests: ['Requests', 'Keep every sourcing request moving forward.'],
       companies: ['Cargo companies', 'Discover verified partners for your next order.'],
       messages: ['Messages', 'Your conversations with customers and cargo partners.'],
@@ -743,6 +822,11 @@ function App() {
   }, [activeRole, activeSection]);
 
   function navigate(section) {
+    if (section === 'new-request') {
+      handleAction('new-request');
+      setMobileNavOpen(false);
+      return;
+    }
     setActiveSection(section);
     setMobileNavOpen(false);
   }
@@ -768,6 +852,8 @@ function App() {
       setMessage(action === 'message:sent' ? 'Message sent.' : 'Conversation opened.');
     } else if (action.startsWith('profile:')) {
       setMessage('Profile editing will be available when your account is connected.');
+    } else if (action === 'notifications') {
+      setMessage('You have 3 unread notifications.');
     } else {
       setMessage('Request details opened.');
     }
@@ -781,7 +867,7 @@ function App() {
 
   function renderSection() {
     if (activeSection === 'overview') {
-      return <Overview role={activeRole} onNavigate={navigate} onAction={handleAction} search={search} verifiedCompanies={verifiedCompanies} />;
+      return <Overview role={activeRole} onNavigate={navigate} onAction={handleAction} verifiedCompanies={verifiedCompanies} />;
     }
     if (activeSection === 'requests') return <RequestsPage role={activeRole} search={search} onNavigate={navigate} onAction={handleAction} />;
     if (activeSection === 'offers' && activeRole === 'customer') return <CustomerOffersPage onAction={handleAction} />;
@@ -799,6 +885,8 @@ function App() {
     ? `${pageDetails[0]} ${currentRole.name.split(' ')[0]}`
     : pageDetails[0];
   const showSearch = ['overview', 'requests', 'opportunities', 'verification'].includes(activeSection);
+  const customerMode = activeRole === 'customer';
+  const customerDashboardHeader = customerMode && activeSection === 'overview';
   const headerAction = activeRole === 'customer' && ['overview', 'requests'].includes(activeSection)
     ? <button className="primary-button" onClick={() => handleAction('new-request')}><Icon name="plus" size={17} />New request</button>
     : activeRole === 'provider' && activeSection === 'opportunities'
@@ -814,28 +902,44 @@ function App() {
   }
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell${customerMode ? ' customer-shell' : ''}`}>
       <aside className={`sidebar${mobileNavOpen ? ' sidebar-open' : ''}`}>
         <a className="sidebar-brand" href="#home" aria-label="Tayonx dashboard home" onClick={() => navigate('overview')}><img src={logo} alt="Tayonx" /></a>
-        <div className="workspace-label">WORKSPACE</div>
-        <div className="role-switcher" aria-label="Choose dashboard">
-          {Object.entries(roles).map(([role, config]) => (
-            <button className={`role-switch${activeRole === role ? ' active' : ''}`} key={role} onClick={() => selectRole(role)}>
-              <Avatar initials={config.initials} className="role-avatar" /><span>{config.label}</span>{activeRole === role && <span className="active-role-dot" />}
-            </button>
-          ))}
-        </div>
-        <div className="nav-divider" />
-        <p className="nav-caption">{currentRole.descriptor}</p>
+        {customerMode ? (
+          <div className="customer-role-label">CUSTOMER</div>
+        ) : (
+          <>
+            <div className="workspace-label">WORKSPACE</div>
+            <div className="role-switcher" aria-label="Choose dashboard">
+              {Object.entries(roles).map(([role, config]) => (
+                <button className={`role-switch${activeRole === role ? ' active' : ''}`} key={role} onClick={() => selectRole(role)}>
+                  <Avatar initials={config.initials} className="role-avatar" /><span>{config.label}</span>{activeRole === role && <span className="active-role-dot" />}
+                </button>
+              ))}
+            </div>
+            <div className="nav-divider" />
+            <p className="nav-caption">{currentRole.descriptor}</p>
+          </>
+        )}
         <nav className="side-nav" aria-label={`${currentRole.label} navigation`}>
           {currentRole.navigation.map(([section, label, icon]) => (
-            <button className={`nav-item${activeSection === section ? ' active' : ''}`} key={section} onClick={() => navigate(section)}>
-              <Icon name={icon} size={19} /><span>{label}</span>{label === 'Messages' && <i className="nav-count">2</i>}
-            </button>
+            <Fragment key={section}>
+              {customerMode && section === 'profile' && <p className="nav-caption customer-account-caption">Account</p>}
+              <button
+                className={`nav-item${activeSection === section ? ' active' : ''}`}
+                key={section}
+                onClick={() => section === 'notifications' ? handleAction('notifications') : navigate(section)}
+              >
+                <Icon name={icon} size={customerMode ? 16 : 19} />
+                <span>{label}</span>
+                {section === 'messages' && <i className="nav-count">{customerMode ? '1' : '2'}</i>}
+                {section === 'notifications' && <i className="nav-count">3</i>}
+              </button>
+            </Fragment>
           ))}
         </nav>
         <div className="sidebar-bottom">
-          <div className="sidebar-help"><span><Icon name="shield" size={18} /></span><div><b>Need a hand?</b><small>Visit our help center</small></div><Icon name="arrow" size={15} /></div>
+          {!customerMode && <div className="sidebar-help"><span><Icon name="shield" size={18} /></span><div><b>Need a hand?</b><small>Visit our help center</small></div><Icon name="arrow" size={15} /></div>}
           {showDropdown && (
             <div className="account-dropdown" role="menu">
               <button className="signout-button" onClick={handleSignOut} role="menuitem">
@@ -843,7 +947,9 @@ function App() {
               </button>
             </div>
           )}
-          <div className="sidebar-user">
+          {customerMode ? (
+            <button className="customer-signout" onClick={handleSignOut}><Icon name="arrow" size={15} />Log out</button>
+          ) : <div className="sidebar-user">
             <Avatar initials={currentRole.initials} />
             <span><b>{currentRole.name}</b><small>{currentRole.label}</small></span>
             <button
@@ -855,7 +961,7 @@ function App() {
             >
               <Icon name="dots" size={18} />
             </button>
-          </div>
+          </div>}
         </div>
       </aside>
 
@@ -863,19 +969,25 @@ function App() {
       <div className="app-main">
         <header className="topbar">
           <button className="mobile-menu icon-button" aria-label="Open navigation" onClick={() => setMobileNavOpen(true)}><Icon name="menu" /></button>
-          <div className="breadcrumb"><span>{currentRole.label}</span><Icon name="arrow" size={14} /><b>{pageDetails[0]}</b></div>
+          {customerDashboardHeader ? (
+            <div className="customer-topbar-title"><strong>Dashboard</strong><span>Welcome back, Abdi Hassan</span></div>
+          ) : (
+            <div className="breadcrumb"><span>{currentRole.label}</span><Icon name="arrow" size={14} /><b>{pageDetails[0]}</b></div>
+          )}
           <div className="topbar-actions">
-            {showSearch && <label className="search-box"><Icon name="search" size={17} /><input aria-label="Search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search anything…" /><kbd>⌘ K</kbd></label>}
+            {customerDashboardHeader && <span className="customer-country-chip"><b>SO</b>Somaliland</span>}
+            {showSearch && !customerDashboardHeader && <label className="search-box"><Icon name="search" size={17} /><input aria-label="Search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search anything…" /><kbd>⌘ K</kbd></label>}
             <button className="icon-button notification-button" aria-label="Notifications"><Icon name="bell" size={19} /><i /></button>
+            {customerDashboardHeader && headerAction}
             <Avatar initials={currentRole.initials} className="topbar-avatar" />
           </div>
         </header>
 
-        <main className="dashboard-main">
-          <PageTitle eyebrow={`${currentRole.label} dashboard`} title={title} description={pageDetails[1]} action={headerAction} />
+        <main className={`dashboard-main${customerDashboardHeader ? ' customer-dashboard-main' : ''}`}>
+          {!customerDashboardHeader && <PageTitle eyebrow={`${currentRole.label} dashboard`} title={title} description={pageDetails[1]} action={headerAction} />}
           {message && <div className="toast-message" role="status"><Icon name="check" size={17} />{message}<button aria-label="Dismiss message" onClick={() => setMessage('')}><Icon name="close" size={16} /></button></div>}
-          <div className="dashboard-content">{renderSection()}</div>
-          <footer className="dashboard-footer"><span>© 2026 Tayonx</span><span>Connect · Request · Chat · Get it done</span><button onClick={() => setMessage('Help center opened.')}>Help & support</button></footer>
+          <div className={`dashboard-content${customerDashboardHeader ? ' customer-dashboard-content' : ''}`}>{renderSection()}</div>
+          {!customerDashboardHeader && <footer className="dashboard-footer"><span>© 2026 Tayonx</span><span>Connect · Request · Chat · Get it done</span><button onClick={() => setMessage('Help center opened.')}>Help & support</button></footer>}
         </main>
       </div>
 
