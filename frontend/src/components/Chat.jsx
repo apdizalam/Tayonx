@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { getChatContacts, getChatHistory } from '../lib/api.js';
+import { getChatContacts, getChatHistory, reportChat } from '../lib/api.js';
 import { createChatSocket } from '../socket.js';
 import Icon from './Icon.jsx';
 
@@ -38,6 +38,12 @@ export default function Chat({ user }) {
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   const [connectionState, setConnectionState] = useState('connecting');
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportReason, setReportReason] = useState('other');
+  const [reportDetails, setReportDetails] = useState('');
+  const [reportError, setReportError] = useState('');
+  const [reportSaving, setReportSaving] = useState(false);
+  const [reportFeedback, setReportFeedback] = useState('');
   const socketRef = useRef(null);
   const historyRef = useRef(null);
   const selectedContactIdRef = useRef('');
@@ -151,6 +157,23 @@ export default function Chat({ user }) {
     });
   }
 
+  async function submitReport(event) {
+    event.preventDefault();
+    if (!selectedContactId || reportSaving) return;
+    setReportSaving(true);
+    setReportError('');
+    try {
+      await reportChat(selectedContactId, { reason: reportReason, details: reportDetails });
+      setReportOpen(false);
+      setReportDetails('');
+      setReportFeedback('Conversation report submitted to Tayonx support.');
+    } catch (requestError) {
+      setReportError(requestError.message);
+    } finally {
+      setReportSaving(false);
+    }
+  }
+
   return (
     <>
       <aside className="conversation-list">
@@ -182,6 +205,7 @@ export default function Chat({ user }) {
           <div className="chat-heading">
             <ChatAvatar name={selectedContact.name} />
             <span><b>{selectedContact.name}</b><small><i className={connectionState === 'connected' ? 'is-online' : ''} />{contactRole(selectedContact.role)} · {connectionState === 'connected' ? 'Live' : 'Reconnecting'}</small></span>
+            {user.role !== 'admin' && <button type="button" className="customer-outline-button chat-report-button" onClick={() => { setReportError(''); setReportOpen(true); }}>Report</button>}
           </div>
           <div className="chat-history" ref={historyRef} aria-live="polite">
             {historyLoading && !messages.length && <p className="chat-list-state" role="status">Loading conversation…</p>}
@@ -199,8 +223,21 @@ export default function Chat({ user }) {
             <input aria-label="Message" value={draft} onChange={(event) => setDraft(event.target.value)} maxLength="4000" placeholder={`Message ${selectedContact.name}…`} disabled={sending} />
             <button type="submit" className="primary-button" aria-label="Send message" disabled={sending || !draft.trim() || connectionState !== 'connected'}><Icon name="send" size={16} /></button>
           </form>
+          {reportFeedback && <p className="chat-report-feedback" role="status">{reportFeedback}<button type="button" className="text-button" onClick={() => setReportFeedback('')}>Dismiss</button></p>}
         </> : <div className="chat-empty-pane"><Icon name="chat" size={24} /><strong>Select a conversation</strong><span>Choose a contact to read and send messages.</span></div>}
       </section>
+      {reportOpen && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !reportSaving) setReportOpen(false); }}>
+        <form className="request-modal chat-report-modal" onSubmit={submitReport}>
+          <div className="modal-heading"><div><p className="eyebrow">SAFETY REPORT</p><h2>Report conversation</h2></div><button type="button" className="icon-button" aria-label="Close report dialog" disabled={reportSaving} onClick={() => setReportOpen(false)}><Icon name="close" /></button></div>
+          <p>Tell Tayonx support why you are reporting your conversation with {selectedContact?.name}.</p>
+          <label>Reason<select value={reportReason} onChange={(event) => setReportReason(event.target.value)} required>
+            <option value="harassment">Harassment</option><option value="spam">Spam</option><option value="fraud">Fraud or scam</option><option value="inappropriate">Inappropriate content</option><option value="other">Other</option>
+          </select></label>
+          <label>Details<textarea value={reportDetails} onChange={(event) => setReportDetails(event.target.value)} maxLength="2000" rows="4" placeholder="Add context to help our team review the report." /></label>
+          {reportError && <p className="signin-message" role="alert">{reportError}</p>}
+          <button type="submit" className="primary-button full-button" disabled={reportSaving}>{reportSaving ? 'Submitting…' : 'Submit report'}</button>
+        </form>
+      </div>}
     </>
   );
 }

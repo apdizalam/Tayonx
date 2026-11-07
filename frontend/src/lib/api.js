@@ -91,3 +91,27 @@ export function getChatContacts(options) {
 export function getChatHistory(userId, options) {
   return apiRequest(`/api/chats/${encodeURIComponent(userId)}`, options);
 }
+
+export function reportChat(userId, values) {
+  return apiRequest(`/api/chats/${encodeURIComponent(userId)}/report`, { method: 'POST', body: values });
+}
+
+export function getAdminChats(options) {
+  return apiRequest('/api/admin/chats', options);
+}
+
+export function getAdminConversation(firstUserId, secondUserId, options) {
+  return apiRequest(`/api/admin/chats/conversations/${encodeURIComponent(firstUserId)}/${encodeURIComponent(secondUserId)}`, options);
+}
+
+export function updateChatReport(reportId, values) {
+  return apiRequest(`/api/admin/chats/reports/${encodeURIComponent(reportId)}`, { method: 'PATCH', body: values });
+}
+
+export function getAdminSettings(options) {
+  return apiRequest('/api/admin/settings', options);
+}
+
+export function updateAdminSettings(values) {
+  return apiRequest('/api/admin/settings', { method: 'PUT', body: values });
+}
