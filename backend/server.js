@@ -5,6 +5,7 @@ const http = require('http');
 const { Server } = require('socket.io');
 require('dotenv').config();
 const authRoutes = require('./routes/auth');
+const requestRoutes = require('./routes/requests');
 
 const app = express();
 const server = http.createServer(app);
@@ -16,18 +17,19 @@ const allowedOrigins = process.env.FRONTEND_ORIGIN
 // Express Middleware
 app.use(cors({
   origin: allowedOrigins,
-  methods: ['GET', 'POST'],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
   credentials: true
 }));
 
 app.use(express.json());
 app.use('/api/auth', authRoutes);
+app.use('/api/requests', requestRoutes);
 
 // Socket.io Setup (Real-Time)
 const io = new Server(server, {
   cors: {
     origin: allowedOrigins,
-    methods: ['GET', 'POST']
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE']
   }
 });
 
