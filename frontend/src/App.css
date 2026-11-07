@@ -1898,6 +1898,16 @@ button {
   font-size: 11px;
 }
 
+.toast-message.toast-error {
+  border-color: #f2c7c7;
+  color: #b42318;
+  background: #fff4f2;
+}
+
+.toast-message.toast-error > button {
+  color: #b42318;
+}
+
 .toast-message > button {
   display: grid;
   width: 24px;
@@ -5051,18 +5061,165 @@ button.admin-kpi:hover {
   font-weight: 700;
 }
 
-.customer-sample-note {
+.customer-request-header {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) auto 54px;
+  gap: 9px;
+  padding: 6px 12px;
+  border-bottom: 1px solid #e3e8f0;
   color: #64728a;
-  font-family: var(--font-mono);
   font-size: 8px;
-  line-height: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
 }
 
-.customer-sample-note span {
-  padding: 2px 5px;
-  border-radius: 2px;
-  color: #7a450a;
-  background: #fef3dc;
+.customer-request-header span:last-child {
+  text-align: center;
+}
+
+.customer-request-header span:first-child {
+  grid-column: 1 / span 2;
+}
+
+.customer-dashboard .customer-request-row {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) auto 54px;
+  gap: 9px;
+  cursor: default;
+}
+
+.customer-row-actions {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+}
+
+.customer-tracking-list,
+.customer-compact-list,
+.customer-directory-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.customer-profile-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  padding: 14px;
+}
+
+.customer-profile-grid > div {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 5px;
+  padding: 11px;
+  border: 1px solid #e3e8f0;
+  border-radius: 4px;
+  background: #f8faff;
+}
+
+.customer-profile-grid span {
+  color: #64728a;
+  font-size: 9px;
+}
+
+.customer-profile-grid strong {
+  overflow: hidden;
+  color: #0a1a33;
+  font-size: 11px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+}
+
+.customer-unavailable-state {
+  min-height: 220px;
+  align-items: center;
+  text-align: center;
+}
+
+.customer-unavailable-state p {
+  max-width: 440px;
+}
+
+.customer-tracking-item {
+  padding: 9px 10px 0;
+  border-bottom: 1px solid #e8edf4;
+}
+
+.customer-tracking-item:last-child {
+  border-bottom: 0;
+}
+
+.customer-tracking-heading {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.customer-tracking-heading > span:first-child {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.customer-tracking-heading strong {
+  overflow: hidden;
+  color: #0a1a33;
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.customer-tracking-heading small {
+  color: #64728a;
+  font-size: 8px;
+}
+
+.customer-tracking-item .shipment-tracking {
+  padding: 10px 0 2px;
+}
+
+.customer-offer-row {
+  display: flex;
+  min-width: 0;
+  min-height: 51px;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-bottom: 1px solid #e8edf4;
+}
+
+.customer-offer-row:last-child {
+  border-bottom: 0;
+}
+
+.customer-offer-amount {
+  color: #0a1a33;
+  font-size: 9px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.customer-offer-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.customer-offer-actions .small-primary {
+  min-height: 24px;
+  padding: 0 7px;
+  font-size: 8px;
+}
+
+.customer-offer-row > .status-badge {
+  flex: none;
 }
 
 @media (max-width: 800px) {
@@ -5108,8 +5265,27 @@ button.admin-kpi:hover {
     grid-template-columns: minmax(0, 1fr);
   }
 
+  .customer-profile-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .customer-dashboard {
     gap: 12px;
+  }
+
+  .customer-request-header {
+    grid-template-columns: 30px minmax(0, 1fr) auto 48px;
+  }
+
+  .customer-dashboard .customer-request-row {
+    grid-template-columns: 30px minmax(0, 1fr) auto 48px;
+    gap: 6px;
+    padding: 7px;
+  }
+
+  .customer-request-icon {
+    width: 30px;
+    height: 30px;
   }
 
   .customer-stats-grid {
@@ -5161,5 +5337,11 @@ button.admin-kpi:hover {
     max-width: 76px;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+
+  .customer-offer-row {
+    gap: 5px;
+    padding-right: 7px;
+    padding-left: 7px;
   }
 }
