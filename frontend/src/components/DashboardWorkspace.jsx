@@ -791,7 +791,7 @@ export default function DashboardWorkspace({ initialRole }) {
     if (customerMode) {
       return (
         <div className="customer-dashboard">
-          <div className="customer-stats-grid">
+          <div className="dashboard-stat-grid customer-stats-grid">
             {[
               ['My requests', requests.length, 'box'],
               ['Offers waiting', pendingOffers.length, 'mail'],
@@ -858,7 +858,7 @@ export default function DashboardWorkspace({ initialRole }) {
     if (providerMode) {
       return (
         <div className="provider-dashboard">
-          <div className="provider-stats-grid">
+          <div className="dashboard-stat-grid provider-stats-grid">
             {[
               ['New requests', requests.length, 'box'],
               ['Offers sent', offers.length, 'chat'],
@@ -902,7 +902,7 @@ export default function DashboardWorkspace({ initialRole }) {
 
     return (
       <div className="admin-dashboard">
-        <div className="admin-kpi-grid">
+        <div className="dashboard-stat-grid admin-kpi-grid">
           {[
             ['Customers', adminCustomers.size, 'users', 'admin-kpi-blue', 'Customers with requests'],
             ['Cargo companies', adminProviders.size, 'building', 'admin-kpi-green', 'Companies with quotes'],
@@ -1013,10 +1013,10 @@ export default function DashboardWorkspace({ initialRole }) {
             <Avatar name={displayName} className={`topbar-avatar${providerMode || adminMode ? ' provider-topbar-avatar' : ''}`} />
           </div>
         </header>
-        <main className={`dashboard-main${customerMode ? ' customer-dashboard-main' : ''}${providerMode ? ' provider-dashboard-main' : ''}${adminMode ? ' admin-dashboard-main' : ''}`}>
+        <main className={`dashboard-main dashboard-main-wide${customerMode ? ' customer-dashboard-main' : ''}${providerMode ? ' provider-dashboard-main' : ''}${adminMode ? ' admin-dashboard-main' : ''}`}>
           {error && <div className="toast-message toast-error" role="alert"><Icon name="alert" size={17} />{error}<button aria-label="Dismiss error" onClick={() => setError('')}><Icon name="close" size={16} /></button></div>}
           {message && <div className="toast-message" role="status"><Icon name="check" size={17} />{message}<button aria-label="Dismiss message" onClick={() => setMessage('')}><Icon name="close" size={16} /></button></div>}
-          <div className={`dashboard-content${customerMode ? ' customer-dashboard-content' : ''}${providerMode ? ' provider-dashboard-content' : ''}${adminMode ? ' admin-dashboard-content' : ''}`}>{renderContent()}</div>
+          <div className={`dashboard-content dashboard-layout-wide${customerMode ? ' customer-dashboard-content' : ''}${providerMode ? ' provider-dashboard-content' : ''}${adminMode ? ' admin-dashboard-content' : ''}`}>{renderContent()}</div>
           <footer className="dashboard-footer"><span>Tayonx</span><span>Connect · Request · Ship · Get it done</span></footer>
         </main>
       </div>
