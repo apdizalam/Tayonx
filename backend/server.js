@@ -7,6 +7,8 @@ require('dotenv').config();
 const authRoutes = require('./routes/auth');
 const requestRoutes = require('./routes/requests');
 const userRoutes = require('./routes/users');
+const chatRoutes = require('./routes/chats');
+const registerChatSocket = require('./socket');
 
 const app = express();
 const server = http.createServer(app);
@@ -26,6 +28,7 @@ app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/requests', requestRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/chats', chatRoutes.router);
 
 // Socket.io Setup (Real-Time)
 const io = new Server(server, {
@@ -40,14 +43,7 @@ mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log('✅ MongoDB Atlas connected successfully!'))
   .catch((err) => console.error('❌ Database connection error:', err));
 
-// Socket.io Listener
-io.on('connection', (socket) => {
-  console.log(`⚡ User Connected: ${socket.id}`);
-
-  socket.on('disconnect', () => {
-    console.log('🔥 User Disconnected');
-  });
-});
+registerChatSocket(io);
 
 // Test Route
 app.get('/', (req, res) => {

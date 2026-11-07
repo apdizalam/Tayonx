@@ -83,3 +83,11 @@ export function updateUser(id, values) {
 export function deleteUser(id) {
   return apiRequest(`/api/users/${encodeURIComponent(id)}`, { method: 'DELETE' });
 }
+
+export function getChatContacts(options) {
+  return apiRequest('/api/chats/contacts', options);
+}
+
+export function getChatHistory(userId, options) {
+  return apiRequest(`/api/chats/${encodeURIComponent(userId)}`, options);
+}
