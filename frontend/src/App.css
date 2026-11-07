@@ -1977,6 +1977,15 @@ button {
   background: #1f6bff;
 }
 
+.signin-card .primary-button:hover:not(:disabled) {
+  background: #1559e0;
+}
+
+.signin-card .primary-button:disabled {
+  cursor: wait;
+  opacity: 0.75;
+}
+
 .signin-card .primary-button:hover {
   background: #1559e0;
 }
@@ -1992,6 +2001,20 @@ button {
 .auth-link-button:hover {
   border-color: #b5c3d6;
   background: #f8faff;
+}
+
+.auth-switch {
+  margin: 0;
+  color: #64728a;
+  font-size: 11px;
+  text-align: center;
+}
+
+.auth-switch a {
+  color: #1559e0;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .register-card {
