@@ -3,6 +3,18 @@ import logo from './assets/tayonx-logo.png';
 import './App.css';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+const dashboardPaths = {
+  admin: '/admin/dashboard',
+  customer: '/customer/dashboard',
+  cargo_provider: '/cargo/dashboard',
+};
+
+function getRoleForPath(pathname) {
+  const path = pathname.replace(/\/+$/, '');
+  if (path === dashboardPaths.admin) return 'admin';
+  if (path === dashboardPaths.cargo_provider) return 'provider';
+  return 'customer';
+}
 
 const roles = {
   customer: {
@@ -90,6 +102,7 @@ function Icon({ name, size = 20 }) {
     user: <><circle cx="12" cy="8" r="4" /><path d="M5 21a7 7 0 0 1 14 0" /></>,
     star: <path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9L12 3Z" />,
     users: <><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /></>,
+    alert: <><path d="M12 3 22 21H2L12 3Z" /><path d="M12 9v5m0 3h.01" /></>,
     laptop: <><path d="M4 5h16v12H4zM2 20h20" /></>,
     headphones: <><path d="M3 13v-2a9 9 0 0 1 18 0v2" /><path d="M5 13h3v7H6a3 3 0 0 1-3-3v-2a2 2 0 0 1 2-2Zm14 0h-3v7h2a3 3 0 0 0 3-3v-2a2 2 0 0 0-2-2Z" /></>,
     package: <><path d="M4 7h16v14H4zM3 7l2-4h14l2 4M12 7v14" /></>,
@@ -419,13 +432,109 @@ function ProviderDashboard({ onNavigate, onAction }) {
   );
 }
 
-function Overview({ role, onNavigate, onAction, verifiedCompanies }) {
+function AdminDashboard({ onNavigate, onAction, period }) {
+  const latestRequests = [
+    { id: 'REQ-1051', customer: 'Abdi Hassan', product: 'MacBook Pro × 20', source: 'China', offers: 4, status: 'Open' },
+    { id: 'REQ-1042', customer: 'Abdi Hassan', product: 'Laptops × 50', source: 'China', offers: 3, status: 'Offers received' },
+    { id: 'REQ-1037', customer: 'Ahmed Ali', product: 'Textiles × 2 rolls', source: 'Turkey', offers: 2, status: 'In progress' },
+    { id: 'REQ-1029', customer: 'Hodan Yusuf', product: 'Solar panels × 40', source: 'China', offers: 5, status: 'Delivered' },
+  ];
+
+  return (
+    <div className="admin-dashboard" data-period={period}>
+      <div className="admin-kpi-grid">
+        {[
+          { label: 'Customers', value: '1.2K', detail: 'Up 8% this month', icon: 'users', tone: 'blue' },
+          { label: 'Cargo companies', value: '350', detail: '12 new', icon: 'building', tone: 'green' },
+          { label: 'Requests', value: '2.4K', detail: 'Up 15%', icon: 'box', tone: 'navy' },
+          { label: 'Awaiting verification', value: '6', detail: 'Review now', icon: 'shield', tone: 'amber', action: true },
+        ].map((stat) => (
+          <button className={`admin-kpi admin-kpi-${stat.tone}`} key={stat.label} onClick={stat.action ? () => onNavigate('companies') : undefined}>
+            <span className="admin-kpi-icon"><Icon name={stat.icon} size={16} /></span>
+            <span className="admin-kpi-content"><strong>{stat.value}</strong><span>{stat.label}</span><small>{stat.action ? <><u>Review now</u></> : stat.detail}</small></span>
+          </button>
+        ))}
+      </div>
+
+      <div className="admin-insights-grid">
+        <Card className="admin-insight-card">
+          <CardHeading title="Requests overview" action={<span className="admin-caption">1,600 total</span>} />
+          <div className="admin-request-overview">
+            <div className="admin-donut" role="img" aria-label="Requests: 53% completed, 33% open, 14% cancelled"><span>53%</span></div>
+            <div className="admin-legend">
+              <div><i className="completed" />Completed<strong>850</strong></div>
+              <div><i className="open" />Open<strong>520</strong></div>
+              <div><i className="cancelled" />Cancelled<strong>230</strong></div>
+            </div>
+          </div>
+        </Card>
+
+        <Card className="admin-insight-card">
+          <CardHeading title="Requests by source" />
+          <div className="admin-source-content">
+            <div className="admin-source-item"><span><b>CN</b>China</span><strong>72%</strong><i><b style={{ width: '72%' }} /></i></div>
+            <div className="admin-source-item"><span><b>TR</b>Turkey</span><strong>28%</strong><i><b className="turkey" style={{ width: '28%' }} /></i></div>
+            <p>Top categories: Electronics · Textiles · Household</p>
+          </div>
+        </Card>
+
+        <Card className="admin-insight-card">
+          <CardHeading title="Recent activity" action={<button className="link-button" onClick={() => onNavigate('messages')}>All <Icon name="arrow" size={14} /></button>} />
+          <ol className="admin-activity-list">
+            <li className="current"><i /><span><strong>New request · Laptops × 50</strong><small>Abdi Hassan · 2 min ago</small></span></li>
+            <li className="success"><i /><span><strong>Offer accepted</strong><small>Global Cargo Trade · 5 min ago</small></span></li>
+            <li><i /><span><strong>Company applied</strong><small>Anatolia Freight · 8 min ago</small></span></li>
+          </ol>
+        </Card>
+      </div>
+
+      <div className="admin-lower-grid">
+        <Card className="admin-latest-card">
+          <CardHeading title="Latest requests" action={<button className="link-button" onClick={() => onNavigate('requests')}>View all <Icon name="arrow" size={14} /></button>} />
+          <div className="table-scroll">
+            <table className="data-table admin-latest-table">
+              <thead><tr><th>ID</th><th>Customer</th><th>Product</th><th>Source</th><th>Offers</th><th>Status</th></tr></thead>
+              <tbody>{latestRequests.map((request) => (
+                <tr key={request.id} onClick={() => onNavigate('requests')}>
+                  <td className="admin-request-id">{request.id}</td><td>{request.customer}</td><td>{request.product}</td><td>{request.source}</td><td className="admin-offer-count">{request.offers}</td>
+                  <td><span className={`customer-status ${request.status === 'In progress' ? 'customer-status-warning' : request.status === 'Delivered' ? 'customer-status-success' : 'customer-status-info'}`}>{request.status}</span></td>
+                </tr>
+              ))}</tbody>
+            </table>
+          </div>
+        </Card>
+
+        <Card className="admin-attention-card">
+          <CardHeading title="Needs attention" action={<span className="admin-danger-count">● 2</span>} />
+          <div className="admin-attention-item">
+            <Icon name="alert" size={16} />
+            <span><strong>Chat reported by a customer</strong><small>Possible payment outside Tayonx · Mersin Shipping</small></span>
+            <button onClick={() => onAction('attention:chat')}>Review</button>
+          </div>
+          <div className="admin-attention-item warning">
+            <Icon name="clock" size={16} />
+            <span><strong>Request with no offers for 3 days</strong><small>REQ-1018 · Building tiles · Turkey</small></span>
+            <button onClick={() => onAction('attention:request')}>Review</button>
+          </div>
+        </Card>
+      </div>
+
+      <p className="admin-sample-note">All figures are <span>SAMPLE</span> data from the concept.</p>
+    </div>
+  );
+}
+
+function Overview({ role, onNavigate, onAction, verifiedCompanies, adminPeriod }) {
   if (role === 'customer') {
     return <CustomerDashboard onNavigate={onNavigate} onAction={onAction} />;
   }
 
   if (role === 'provider') {
     return <ProviderDashboard onNavigate={onNavigate} onAction={onAction} />;
+  }
+
+  if (role === 'admin') {
+    return <AdminDashboard onNavigate={onNavigate} onAction={onAction} period={adminPeriod} />;
   }
 
   return (
@@ -654,9 +763,15 @@ function SignInPage() {
         return;
       }
 
+      const dashboardPath = dashboardPaths[result.user.role];
+      if (!dashboardPath) {
+        setMessage('The account service returned an unsupported account role. Please contact support.');
+        return;
+      }
+
       localStorage.setItem('token', result.token);
       localStorage.setItem('user', JSON.stringify(result.user));
-      window.location.href = '/dashboard';
+      window.location.href = dashboardPath;
     } catch {
       setMessage('Cannot reach the account service. Check that the backend is running.');
     } finally {
@@ -839,7 +954,7 @@ function RegisterPage() {
 function App() {
   const [isLoginRoute] = useState(() => window.location.pathname.replace(/\/+$/, '') === '/login');
   const [isRegisterRoute] = useState(() => window.location.pathname.replace(/\/+$/, '') === '/register');
-  const [activeRole, setActiveRole] = useState('customer');
+  const [activeRole, setActiveRole] = useState(() => getRoleForPath(window.location.pathname));
   const [activeSection, setActiveSection] = useState('overview');
   const [search, setSearch] = useState('');
   const [message, setMessage] = useState('');
@@ -848,6 +963,7 @@ function App() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const [showRoleMenu, setShowRoleMenu] = useState(false);
+  const [adminPeriod, setAdminPeriod] = useState('30 days');
   const currentRole = roles[activeRole];
   useEffect(() => {
     document.title = isLoginRoute
@@ -906,6 +1022,24 @@ function App() {
       setMessage(action === 'message:sent' ? 'Message sent.' : 'Conversation opened.');
     } else if (action.startsWith('profile:')) {
       setMessage('Profile editing will be available when your account is connected.');
+    } else if (action === 'report:exported') {
+      const rows = [
+        ['ID', 'Customer', 'Product', 'Source', 'Offers', 'Status'],
+        ['REQ-1051', 'Abdi Hassan', 'MacBook Pro x 20', 'China', '4', 'Open'],
+        ['REQ-1042', 'Abdi Hassan', 'Laptops x 50', 'China', '3', 'Offers received'],
+        ['REQ-1037', 'Ahmed Ali', 'Textiles x 2 rolls', 'Turkey', '2', 'In progress'],
+        ['REQ-1029', 'Hodan Yusuf', 'Solar panels x 40', 'China', '5', 'Delivered'],
+      ];
+      const csv = rows.map((row) => row.map((value) => `"${value.replaceAll('"', '""')}"`).join(',')).join('\r\n');
+      const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'tayonx-admin-requests.csv';
+      link.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 0);
+      setMessage('Admin request report exported.');
+    } else if (action.startsWith('attention:')) {
+      setMessage('Attention item opened for review.');
     } else if (action === 'notifications') {
       setMessage('You have 3 unread notifications.');
     } else {
@@ -921,17 +1055,20 @@ function App() {
 
   function renderSection() {
     if (activeSection === 'overview') {
-      return <Overview role={activeRole} onNavigate={navigate} onAction={handleAction} verifiedCompanies={verifiedCompanies} />;
+      return <Overview role={activeRole} onNavigate={navigate} onAction={handleAction} verifiedCompanies={verifiedCompanies} adminPeriod={adminPeriod} />;
     }
     if (activeSection === 'requests') return <RequestsPage role={activeRole} search={search} onNavigate={navigate} onAction={handleAction} />;
     if (activeSection === 'offers' && activeRole === 'customer') return <CustomerOffersPage onAction={handleAction} />;
     if (activeSection === 'offers' && activeRole === 'provider') return <OffersPage onAction={handleAction} />;
+    if (activeSection === 'companies' && activeRole === 'admin') return <Card><CardHeading title="Companies awaiting verification" subtitle="Review company documents before providers can send offers" action={<span className="results-count">{verifiedCompanies.length} pending</span>} /><CompanyTable companies={verifiedCompanies} onReview={() => setMessage('Business license preview opened.')} onVerify={(id) => approveCompany(id, true)} onReject={(id) => approveCompany(id, false)} /></Card>;
     if (activeSection === 'companies') return <CompaniesPage />;
     if (activeSection === 'messages') return <MessagesPage onAction={handleAction} />;
     if (activeSection === 'opportunities') return <OpportunitiesPage search={search} onAction={handleAction} />;
     if (activeSection === 'profile') return <ProfilePage onAction={handleAction} />;
     if (activeSection === 'verification') return <Card><CardHeading title="Pending company applications" subtitle="Business details and licenses submitted for review" action={<span className="results-count">{verifiedCompanies.length} to review</span>} /><CompanyTable companies={verifiedCompanies} onReview={() => setMessage('Business license preview opened.')} onVerify={(id) => approveCompany(id, true)} onReject={(id) => approveCompany(id, false)} /></Card>;
     if (activeSection === 'reports') return <ReportsPage />;
+    if (activeSection === 'users') return <Card><CardHeading title="Marketplace users" subtitle="Customer and cargo provider accounts" /><div className="admin-users-summary"><div><strong>1,200</strong><span>Customers</span></div><div><strong>350</strong><span>Cargo companies</span></div><p>User management details are sample data for this concept.</p></div></Card>;
+    if (activeSection === 'settings') return <Card><CardHeading title="System settings" subtitle="Admin workspace configuration" /><div className="admin-users-summary"><p>System settings are managed by the Tayonx operations team.</p></div></Card>;
     return null;
   }
 
@@ -941,9 +1078,11 @@ function App() {
   const showSearch = ['overview', 'requests', 'opportunities', 'verification'].includes(activeSection);
   const customerMode = activeRole === 'customer';
   const providerMode = activeRole === 'provider';
+  const adminMode = activeRole === 'admin';
   const customerDashboardHeader = customerMode && activeSection === 'overview';
   const providerDashboardHeader = providerMode && activeSection === 'overview';
-  const dashboardHeader = customerDashboardHeader || providerDashboardHeader;
+  const adminDashboardHeader = adminMode && activeSection === 'overview';
+  const dashboardHeader = customerDashboardHeader || providerDashboardHeader || adminDashboardHeader;
   const headerAction = activeRole === 'customer' && ['overview', 'requests'].includes(activeSection)
     ? <button className="primary-button" onClick={() => handleAction('new-request')}><Icon name="plus" size={17} />New request</button>
     : activeRole === 'provider' && activeSection === 'opportunities'
@@ -959,13 +1098,13 @@ function App() {
   }
 
   return (
-    <div className={`app-shell${customerMode ? ' customer-shell' : ''}${providerMode ? ' provider-shell' : ''}`}>
+    <div className={`app-shell${customerMode ? ' customer-shell' : ''}${providerMode ? ' provider-shell' : ''}${adminMode ? ' admin-shell' : ''}`}>
       <aside className={`sidebar${mobileNavOpen ? ' sidebar-open' : ''}`}>
         <a className="sidebar-brand" href="#home" aria-label="Tayonx dashboard home" onClick={() => navigate('overview')}><img src={logo} alt="Tayonx" /></a>
-        {customerMode || providerMode ? (
+        {customerMode || providerMode || adminMode ? (
           <div className="workspace-role-picker">
             <button className="customer-role-label" aria-expanded={showRoleMenu} aria-haspopup="menu" onClick={() => setShowRoleMenu((open) => !open)}>
-              {providerMode ? 'CARGO PROVIDER' : 'CUSTOMER'}
+              {providerMode ? 'CARGO PROVIDER' : adminMode ? 'ADMIN' : 'CUSTOMER'}
             </button>
             {showRoleMenu && <div className="role-choice-menu" role="menu">{Object.entries(roles).map(([role, config]) => (
               <button key={role} role="menuitem" onClick={() => { selectRole(role); setShowRoleMenu(false); }}>{config.label}</button>
@@ -990,22 +1129,24 @@ function App() {
             <Fragment key={section}>
               {customerMode && section === 'profile' && <p className="nav-caption customer-account-caption">Account</p>}
               {providerMode && section === 'profile' && <p className="nav-caption customer-account-caption">Company</p>}
+              {adminMode && section === 'settings' && <p className="nav-caption customer-account-caption">System</p>}
               <button
                 className={`nav-item${activeSection === section ? ' active' : ''}`}
                 key={section}
                 onClick={() => section === 'notifications' ? handleAction('notifications') : navigate(section)}
               >
-                <Icon name={icon} size={customerMode || providerMode ? 16 : 19} />
+                <Icon name={icon} size={customerMode || providerMode || adminMode ? 16 : 19} />
                 <span>{label}</span>
-                {section === 'messages' && <i className="nav-count">{customerMode ? '1' : providerMode ? '5' : '2'}</i>}
+                {section === 'messages' && !adminMode && <i className="nav-count">{customerMode ? '1' : '5'}</i>}
                 {providerMode && section === 'opportunities' && <i className="nav-count">8</i>}
+                {adminMode && section === 'companies' && <i className="nav-count">6</i>}
                 {section === 'notifications' && <i className="nav-count">3</i>}
               </button>
             </Fragment>
           ))}
         </nav>
         <div className="sidebar-bottom">
-          {!customerMode && !providerMode && <div className="sidebar-help"><span><Icon name="shield" size={18} /></span><div><b>Need a hand?</b><small>Visit our help center</small></div><Icon name="arrow" size={15} /></div>}
+          {!customerMode && !providerMode && !adminMode && <div className="sidebar-help"><span><Icon name="shield" size={18} /></span><div><b>Need a hand?</b><small>Visit our help center</small></div><Icon name="arrow" size={15} /></div>}
           {showDropdown && (
             <div className="account-dropdown" role="menu">
               <button className="signout-button" onClick={handleSignOut} role="menuitem">
@@ -1013,7 +1154,7 @@ function App() {
               </button>
             </div>
           )}
-          {customerMode || providerMode ? (
+          {customerMode || providerMode || adminMode ? (
             <button className="customer-signout" onClick={handleSignOut}><Icon name="arrow" size={15} />Log out</button>
           ) : <div className="sidebar-user">
             <Avatar initials={currentRole.initials} />
@@ -1039,23 +1180,29 @@ function App() {
             <div className="customer-topbar-title"><strong>Dashboard</strong><span>Welcome back, Abdi Hassan</span></div>
           ) : providerDashboardHeader ? (
             <div className="customer-topbar-title"><strong>Dashboard</strong><span>Welcome back, Global Cargo Ltd</span></div>
+          ) : adminDashboardHeader ? (
+            <div className="customer-topbar-title"><strong>Admin dashboard</strong><span>Welcome, Super Admin</span></div>
           ) : (
             <div className="breadcrumb"><span>{currentRole.label}</span><Icon name="arrow" size={14} /><b>{pageDetails[0]}</b></div>
           )}
           <div className="topbar-actions">
             {customerDashboardHeader && <span className="customer-country-chip"><b>SO</b>Somaliland</span>}
             {providerDashboardHeader && <><span className="customer-country-chip"><b>CN</b>China</span><span className="provider-verified-chip"><Icon name="check" size={13} />Verified company</span></>}
+            {adminDashboardHeader && <>
+              <div className="admin-period-switch" aria-label="Dashboard date range">{['7 days', '30 days', 'All time'].map((period) => <button aria-pressed={adminPeriod === period} className={adminPeriod === period ? 'active' : ''} key={period} onClick={() => setAdminPeriod(period)}>{period}</button>)}</div>
+              <button className="admin-export-button" onClick={() => handleAction('report:exported')}><Icon name="download" size={13} />Export</button>
+            </>}
             {showSearch && !dashboardHeader && <label className="search-box"><Icon name="search" size={17} /><input aria-label="Search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search anything…" /><kbd>⌘ K</kbd></label>}
-            {!providerDashboardHeader && <button className="icon-button notification-button" aria-label="Notifications"><Icon name="bell" size={19} /><i /></button>}
+            {!providerDashboardHeader && !adminDashboardHeader && <button className="icon-button notification-button" aria-label="Notifications"><Icon name="bell" size={19} /><i /></button>}
             {customerDashboardHeader && headerAction}
-            <Avatar initials={currentRole.initials} className={providerDashboardHeader ? 'topbar-avatar provider-topbar-avatar' : 'topbar-avatar'} />
+            <Avatar initials={currentRole.initials} className={providerDashboardHeader || adminDashboardHeader ? 'topbar-avatar provider-topbar-avatar' : 'topbar-avatar'} />
           </div>
         </header>
 
-        <main className={`dashboard-main${customerDashboardHeader ? ' customer-dashboard-main' : ''}${providerDashboardHeader ? ' provider-dashboard-main' : ''}`}>
+        <main className={`dashboard-main${customerDashboardHeader ? ' customer-dashboard-main' : ''}${providerDashboardHeader ? ' provider-dashboard-main' : ''}${adminDashboardHeader ? ' admin-dashboard-main' : ''}`}>
           {!dashboardHeader && <PageTitle eyebrow={`${currentRole.label} dashboard`} title={title} description={pageDetails[1]} action={headerAction} />}
           {message && <div className="toast-message" role="status"><Icon name="check" size={17} />{message}<button aria-label="Dismiss message" onClick={() => setMessage('')}><Icon name="close" size={16} /></button></div>}
-          <div className={`dashboard-content${customerDashboardHeader ? ' customer-dashboard-content' : ''}${providerDashboardHeader ? ' provider-dashboard-content' : ''}`}>{renderSection()}</div>
+          <div className={`dashboard-content${customerDashboardHeader ? ' customer-dashboard-content' : ''}${providerDashboardHeader ? ' provider-dashboard-content' : ''}${adminDashboardHeader ? ' admin-dashboard-content' : ''}`}>{renderSection()}</div>
           {!dashboardHeader && <footer className="dashboard-footer"><span>© 2026 Tayonx</span><span>Connect · Request · Chat · Get it done</span><button onClick={() => setMessage('Help center opened.')}>Help & support</button></footer>}
         </main>
       </div>
