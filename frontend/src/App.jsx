@@ -3,6 +3,7 @@ import logo from './assets/tayonx-logo.png';
 import './App.css';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 const roles = {
   customer: {
@@ -635,6 +636,8 @@ function SignInPage() {
     event.preventDefault();
     setMessage('');
     setIsSubmitting(true);
+    setIsSubmitting(true);
+    setMessage('');
 
     try {
       const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
@@ -646,6 +649,7 @@ function SignInPage() {
 
       if (!response.ok) {
         setMessage(result.message || result.error || 'Sign-in failed. Check your email and password.');
+        setMessage(result.message || result.error || 'Sign-in failed. Check your credentials and try again.');
         return;
       }
 
@@ -668,12 +672,75 @@ function SignInPage() {
     <main className="signin-page">
       <a className="signin-brand" href="/" aria-label="Tayonx home"><img src={logo} alt="Tayonx" /></a>
       <form className="signin-card" onSubmit={handleSubmit}>
-        <p className="eyebrow">CUSTOMER PORTAL</p>
+        <p className="eyebrow">SECURE ACCOUNT</p>
         <h1>Welcome back</h1>
         <p className="page-description">Sign in to continue to your Tayonx workspace.</p>
         <label htmlFor="signin-email">Email address<input autoComplete="email" id="signin-email" name="email" onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" required type="email" value={email} /></label>
         <label htmlFor="signin-password">Password<input autoComplete="current-password" id="signin-password" name="password" onChange={(event) => setPassword(event.target.value)} placeholder="Enter your password" required type="password" value={password} /></label>
         <button className="primary-button full-button" disabled={isSubmitting} type="submit">{isSubmitting ? 'Signing in…' : 'Sign in'}</button>
+        <a className="secondary-button full-button auth-link-button" href="/register">Create an account</a>
+        <p className="signin-message" aria-live="polite" role={message ? 'alert' : undefined}>{message}</p>
+      </form>
+      <p className="signin-footnote">Connect · Request · Chat · Get it done</p>
+    </main>
+  );
+}
+
+function RegisterPage() {
+  const [message, setMessage] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+    setIsSubmitting(true);
+    setMessage('');
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: formData.get('name'),
+          email: formData.get('email'),
+          password: formData.get('password'),
+          role: formData.get('role'),
+        }),
+      });
+      const result = await response.json();
+
+      if (!response.ok) {
+        setMessage(result.error || 'Registration failed. Check your details and try again.');
+        return;
+      }
+
+      localStorage.setItem('token', result.token);
+      window.location.href = '/';
+    } catch {
+      setMessage('Cannot reach the account service. Check that the backend is running.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <main className="signin-page">
+      <a className="signin-brand" href="/" aria-label="Tayonx home"><img src={logo} alt="Tayonx" /></a>
+      <form className="signin-card register-card" onSubmit={handleSubmit}>
+        <p className="eyebrow">JOIN TAYONX</p>
+        <h1>Create your account</h1>
+        <p className="page-description">Get started as a customer or cargo provider.</p>
+        <label htmlFor="register-name">Full name or company name<input autoComplete="name" id="register-name" maxLength={100} name="name" placeholder="Your name" required /></label>
+        <label htmlFor="register-email">Email address<input autoComplete="email" id="register-email" name="email" placeholder="you@example.com" required type="email" /></label>
+        <label htmlFor="register-role">Account type<select id="register-role" name="role" defaultValue="customer"><option value="customer">Customer</option><option value="cargo_provider">Cargo company</option></select></label>
+        <label htmlFor="register-password">Password<input autoComplete="new-password" id="register-password" minLength={8} maxLength={72} name="password" placeholder="At least 8 characters" required type="password" /></label>
+        <button className="primary-button full-button" disabled={isSubmitting} type="submit">{isSubmitting ? 'Creating account…' : 'Create account'}</button>
+        <p className="auth-switch">Already have an account? <a href="/login">Sign in</a></p>
+        <p className="page-description">You have been signed out. Sign in to continue to your Tayonx workspace.</p>
+        <label htmlFor="signin-email">Email address<input autoComplete="email" id="signin-email" name="email" placeholder="you@example.com" required type="email" /></label>
+        <label htmlFor="signin-password">Password<input autoComplete="current-password" id="signin-password" name="password" placeholder="Enter your password" required type="password" /></label>
+        <button className="primary-button full-button" type="submit">Sign in</button>
         <a className="secondary-button full-button auth-link-button" href="/register">Create an account</a>
         <p className="signin-message" aria-live="polite" role={message ? 'alert' : undefined}>{message}</p>
       </form>
@@ -848,6 +915,7 @@ function App() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const [showRoleMenu, setShowRoleMenu] = useState(false);
+  const [authenticatedUser, setAuthenticatedUser] = useState(null);
   const currentRole = roles[activeRole];
   useEffect(() => {
     document.title = isLoginRoute
@@ -855,6 +923,39 @@ function App() {
       : isRegisterRoute
         ? 'Tayonx | Create account'
         : 'Tayonx | Marketplace dashboards';
+  }, [isLoginRoute, isRegisterRoute]);
+  useEffect(() => {
+    if (isLoginRoute || isRegisterRoute) return undefined;
+    const token = localStorage.getItem('token');
+    if (!token) return undefined;
+
+    let isCurrent = true;
+    fetch(`${API_BASE_URL}/api/auth/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(async (response) => {
+        const result = await response.json();
+        if (!isCurrent) return;
+        if (!response.ok) {
+          if (response.status === 401) {
+            localStorage.removeItem('token');
+            setMessage('Your session expired. Please sign in again.');
+          } else {
+            setMessage(result.error || 'Could not verify your account session.');
+          }
+          return;
+        }
+
+        setAuthenticatedUser(result.user);
+        setActiveRole(result.user.role === 'cargo_provider' ? 'provider' : result.user.role);
+      })
+      .catch(() => {
+        if (isCurrent) setMessage('Unable to verify your account session. Check that the backend is running.');
+      });
+
+    return () => {
+      isCurrent = false;
+    };
   }, [isLoginRoute, isRegisterRoute]);
   const pageDetails = useMemo(() => {
     const titles = {
@@ -884,6 +985,10 @@ function App() {
   }
 
   function selectRole(role) {
+    if (role === 'admin' && authenticatedUser?.role !== 'admin') {
+      setMessage('Sign in with an admin account to open the admin dashboard.');
+      return;
+    }
     setActiveRole(role);
     setActiveSection('overview');
     setSearch('');
@@ -966,6 +1071,13 @@ function App() {
           <div className="workspace-role-picker">
             <button className="customer-role-label" aria-expanded={showRoleMenu} aria-haspopup="menu" onClick={() => setShowRoleMenu((open) => !open)}>
               {providerMode ? 'CARGO PROVIDER' : 'CUSTOMER'}
+        <div className="workspace-label">WORKSPACE</div>
+        <div className="role-switcher" aria-label="Choose dashboard">
+          {Object.entries(roles)
+            .filter(([role]) => role !== 'admin' || authenticatedUser?.role === 'admin')
+            .map(([role, config]) => (
+            <button className={`role-switch${activeRole === role ? ' active' : ''}`} key={role} onClick={() => selectRole(role)}>
+              <Avatar initials={config.initials} className="role-avatar" /><span>{config.label}</span>{activeRole === role && <span className="active-role-dot" />}
             </button>
             {showRoleMenu && <div className="role-choice-menu" role="menu">{Object.entries(roles).map(([role, config]) => (
               <button key={role} role="menuitem" onClick={() => { selectRole(role); setShowRoleMenu(false); }}>{config.label}</button>
