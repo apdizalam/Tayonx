@@ -1,5 +1,10 @@
-import { io } from "socket.io-client";
+import { io } from 'socket.io-client';
+import { API_BASE_URL } from './lib/api.js';
 
-// Ku xirashada Backend Server-ka (Port 5000)
-const SOCKET_URL = "http://localhost:5000";
-export const socket = io(SOCKET_URL);
+export function createChatSocket(token) {
+  const socketUrl = API_BASE_URL || (import.meta.env.DEV ? 'http://localhost:5000' : window.location.origin);
+  return io(socketUrl, {
+    autoConnect: false,
+    auth: { token },
+  });
+}

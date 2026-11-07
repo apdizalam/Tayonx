@@ -4,7 +4,7 @@ import logo from '../assets/tayonx-logo.png';
 import '../App.css';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '';
-const dashboardPaths = { admin: '/admin/dashboard', customer: '/customer/dashboard', cargo_provider: '/cargo/dashboard' };
+const dashboardPaths = { admin: '/admin/dashboard', customer: '/customer/dashboard', cargo_provider: '/cargo/dashboard', individual_cargo: '/cargo/dashboard' };
 
 export default function LoginPage() {
   const navigate = useNavigate();
