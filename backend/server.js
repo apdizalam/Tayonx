@@ -8,6 +8,7 @@ const authRoutes = require('./routes/auth');
 
 const app = express();
 const server = http.createServer(app);
+
 const allowedOrigins = process.env.FRONTEND_ORIGIN
   ? [process.env.FRONTEND_ORIGIN]
   : ['http://localhost:5173', 'http://127.0.0.1:5173'];
@@ -16,9 +17,9 @@ const allowedOrigins = process.env.FRONTEND_ORIGIN
 app.use(cors({
   origin: allowedOrigins,
   methods: ['GET', 'POST'],
-  methods: ["GET", "POST"],
   credentials: true
 }));
+
 app.use(express.json());
 app.use('/api/auth', authRoutes);
 
@@ -27,7 +28,6 @@ const io = new Server(server, {
   cors: {
     origin: allowedOrigins,
     methods: ['GET', 'POST']
-    methods: ["GET", "POST"]
   }
 });
 
