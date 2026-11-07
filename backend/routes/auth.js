@@ -5,6 +5,8 @@ const mongoose = require('mongoose');
 const User = require('../models/User');
 
 const router = express.Router();
+const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const allowedCountries = ['Somaliland', 'Somalia', 'Other', 'China', 'Turkey'];
 const tokenLifetime = '1h';
 
 function getJwtSecret() {
@@ -21,6 +23,7 @@ function publicUser(user) {
     name: user.name,
     email: user.email,
     role: user.role,
+    country: user.country,
   };
 }
 
@@ -65,11 +68,21 @@ router.post('/register', async (req, res) => {
   const name = typeof req.body.name === 'string' ? req.body.name.trim() : '';
   const email = typeof req.body.email === 'string' ? req.body.email.trim().toLowerCase() : '';
   const password = typeof req.body.password === 'string' ? req.body.password : '';
+  let role = typeof req.body.role === 'string' ? req.body.role.trim().toLowerCase() : 'customer';
+  const country = typeof req.body.country === 'string' ? req.body.country : '';
+
+  // U beddel role-ka mid waafaqsan database-ka haddii uu yimaado "cargo company"
+  if (role === 'cargo company' || role === 'cargo_provider') {
+    role = 'cargo_provider';
+  } else {
+    role = 'customer';
+  }
   const role = req.body.role || 'customer';
 
   if (!name || name.length > 100) {
     return res.status(400).json({ error: 'Name is required and must be 100 characters or fewer.' });
   }
+  if (!emailPattern.test(email) || email.length > 254) {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) {
     return res.status(400).json({ error: 'Enter a valid email address.' });
   }
@@ -78,6 +91,9 @@ router.post('/register', async (req, res) => {
   }
   if (!['customer', 'cargo_provider'].includes(role)) {
     return res.status(400).json({ error: 'Choose a valid account type.' });
+  }
+  if (!allowedCountries.includes(country)) {
+    return res.status(400).json({ error: 'Choose a valid country.' });
   }
   if (mongoose.connection.readyState !== 1) {
     return res.status(503).json({ error: 'The account service is unavailable.' });
@@ -94,6 +110,9 @@ router.post('/register', async (req, res) => {
       email,
       password: await bcrypt.hash(password, 12),
       role,
+      country,
+    });
+    return res.status(201).json({ message: 'Account created successfully.', user: publicUser(user) });
     });
     const token = jwt.sign({ sub: user.id }, getJwtSecret(), { expiresIn: tokenLifetime });
     return res.status(201).json({ token, user: publicUser(user) });
@@ -101,6 +120,34 @@ router.post('/register', async (req, res) => {
     if (error.code === 11000) {
       return res.status(409).json({ error: 'An account with this email already exists.' });
     }
+    return sendAuthError(res, error);
+  }
+});
+
+router.post('/login', async (req, res) => {
+  const email = typeof req.body.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+  const password = typeof req.body.password === 'string' ? req.body.password : '';
+
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Email and password are required.' });
+  }
+  if (email.length > 254 || Buffer.byteLength(password, 'utf8') > 72) {
+    return res.status(400).json({ error: 'Invalid email or password.' });
+  }
+  if (mongoose.connection.readyState !== 1) {
+    return res.status(503).json({ error: 'The account service is unavailable.' });
+  }
+
+  try {
+    const user = await User.findOne({ email }).select('+password');
+    const passwordMatches = user && await bcrypt.compare(password, user.password);
+    if (!passwordMatches) {
+      return res.status(401).json({ error: 'Email or password is incorrect.' });
+    }
+
+    const token = jwt.sign({ sub: user.id }, getJwtSecret(), { expiresIn: '1h' });
+    return res.json({ token, user: publicUser(user) });
+  } catch (error) {
     return sendAuthError(res, error);
   }
 });
@@ -134,4 +181,5 @@ router.get('/me', async (req, res) => {
   }
 });
 
+module.exports = router;
 module.exports = router;
