@@ -15,6 +15,7 @@ const allowedOrigins = process.env.FRONTEND_ORIGIN
 // Express Middleware
 app.use(cors({
   origin: allowedOrigins,
+  methods: ['GET', 'POST'],
   methods: ["GET", "POST"],
   credentials: true
 }));
@@ -25,6 +26,7 @@ app.use('/api/auth', authRoutes);
 const io = new Server(server, {
   cors: {
     origin: allowedOrigins,
+    methods: ['GET', 'POST']
     methods: ["GET", "POST"]
   }
 });
