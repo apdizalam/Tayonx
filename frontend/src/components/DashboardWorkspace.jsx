@@ -2,6 +2,7 @@ import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import logo from '../assets/tayonx-logo.png';
 import Icon from './Icon.jsx';
+import Chat from './Chat.jsx';
 import {
   apiRequest,
   createOffer,
@@ -713,9 +714,12 @@ export default function DashboardWorkspace({ initialRole }) {
       return <Card><CardHeading title="Orders & shipping" subtitle="Accepted offers and their live shipment status." />{loading ? <p className="empty-table" role="status">Loading accepted orders…</p> : orders.length ? <OffersTable offers={orders} role="provider" busyId={busyId} onEdit={(offer) => { setEditingOffer(offer); setOfferRequest(null); setFormError(''); }} onDelete={deleteCargoOffer} onStatusChange={handleStatusChange} /> : <div className="empty-state"><strong>No accepted orders yet</strong><p>When a customer accepts one of your offers, the order and shipping progress will appear here.</p><button className="small-primary" onClick={() => setSection('opportunities')}>Browse requests</button></div>}</Card>;
     }
 
-    if (providerMode && ['messages', 'settings'].includes(section)) {
-      const feature = section === 'messages' ? 'Chats' : 'Settings';
-      return <Card><CardHeading title={feature} /><div className="provider-unavailable-state"><span className="provider-stat-icon"><Icon name={section === 'messages' ? 'chat' : 'user'} size={18} /></span><strong>{feature} are not connected yet</strong><p>The current backend does not provide {section === 'messages' ? 'customer messaging' : 'cargo company settings'} endpoints. Your real offers and customer request details are available in My offers and Requests.</p><button className="small-primary" onClick={() => setSection(section === 'messages' ? 'offers' : 'company')}>{section === 'messages' ? 'View my offers' : 'View company account'}</button></div></Card>;
+    if (section === 'messages' && user) {
+      return <Card className="messages-card live-chat-card"><Chat user={user} /></Card>;
+    }
+
+    if (providerMode && section === 'settings') {
+      return <Card><CardHeading title="Settings" /><div className="provider-unavailable-state"><span className="provider-stat-icon"><Icon name="user" size={18} /></span><strong>Settings are not connected yet</strong><p>The current backend does not provide cargo company settings endpoints.</p><button className="small-primary" onClick={() => setSection('company')}>View company account</button></div></Card>;
     }
 
     if (providerMode && section === 'company') {
@@ -762,9 +766,8 @@ export default function DashboardWorkspace({ initialRole }) {
       </div></div>;
     }
 
-    if (adminMode && ['messages', 'settings'].includes(section)) {
-      const feature = section === 'messages' ? 'Chats and reports' : 'Admin settings';
-      return <Card><CardHeading title={feature} /><div className="admin-unavailable-state"><strong>{feature} are not connected yet</strong><p>The current backend does not provide {section === 'messages' ? 'chat or report-management' : 'admin settings'} endpoints. No sample records are shown here.</p></div></Card>;
+    if (adminMode && section === 'settings') {
+      return <Card><CardHeading title="Admin settings" /><div className="admin-unavailable-state"><strong>Admin settings are not connected yet</strong><p>The current backend does not provide admin settings endpoints. No sample records are shown here.</p></div></Card>;
     }
 
     if (customerMode && section === 'companies') {
@@ -773,10 +776,6 @@ export default function DashboardWorkspace({ initialRole }) {
 
     if (customerMode && section === 'notifications') {
       return <Card><CardHeading title="Notifications" subtitle="Updates from your shipping requests." />{loading ? <p className="empty-table" role="status">Loading updates…</p> : pendingOffers.length ? <div className="customer-directory-list">{pendingOffers.map((offer) => <div className="customer-offer-row" key={offer._id}><span className="customer-company-avatar blue"><Icon name="mail" size={15} /></span><span className="customer-row-copy"><strong>New quote for {offer.request.product}</strong><small>{offer.provider?.name || 'Cargo provider'} · {new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(offer.price)} · {offer.deliveryDays} days</small></span><button className="small-primary" onClick={() => { setSelectedRequestId(offer.request.id); setSection('offers'); }}>Review</button></div>)}</div> : <div className="empty-state"><strong>You’re all caught up</strong><p>New provider quotes for your requests will appear here.</p></div>}</Card>;
-    }
-
-    if (customerMode && section === 'messages') {
-      return <Card><CardHeading title="Chat" subtitle="Message cargo providers about your shipments." /><div className="empty-state customer-unavailable-state"><span className="customer-stat-icon"><Icon name="chat" size={19} /></span><strong>Messaging is not available yet</strong><p>There is no messaging service connected to this account. You can review and respond to provider quotes from your Offers page.</p><button className="small-primary" onClick={() => setSection('offers')}>View offers</button></div></Card>;
     }
 
     if (customerMode && section === 'profile') {
