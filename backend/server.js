@@ -16,6 +16,7 @@ const allowedOrigins = process.env.FRONTEND_ORIGIN
 app.use(cors({
   origin: allowedOrigins,
   methods: ['GET', 'POST'],
+  methods: ["GET", "POST"],
   credentials: true
 }));
 app.use(express.json());
@@ -26,6 +27,7 @@ const io = new Server(server, {
   cors: {
     origin: allowedOrigins,
     methods: ['GET', 'POST']
+    methods: ["GET", "POST"]
   }
 });
 
