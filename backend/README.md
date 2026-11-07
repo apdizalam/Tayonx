@@ -27,3 +27,16 @@ All `/api/requests` endpoints require a bearer token from the login response. Re
 | `PATCH` | `/api/requests/offers/:offerId/status` | Request owner or admin | Accept or decline a quote |
 
 Request fields are `product`, `sourceCountry`, `destination`, `quantity`, and optional `details`. Offer fields are `price`, `deliveryDays`, and optional `includes`. Shipment statuses progress through `open`, `offers_received`, `in_progress`, `purchased`, `shipping`, and `delivered`; a customer may cancel before delivery. Only the assigned provider can advance an accepted shipment.
+
+## Admin user management API
+
+All `/api/users` endpoints require a bearer token belonging to an administrator. The routes read and update the `User` collection in MongoDB.
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/api/users` | List registered accounts without returning password hashes |
+| `POST` | `/api/users` | Create an account with a name, email, password, country, and role |
+| `PUT` | `/api/users/:id` | Update supplied account fields; a password is optional |
+| `DELETE` | `/api/users/:id` | Delete an account |
+
+The admin create form supports the `customer`, `cargo_provider`, and `individual_cargo` roles. Passwords must be at least 8 characters and are hashed with bcrypt before storage. Email addresses must be unique. Administrators can edit existing admin accounts, but cannot delete their own account, demote themselves, or remove/demote the last administrator. Invalid IDs and fields return `400`; duplicate emails return `409`; unauthenticated and unauthorized requests return `401` and `403`.

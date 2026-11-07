@@ -5,8 +5,13 @@ const { authenticate, requireRole } = require('../middleware/authenticate');
 
 const router = express.Router();
 const requestStatuses = ['open', 'offers_received', 'in_progress', 'purchased', 'shipping', 'delivered', 'cancelled'];
+const cargoProviderRoles = ['cargo_provider', 'individual_cargo'];
 
 router.use(authenticate);
+
+function isCargoProvider(user) {
+  return cargoProviderRoles.includes(user.role);
+}
 
 function databaseUnavailable(res) {
   return res.status(503).json({ error: 'The shipping request service is unavailable.' });
@@ -47,7 +52,7 @@ router.get('/', async (req, res) => {
     let filter = {};
     if (req.user.role === 'customer') {
       filter = { customer: req.user._id };
-    } else if (req.user.role === 'cargo_provider') {
+    } else if (isCargoProvider(req.user)) {
       filter = req.query.scope === 'offers'
         ? { 'offers.provider': req.user._id }
         : {
@@ -57,7 +62,7 @@ router.get('/', async (req, res) => {
         };
     }
     let query = ShippingRequest.find(filter);
-    const hideOffers = req.user.role === 'cargo_provider' && req.query.scope !== 'offers';
+    const hideOffers = isCargoProvider(req.user) && req.query.scope !== 'offers';
     if (hideOffers) query = query.select('-offers');
     query = query.populate('customer', 'name').sort({ createdAt: -1 });
     if (!hideOffers) query = query.populate('offers.provider', 'name');
@@ -88,7 +93,7 @@ router.get('/offers', async (req, res) => {
   try {
     let filter = {};
     if (req.user.role === 'customer') filter = { customer: req.user._id };
-    if (req.user.role === 'cargo_provider') filter = { 'offers.provider': req.user._id };
+    if (isCargoProvider(req.user)) filter = { 'offers.provider': req.user._id };
     const requests = await ShippingRequest.find(filter)
       .populate('customer', 'name')
       .populate('offers.provider', 'name')
@@ -96,7 +101,7 @@ router.get('/offers', async (req, res) => {
     const offers = requests.flatMap((request) => request.offers
       .filter((offer) => req.user.role === 'admin'
         || (req.user.role === 'customer' && request.customer?._id.equals(req.user._id))
-        || (req.user.role === 'cargo_provider' && offer.provider?._id.equals(req.user._id)))
+        || (isCargoProvider(req.user) && offer.provider?._id.equals(req.user._id)))
       .map((offer) => ({
         ...offer.toObject(),
         request: {
@@ -127,12 +132,12 @@ router.get('/:id', async (req, res) => {
     if (req.user.role === 'customer' && (!request.customer || !request.customer._id.equals(req.user._id))) {
       return res.status(403).json({ error: 'You do not have access to this request.' });
     }
-    if (req.user.role === 'cargo_provider'
+    if (isCargoProvider(req.user)
       && !['open', 'offers_received'].includes(request.status)
       && !request.offers.some((offer) => offer.provider?._id.equals(req.user._id))) {
       return res.status(404).json({ error: 'Shipping request not found.' });
     }
-    if (req.user.role === 'cargo_provider') {
+    if (isCargoProvider(req.user)) {
       request.offers = request.offers.filter((offer) => offer.provider?._id.equals(req.user._id));
     }
     return res.json({ request });
@@ -180,7 +185,7 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
-router.post('/:id/decline', requireRole('cargo_provider'), async (req, res) => {
+router.post('/:id/decline', requireRole(...cargoProviderRoles), async (req, res) => {
   if (!validId(req.params.id)) return res.status(400).json({ error: 'Invalid request id.' });
   if (mongoose.connection.readyState !== 1) return databaseUnavailable(res);
 
@@ -201,7 +206,7 @@ router.post('/:id/decline', requireRole('cargo_provider'), async (req, res) => {
   }
 });
 
-router.post('/:id/offers', requireRole('cargo_provider'), async (req, res) => {
+router.post('/:id/offers', requireRole(...cargoProviderRoles), async (req, res) => {
   if (!validId(req.params.id)) return res.status(400).json({ error: 'Invalid request id.' });
   if (mongoose.connection.readyState !== 1) return databaseUnavailable(res);
 
@@ -235,7 +240,7 @@ router.post('/:id/offers', requireRole('cargo_provider'), async (req, res) => {
   }
 });
 
-router.put('/offers/:offerId', requireRole('cargo_provider', 'admin'), async (req, res) => {
+router.put('/offers/:offerId', requireRole(...cargoProviderRoles, 'admin'), async (req, res) => {
   if (!validId(req.params.offerId)) return res.status(400).json({ error: 'Invalid offer id.' });
   if (mongoose.connection.readyState !== 1) return databaseUnavailable(res);
 
@@ -263,7 +268,7 @@ router.put('/offers/:offerId', requireRole('cargo_provider', 'admin'), async (re
   }
 });
 
-router.delete('/offers/:offerId', requireRole('cargo_provider', 'admin'), async (req, res) => {
+router.delete('/offers/:offerId', requireRole(...cargoProviderRoles, 'admin'), async (req, res) => {
   if (!validId(req.params.offerId)) return res.status(400).json({ error: 'Invalid offer id.' });
   if (mongoose.connection.readyState !== 1) return databaseUnavailable(res);
 
@@ -329,7 +334,7 @@ router.patch('/:id/status', async (req, res) => {
     const isOwner = request.customer.equals(req.user._id);
     const assignedProvider = request.offers.some((offer) => offer.provider.equals(req.user._id) && offer.status === 'accepted');
     if (req.user.role === 'customer' && !isOwner) return res.status(403).json({ error: 'Only the request owner can update this shipment.' });
-    if (req.user.role === 'cargo_provider' && !assignedProvider) return res.status(403).json({ error: 'Only the selected cargo provider can update this shipment.' });
+    if (isCargoProvider(req.user) && !assignedProvider) return res.status(403).json({ error: 'Only the selected cargo provider can update this shipment.' });
 
     const transitions = {
       open: ['cancelled'],
