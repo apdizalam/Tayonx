@@ -1,940 +1,630 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
-import { useNavigate as useRouterNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import logo from '../assets/tayonx-logo.png';
 import Icon from './Icon.jsx';
+import {
+  apiRequest,
+  createOffer,
+  createRequest,
+  declineRequest,
+  deleteOffer,
+  deleteRequest,
+  getOffers,
+  getRequests,
+  respondToOffer,
+  updateOffer,
+  updateRequest,
+  updateShipmentStatus,
+} from '../lib/api.js';
 import '../App.css';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || '';
-const dashboardPaths = {
-  admin: '/admin/dashboard',
-  customer: '/customer/dashboard',
-  cargo_provider: '/cargo/dashboard',
-};
-
-const roles = {
+const roleConfig = {
   customer: {
     label: 'Customer',
-    name: 'Abdi Hassan',
-    initials: 'AH',
-    descriptor: 'Customer workspace',
-    navigation: [
+    sections: [
       ['overview', 'Dashboard', 'home'],
       ['requests', 'My requests', 'box'],
-      ['new-request', 'New request', 'plus'],
+      ['offers', 'Offers', 'mail'],
       ['companies', 'Cargo companies', 'building'],
       ['messages', 'Chat', 'chat'],
       ['notifications', 'Notifications', 'bell'],
       ['profile', 'Profile', 'user'],
+      ['new-request', 'New request', 'plus'],
     ],
   },
   provider: {
     label: 'Cargo provider',
-    name: 'Global Cargo Ltd',
-    initials: 'GC',
-    descriptor: 'Provider workspace',
-    navigation: [
-      ['overview', 'Dashboard', 'home'],
-      ['opportunities', 'Requests', 'box'],
-      ['offers', 'My offers', 'mail'],
-      ['messages', 'Chats', 'chat'],
-      ['profile', 'Company profile', 'building'],
-    ],
+    sections: [['overview', 'Overview', 'home'], ['opportunities', 'Requests', 'box'], ['offers', 'My offers', 'mail']],
   },
   admin: {
     label: 'Admin',
-    name: 'Tayonx Admin',
-    initials: 'SA',
-    descriptor: 'Admin workspace',
-    navigation: [
-      ['overview', 'Dashboard', 'home'],
-      ['requests', 'Requests', 'box'],
-      ['companies', 'Cargo companies', 'building'],
-      ['users', 'Users', 'users'],
-      ['messages', 'Chats & reports', 'chat'],
-      ['reports', 'Analytics', 'chart'],
-      ['settings', 'Settings', 'settings'],
-    ],
+    sections: [['overview', 'Overview', 'home'], ['requests', 'All requests', 'box'], ['offers', 'All offers', 'mail']],
   },
 };
 
-const customerRequests = [
-  { id: 'TX-2048', product: '50 business laptops', route: 'China → Hargeisa', date: 'Oct 24, 2026', offers: 4, status: 'Offers received' },
-  { id: 'TX-2041', product: 'Cotton fabric · 200 yards', route: 'Turkey → Hargeisa', date: 'Oct 21, 2026', offers: 2, status: 'In progress' },
-  { id: 'TX-2035', product: 'Solar panels · 20 units', route: 'China → Berbera', date: 'Oct 18, 2026', offers: 0, status: 'Open' },
-  { id: 'TX-2019', product: 'Home furniture set', route: 'Turkey → Hargeisa', date: 'Oct 11, 2026', offers: 3, status: 'Delivered' },
-];
+const shipmentStatuses = ['open', 'offers_received', 'in_progress', 'purchased', 'shipping', 'delivered', 'cancelled'];
 
-const opportunities = [
-  { id: 'TX-2052', product: 'LED lighting · 500 units', route: 'China → Hargeisa', date: 'Today', budget: '$4,500–$5,200', customer: 'Nimco A.' },
-  { id: 'TX-2048', product: '50 business laptops', route: 'China → Hargeisa', date: '2 hours ago', budget: '$18,000–$21,000', customer: 'Abdi H.' },
-  { id: 'TX-2045', product: 'Kitchen appliances · 30 units', route: 'Turkey → Berbera', date: 'Yesterday', budget: '$2,800–$3,400', customer: 'Mohamed A.' },
-];
-
-const pendingCompanies = [
-  { id: 'CO-118', name: 'Eastway Logistics', country: 'China', submitted: 'Oct 25, 2026', initials: 'EL' },
-  { id: 'CO-117', name: 'Anatolia Cargo', country: 'Turkey', submitted: 'Oct 24, 2026', initials: 'AC' },
-  { id: 'CO-115', name: 'Silk Road Shipping', country: 'China', submitted: 'Oct 22, 2026', initials: 'SR' },
-];
-
-const conversations = [
-  { initials: 'ML', name: 'Muna Logistics', message: 'We can deliver to Hargeisa in 18 days.', time: '10:42 AM', unread: 2 },
-  { initials: 'OC', name: 'Orient Cargo', message: 'Offer updated — customs included.', time: 'Yesterday', unread: 0 },
-  { initials: 'AC', name: 'Anatolia Cargo', message: 'Thanks! I will review the details.', time: 'Tue', unread: 0 },
-];
+function statusLabel(status) {
+  return status.replaceAll('_', ' ');
+}
 
 function StatusBadge({ children }) {
-  const statusClass = children.toLowerCase().replaceAll(' ', '-');
-  return <span className={`status-badge status-${statusClass}`}>{children}</span>;
-}
-
-function PageTitle({ eyebrow, title, description, action }) {
-  return (
-    <div className="page-title-row">
-      <div>
-        <p className="eyebrow">{eyebrow}</p>
-        <h1>{title}</h1>
-        <p className="page-description">{description}</p>
-      </div>
-      {action}
-    </div>
-  );
-}
-
-function StatCard({ label, value, change, icon, tone = 'blue' }) {
-  return (
-    <article className="stat-card">
-      <span className={`stat-icon stat-icon-${tone}`}><Icon name={icon} /></span>
-      <p className="stat-label">{label}</p>
-      <div className="stat-value-row">
-        <strong>{value}</strong>
-        <span className={`stat-change ${change.startsWith('+') ? 'positive' : ''}`}>{change}</span>
-      </div>
-    </article>
-  );
+  return <span className={`status-badge status-${statusLabel(children).toLowerCase().replaceAll(' ', '-')}`}>{statusLabel(children)}</span>;
 }
 
 function Card({ children, className = '' }) {
   return <section className={`dashboard-card ${className}`}>{children}</section>;
 }
 
-function CardHeading({ title, action, subtitle }) {
+function CardHeading({ title, subtitle, action }) {
   return (
     <div className="card-heading">
-      <div>
-        <h2>{title}</h2>
-        {subtitle && <p>{subtitle}</p>}
-      </div>
+      <div><h2>{title}</h2>{subtitle && <p>{subtitle}</p>}</div>
       {action}
     </div>
   );
 }
 
-function Avatar({ initials, className = '' }) {
+function Avatar({ name, className = '' }) {
+  const initials = (name || 'User').split(/\s+/).slice(0, 2).map((part) => part[0] || '').join('').toUpperCase();
   return <span className={`avatar ${className}`}>{initials}</span>;
 }
 
-function RequestTable({ rows, onSelect, search }) {
-  const filteredRows = rows.filter((row) =>
-    `${row.id} ${row.product} ${row.route} ${row.status}`.toLowerCase().includes(search.toLowerCase()),
+function RequestTable({ requests, role, search, busyId, onEdit, onDelete, onSelectOffers, onStatusChange, onCreateOffer, onDeclineRequest }) {
+  const visibleRequests = requests.filter((request) =>
+    `${request.product} ${request.sourceCountry} ${request.destination} ${request.status} ${request.customer?.name || ''}`
+      .toLowerCase().includes(search.toLowerCase()),
   );
+
   return (
     <div className="table-scroll">
       <table className="data-table">
-        <thead>
-          <tr><th>Request</th><th>Route</th><th>Date</th><th>Offers</th><th>Status</th><th /></tr>
-        </thead>
+        <thead><tr><th>Shipping request</th><th>Route</th><th>Posted</th><th>Offers</th><th>Status</th><th>Actions</th></tr></thead>
         <tbody>
-          {filteredRows.map((row) => (
-            <tr key={row.id}>
-              <td><span className="table-primary">{row.product}</span><span className="table-secondary">{row.id}</span></td>
-              <td>{row.route}</td>
-              <td>{row.date}</td>
-              <td>{row.offers ? <button className="text-button" onClick={() => onSelect('offers', row.id)}>{row.offers} offers</button> : '—'}</td>
-              <td><StatusBadge>{row.status}</StatusBadge></td>
-              <td><button className="icon-button table-action" aria-label={`Open ${row.id}`} onClick={() => onSelect('offers', row.id)}><Icon name="arrow" size={17} /></button></td>
-            </tr>
-          ))}
-          {!filteredRows.length && <tr><td className="empty-table" colSpan="6">No requests match your search.</td></tr>}
+          {visibleRequests.map((request) => {
+            const canCancel = role === 'customer' && ['open', 'offers_received', 'in_progress'].includes(request.status);
+            const canComplete = role === 'customer' && request.status === 'shipping';
+            const canEdit = role === 'admin' || role === 'customer';
+            return (
+              <tr key={request._id}>
+                <td><span className="table-primary">{request.product} · {request.quantity}</span><span className="table-secondary">{request._id}</span></td>
+                <td>{request.sourceCountry} → {request.destination}</td>
+                <td>{new Date(request.createdAt).toLocaleDateString()}</td>
+                <td>{role === 'customer' && request.offers?.length
+                  ? <button className="text-button" onClick={() => onSelectOffers(request._id)}>{request.offers.length} offers</button>
+                  : request.offers?.length || '—'}</td>
+                <td>
+                  {role === 'admin' && <select aria-label={`Update status for ${request.product}`} value={request.status} disabled={busyId === request._id} onChange={(event) => onStatusChange(request._id, event.target.value)}>
+                    {shipmentStatuses.map((status) => <option value={status} key={status}>{statusLabel(status)}</option>)}
+                  </select>}
+                  {role === 'customer' && (canCancel || canComplete) && <select aria-label={`Update status for ${request.product}`} value={request.status} disabled={busyId === request._id} onChange={(event) => onStatusChange(request._id, event.target.value)}>
+                    <option value={request.status}>{statusLabel(request.status)}</option>
+                    <option value={canComplete ? 'delivered' : 'cancelled'}>{canComplete ? 'Mark delivered' : 'Cancel request'}</option>
+                  </select>}
+                  {role !== 'admin' && role !== 'customer' || (!canCancel && !canComplete && role === 'customer')
+                    ? <StatusBadge>{request.status}</StatusBadge>
+                    : null}
+                </td>
+                <td><div className="table-buttons">
+                  {canEdit && <button className="icon-button table-action" aria-label={`Edit ${request.product}`} onClick={() => onEdit(request)}><Icon name="edit" size={16} /></button>}
+                  {(role === 'customer' || role === 'admin') && <button className="icon-button table-action" aria-label={`Delete ${request.product}`} disabled={busyId === request._id} onClick={() => onDelete(request)}><Icon name="trash" size={16} /></button>}
+                  {role === 'customer' && <button className="icon-button table-action" aria-label={`View offers for ${request.product}`} onClick={() => onSelectOffers(request._id)}><Icon name="arrow" size={17} /></button>}
+                  {role === 'provider' && ['open', 'offers_received'].includes(request.status) && <><button className="customer-outline-button" disabled={busyId === request._id} onClick={() => onDeclineRequest(request._id)}>Decline</button><button className="small-primary" disabled={busyId === request._id} onClick={() => onCreateOffer(request)}>Send offer</button></>}
+                </div></td>
+              </tr>
+            );
+          })}
+          {!visibleRequests.length && <tr><td className="empty-table" colSpan="6">{search ? 'No requests match your search.' : 'No shipping requests yet.'}</td></tr>}
         </tbody>
       </table>
     </div>
   );
 }
 
-function ActivityFeed({ items }) {
-  return (
-    <div className="activity-feed">
-      {items.map((item) => (
-        <div className="activity-item" key={`${item.title}-${item.time}`}>
-          <span className={`activity-dot ${item.tone || ''}`} />
-          <div><p>{item.title}</p><span>{item.detail}</span></div>
-          <time>{item.time}</time>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function OverviewChart() {
-  const bars = [35, 54, 42, 69, 48, 77, 58, 88, 63, 74, 54, 96];
-  return (
-    <div className="chart-area" aria-label="Requests increased over the last 12 months">
-      <div className="chart-y-labels"><span>120</span><span>80</span><span>40</span><span>0</span></div>
-      <div className="chart">
-        {bars.map((height, index) => (
-          <span className="chart-column" key={index}>
-            <i style={{ height: `${height}%` }} />
-            <small>{['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][index]}</small>
-          </span>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function CustomerDashboard({ onNavigate, onAction }) {
-  const requests = [
-    { name: 'Laptops · 50 pcs', detail: 'From China · posted Nov 4, 2026', icon: 'laptop', status: '3 offers', tone: 'info' },
-    { name: 'Wireless earbuds · 200 pcs', detail: 'From China · Oct 30, 2026', icon: 'headphones', status: 'In progress', tone: 'warning' },
-    { name: 'Textiles · 2 rolls', detail: 'From Turkey · Oct 12, 2026', icon: 'package', status: 'Delivered', tone: 'success' },
-  ];
-  const companies = [
-    { initials: 'GC', name: 'Global Cargo Trade', meta: '4.8 (120 reviews) · China', tone: 'navy' },
-    { initials: 'IS', name: 'Istanbul Express Cargo', meta: '4.6 (84 reviews) · Turkey', tone: 'blue' },
-  ];
-  const chats = [
-    { initials: 'GC', name: 'Global Cargo Trade', message: 'Yes! We can help you. Please tell us the model...', time: '10:22', unread: true },
-    { initials: 'IS', name: 'Istanbul Express Cargo', message: 'Fabric samples are ready.', time: 'Yesterday', unread: false },
-  ];
-
-  return (
-    <div className="customer-dashboard">
-      <div className="customer-stats-grid">
-        {[
-          { label: 'Active requests', value: '2', icon: 'box' },
-          { label: 'Offers waiting', value: '3', icon: 'mail' },
-          { label: 'Active chat', value: '1', icon: 'chat' },
-          { label: 'Completed', value: '1', icon: 'check' },
-        ].map((stat) => (
-          <article className="customer-stat-card" key={stat.label}>
-            <span className="customer-stat-icon"><Icon name={stat.icon} size={17} /></span>
-            <div><strong>{stat.value}</strong><span>{stat.label}</span></div>
-          </article>
-        ))}
-      </div>
-
-      <section className="offers-notice">
-        <Icon name="mail" size={18} />
-        <div><strong>3 offers for “50 × laptops”</strong><span>Compare price, delivery time and rating before you accept.</span></div>
-        <button className="small-primary" onClick={() => onNavigate('offers')}>Compare offers</button>
-      </section>
-
-      <div className="customer-dashboard-grid customer-dashboard-grid-main">
-        <Card className="customer-list-card">
-          <CardHeading
-            title="My recent requests"
-            action={<button className="link-button" onClick={() => onNavigate('requests')}>View all <Icon name="arrow" size={15} /></button>}
-          />
-          <div className="customer-request-list">
-            {requests.map((request) => (
-              <button className="customer-request-row" key={request.name} onClick={() => onNavigate('requests')}>
-                <span className="customer-request-icon"><Icon name={request.icon} size={19} /></span>
-                <span className="customer-row-copy"><strong>{request.name}</strong><small>{request.detail}</small></span>
-                <span className={`customer-status customer-status-${request.tone}`}>{request.status}</span>
-              </button>
-            ))}
-          </div>
-        </Card>
-
-        <Card className="customer-tracking-card">
-          <CardHeading title="Tracking: earbuds" action={<span className="customer-status customer-status-warning">In progress</span>} />
-          <ol className="shipment-tracking">
-            <li className="complete"><i /><span><strong>Offer accepted</strong><small>Global Cargo Trade · Oct 31</small></span></li>
-            <li className="complete"><i /><span><strong>Goods purchased</strong><small>Shenzhen · Nov 2</small></span></li>
-            <li className="current"><i /><span><strong>Shipping to Berbera</strong><small>Est. arrival · Confirm</small></span></li>
-            <li><i /><span><strong>Delivered to Hargeisa</strong></span></li>
-          </ol>
-        </Card>
-      </div>
-
-      <div className="customer-dashboard-grid customer-dashboard-grid-secondary">
-        <Card className="customer-list-card">
-          <CardHeading
-            title="Top cargo companies"
-            action={<button className="link-button" onClick={() => onNavigate('companies')}>View all <Icon name="arrow" size={15} /></button>}
-          />
-          <div className="customer-compact-list">
-            {companies.map((company) => (
-              <div className="customer-company-row" key={company.name}>
-                <Avatar initials={company.initials} className={`customer-company-avatar ${company.tone}`} />
-                <span className="customer-row-copy"><strong>{company.name} <i>✓ Verified</i></strong><small><b>★</b> {company.meta}</small></span>
-                <button className="customer-outline-button" onClick={() => { onNavigate('messages'); onAction('message:opened'); }}>Chat</button>
-              </div>
-            ))}
-          </div>
-        </Card>
-
-        <Card className="customer-list-card">
-          <CardHeading
-            title="Recent chats"
-            action={<button className="link-button" onClick={() => onNavigate('messages')}>Open chat <Icon name="arrow" size={15} /></button>}
-          />
-          <div className="customer-compact-list">
-            {chats.map((chat) => (
-              <button className="customer-chat-row" key={chat.name} onClick={() => onNavigate('messages')}>
-                <Avatar initials={chat.initials} className={`customer-company-avatar ${chat.initials === 'GC' ? 'navy' : 'blue'}`} />
-                <span className="customer-row-copy"><strong>{chat.name}</strong><small>{chat.message}</small></span>
-                <span className="customer-chat-time">{chat.time}{chat.unread && <i>1</i>}</span>
-              </button>
-            ))}
-          </div>
-        </Card>
-      </div>
-
-      <p className="customer-sample-note">All names and numbers are <span>SAMPLE</span> data from the concept.</p>
-    </div>
-  );
-}
-
-function ProviderDashboard({ onNavigate, onAction }) {
-  const [requestFilter, setRequestFilter] = useState('China');
-  const requests = [
-    { id: 'TX-2055', product: 'MacBook Pro · 20 pcs', detail: '14-inch, M-series · budget [$–] · needed by Dec 20', location: 'Hargeisa', time: '12 min ago', icon: 'laptop', country: 'China' },
-    { id: 'TX-2054', product: 'Laptops · 50 pcs', detail: 'Core i5, 16 GB · sea freight OK', location: 'Hargeisa', time: '2 h ago', icon: 'laptop', country: 'China' },
-    { id: 'TX-2053', product: 'Solar panels · 40 pcs', detail: '400 W mono · to Berbera port', location: 'Borama', time: 'Yesterday', icon: 'package', country: 'China' },
-    { id: 'TX-2052', product: 'Phone cases · 1,000 pcs', detail: 'Mixed models · air freight', location: 'Burao', time: 'Yesterday', icon: 'user', country: 'China' },
-    { id: 'TX-2051', product: 'Cotton fabric · 200 yards', detail: 'Woven cotton · delivery to Hargeisa', location: 'Hargeisa', time: 'Yesterday', icon: 'package', country: 'Turkey' },
-  ];
-  const chats = [
-    { initials: 'AH', name: 'Abdi Hassan', message: 'Thanks for your response!', time: '10:24', unread: '2' },
-    { initials: 'AA', name: 'Ahmed Ali', message: 'Okay, thank you!', time: 'Yesterday' },
-  ];
-  const visibleRequests = requests.filter((request) => requestFilter === 'All' || request.country === requestFilter);
-
-  return (
-    <div className="provider-dashboard">
-      <div className="provider-stats-grid">
-        {[
-          { label: 'New requests', value: '8', icon: 'box' },
-          { label: 'Active chats', value: '5', icon: 'chat' },
-          { label: 'Customers served', value: '12', icon: 'check' },
-          { label: 'Rating · 120 reviews', value: '4.8', icon: 'star', tone: 'amber' },
-        ].map((stat) => (
-          <article className="provider-stat-card" key={stat.label}>
-            <span className={`provider-stat-icon${stat.tone ? ` ${stat.tone}` : ''}`}><Icon name={stat.icon} size={16} /></span>
-            <div><strong>{stat.value}</strong><span>{stat.label}</span></div>
-          </article>
-        ))}
-      </div>
-
-      <div className="provider-dashboard-grid">
-        <Card className="provider-requests-card">
-          <CardHeading
-            title="New requests for you"
-            action={<div className="provider-request-filters">{['China', 'All'].map((filter) => <button className={requestFilter === filter ? 'active' : ''} key={filter} onClick={() => setRequestFilter(filter)}>{filter}</button>)}</div>}
-          />
-          <div className="provider-request-list">
-            {visibleRequests.map((request) => (
-              <article className="provider-request-row" key={request.id}>
-                <span className="customer-request-icon"><Icon name={request.icon} size={19} /></span>
-                <button className="provider-request-info" onClick={() => onNavigate('opportunities')}>
-                  <div className="provider-request-title"><strong>{request.product}</strong><span>● New</span></div>
-                  <small>{request.detail}</small>
-                  <div className="provider-request-meta"><span><b>SO</b>{request.location}</span><small>{request.time}</small></div>
-                </button>
-                <div className="provider-request-actions">
-                  <button className="customer-outline-button" onClick={() => onAction(`decline:${request.id}`)}>Decline</button>
-                  <button className="small-primary" onClick={() => onAction(`offer:${request.id}`)}>Send offer</button>
-                </div>
-              </article>
-            ))}
-          </div>
-        </Card>
-
-        <div className="provider-dashboard-aside">
-          <Card className="provider-list-card">
-            <CardHeading title="Chats" action={<button className="link-button" onClick={() => onNavigate('messages')}>View all <Icon name="arrow" size={14} /></button>} />
-            <div className="customer-compact-list">
-              {chats.map((chat) => (
-                <button className="customer-chat-row" key={chat.name} onClick={() => onNavigate('messages')}>
-                  <Avatar initials={chat.initials} className="provider-chat-avatar" />
-                  <span className="customer-row-copy"><strong>{chat.name}</strong><small>{chat.message}</small></span>
-                  <span className="customer-chat-time">{chat.time}{chat.unread && <i>{chat.unread}</i>}</span>
-                </button>
-              ))}
-            </div>
-          </Card>
-
-          <Card className="provider-performance-card">
-            <CardHeading title="This month" />
-            <div className="provider-performance">
-              <div><span>Offer win rate</span><strong>42%</strong><i><b style={{ width: '42%' }} /></i></div>
-              <div><span>Reply within 1 hour</span><strong>88%</strong><i><b style={{ width: '88%' }} /></i></div>
-              <p>Fast replies rank you higher for customers. <span>SAMPLE</span></p>
-            </div>
-          </Card>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function AdminDashboard({ onNavigate, onAction, period }) {
-  const latestRequests = [
-    { id: 'REQ-1051', customer: 'Abdi Hassan', product: 'MacBook Pro × 20', source: 'China', offers: 4, status: 'Open' },
-    { id: 'REQ-1042', customer: 'Abdi Hassan', product: 'Laptops × 50', source: 'China', offers: 3, status: 'Offers received' },
-    { id: 'REQ-1037', customer: 'Ahmed Ali', product: 'Textiles × 2 rolls', source: 'Turkey', offers: 2, status: 'In progress' },
-    { id: 'REQ-1029', customer: 'Hodan Yusuf', product: 'Solar panels × 40', source: 'China', offers: 5, status: 'Delivered' },
-  ];
-
-  return (
-    <div className="admin-dashboard" data-period={period}>
-      <div className="admin-kpi-grid">
-        {[
-          { label: 'Customers', value: '1.2K', detail: 'Up 8% this month', icon: 'users', tone: 'blue' },
-          { label: 'Cargo companies', value: '350', detail: '12 new', icon: 'building', tone: 'green' },
-          { label: 'Requests', value: '2.4K', detail: 'Up 15%', icon: 'box', tone: 'navy' },
-          { label: 'Awaiting verification', value: '6', detail: 'Review now', icon: 'shield', tone: 'amber', action: true },
-        ].map((stat) => (
-          <button className={`admin-kpi admin-kpi-${stat.tone}`} key={stat.label} onClick={stat.action ? () => onNavigate('companies') : undefined}>
-            <span className="admin-kpi-icon"><Icon name={stat.icon} size={16} /></span>
-            <span className="admin-kpi-content"><strong>{stat.value}</strong><span>{stat.label}</span><small>{stat.action ? <><u>Review now</u></> : stat.detail}</small></span>
-          </button>
-        ))}
-      </div>
-
-      <div className="admin-insights-grid">
-        <Card className="admin-insight-card">
-          <CardHeading title="Requests overview" action={<span className="admin-caption">1,600 total</span>} />
-          <div className="admin-request-overview">
-            <div className="admin-donut" role="img" aria-label="Requests: 53% completed, 33% open, 14% cancelled"><span>53%</span></div>
-            <div className="admin-legend">
-              <div><i className="completed" />Completed<strong>850</strong></div>
-              <div><i className="open" />Open<strong>520</strong></div>
-              <div><i className="cancelled" />Cancelled<strong>230</strong></div>
-            </div>
-          </div>
-        </Card>
-
-        <Card className="admin-insight-card">
-          <CardHeading title="Requests by source" />
-          <div className="admin-source-content">
-            <div className="admin-source-item"><span><b>CN</b>China</span><strong>72%</strong><i><b style={{ width: '72%' }} /></i></div>
-            <div className="admin-source-item"><span><b>TR</b>Turkey</span><strong>28%</strong><i><b className="turkey" style={{ width: '28%' }} /></i></div>
-            <p>Top categories: Electronics · Textiles · Household</p>
-          </div>
-        </Card>
-
-        <Card className="admin-insight-card">
-          <CardHeading title="Recent activity" action={<button className="link-button" onClick={() => onNavigate('messages')}>All <Icon name="arrow" size={14} /></button>} />
-          <ol className="admin-activity-list">
-            <li className="current"><i /><span><strong>New request · Laptops × 50</strong><small>Abdi Hassan · 2 min ago</small></span></li>
-            <li className="success"><i /><span><strong>Offer accepted</strong><small>Global Cargo Trade · 5 min ago</small></span></li>
-            <li><i /><span><strong>Company applied</strong><small>Anatolia Freight · 8 min ago</small></span></li>
-          </ol>
-        </Card>
-      </div>
-
-      <div className="admin-lower-grid">
-        <Card className="admin-latest-card">
-          <CardHeading title="Latest requests" action={<button className="link-button" onClick={() => onNavigate('requests')}>View all <Icon name="arrow" size={14} /></button>} />
-          <div className="table-scroll">
-            <table className="data-table admin-latest-table">
-              <thead><tr><th>ID</th><th>Customer</th><th>Product</th><th>Source</th><th>Offers</th><th>Status</th></tr></thead>
-              <tbody>{latestRequests.map((request) => (
-                <tr key={request.id} onClick={() => onNavigate('requests')}>
-                  <td className="admin-request-id">{request.id}</td><td>{request.customer}</td><td>{request.product}</td><td>{request.source}</td><td className="admin-offer-count">{request.offers}</td>
-                  <td><span className={`customer-status ${request.status === 'In progress' ? 'customer-status-warning' : request.status === 'Delivered' ? 'customer-status-success' : 'customer-status-info'}`}>{request.status}</span></td>
-                </tr>
-              ))}</tbody>
-            </table>
-          </div>
-        </Card>
-
-        <Card className="admin-attention-card">
-          <CardHeading title="Needs attention" action={<span className="admin-danger-count">● 2</span>} />
-          <div className="admin-attention-item">
-            <Icon name="alert" size={16} />
-            <span><strong>Chat reported by a customer</strong><small>Possible payment outside Tayonx · Mersin Shipping</small></span>
-            <button onClick={() => onAction('attention:chat')}>Review</button>
-          </div>
-          <div className="admin-attention-item warning">
-            <Icon name="clock" size={16} />
-            <span><strong>Request with no offers for 3 days</strong><small>REQ-1018 · Building tiles · Turkey</small></span>
-            <button onClick={() => onAction('attention:request')}>Review</button>
-          </div>
-        </Card>
-      </div>
-
-      <p className="admin-sample-note">All figures are <span>SAMPLE</span> data from the concept.</p>
-    </div>
-  );
-}
-
-function Overview({ role, onNavigate, onAction, verifiedCompanies, adminPeriod }) {
-  if (role === 'customer') {
-    return <CustomerDashboard onNavigate={onNavigate} onAction={onAction} />;
+function OffersTable({ offers, role, busyId, onEdit, onDelete, onRespond, onStatusChange }) {
+  if (!offers.length) {
+    return <p className="empty-table">{role === 'customer' ? 'No offers have been submitted for your requests.' : 'You have not sent any offers yet.'}</p>;
   }
 
-  if (role === 'provider') {
-    return <ProviderDashboard onNavigate={onNavigate} onAction={onAction} />;
-  }
-
-  if (role === 'admin') {
-    return <AdminDashboard onNavigate={onNavigate} onAction={onAction} period={adminPeriod} />;
-  }
-
-  return (
-    <>
-      <div className="stats-grid">
-        <StatCard label="Total requests" value="1,284" change="+12.8% this month" icon="box" />
-        <StatCard label="Active companies" value="86" change="+6 this month" icon="building" tone="green" />
-        <StatCard label="Pending verification" value={String(verifiedCompanies.length)} change="Needs review" icon="shield" tone="amber" />
-        <StatCard label="Completed orders" value="942" change="+8.4% this month" icon="check" tone="navy" />
-      </div>
-      <div className="dashboard-columns admin-columns">
-        <Card className="wide-card">
-          <CardHeading title="Request activity" subtitle="Marketplace requests over the last 12 months" action={<button className="select-button">Last 12 months <span>⌄</span></button>} />
-          <OverviewChart />
-        </Card>
-        <Card>
-          <CardHeading title="Recent activity" />
-          <ActivityFeed items={[
-            { title: 'Company submitted for review', detail: 'Eastway Logistics · China', time: '8 min', tone: 'amber' },
-            { title: 'Request marked delivered', detail: 'TX-2019 · Hargeisa', time: '35 min', tone: 'green' },
-            { title: 'New customer request', detail: 'LED lighting · 500 units', time: '1 hr', tone: 'blue' },
-          ]} />
-        </Card>
-      </div>
-      <Card>
-        <CardHeading title="Companies awaiting verification" subtitle="Review documents before providers can send offers" action={<button className="link-button" onClick={() => onNavigate('verification')}>Review all <Icon name="arrow" size={16} /></button>} />
-        <CompanyTable
-          companies={verifiedCompanies.slice(0, 3)}
-          onReview={() => onNavigate('verification')}
-          onVerify={() => onNavigate('verification')}
-          onReject={() => onNavigate('verification')}
-        />
-      </Card>
-    </>
-  );
-}
-
-function CompanyTable({ companies, onReview, onVerify, onReject }) {
-  if (!companies.length) {
-    return <div className="empty-state"><span className="empty-state-icon"><Icon name="check" size={22} /></span><strong>All caught up</strong><p>There are no companies waiting for verification.</p></div>;
-  }
   return (
     <div className="table-scroll">
-      <table className="data-table company-table">
-        <thead><tr><th>Company</th><th>Country</th><th>Submitted</th><th>Documents</th><th>Action</th></tr></thead>
-        <tbody>
-          {companies.map((company) => (
-            <tr key={company.id}>
-              <td><span className="company-cell"><Avatar initials={company.initials} /><span><b>{company.name}</b><small>{company.id}</small></span></span></td>
-              <td><span className="country-chip">{company.country}</span></td>
-              <td>{company.submitted}</td>
-              <td><button className="text-button" onClick={onReview}><Icon name="download" size={15} /> Business license</button></td>
-              <td><div className="table-buttons"><button className="approve-button" onClick={() => onVerify?.(company.id)}>Approve</button><button className="reject-button" onClick={() => onReject?.(company.id)}>Reject</button></div></td>
+      <table className="data-table">
+        <thead><tr><th>Request</th><th>{role === 'customer' || role === 'admin' ? 'Cargo provider' : 'Customer'}</th><th>Quote</th><th>Delivery</th><th>Status / shipment</th><th>Actions</th></tr></thead>
+        <tbody>{offers.map((offer) => {
+          const nextStatus = { in_progress: 'purchased', purchased: 'shipping', shipping: 'delivered' }[offer.request.status];
+          return (
+            <tr key={offer._id}>
+              <td><span className="table-primary">{offer.request.product}</span><span className="table-secondary">{offer.request.id}</span></td>
+              <td>{role === 'customer' || role === 'admin' ? offer.provider?.name || 'Cargo provider' : offer.request.customer?.name || 'Customer'}</td>
+              <td><b>{new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(offer.price)}</b></td>
+              <td>{offer.deliveryDays} days</td>
+              <td>{role === 'provider' && offer.status === 'accepted' && nextStatus
+                ? <select aria-label="Update shipment progress" value={offer.request.status} disabled={busyId === offer.request.id} onChange={(event) => onStatusChange(offer.request.id, event.target.value)}>
+                  <option value={offer.request.status}>{statusLabel(offer.request.status)}</option><option value={nextStatus}>{statusLabel(nextStatus)}</option>
+                </select>
+                : <StatusBadge>{role === 'provider' && offer.status === 'accepted' ? offer.request.status : offer.status}</StatusBadge>}</td>
+              <td><div className="table-buttons">
+                {(role === 'provider' || role === 'admin') && offer.status === 'pending' && <>
+                  <button className="icon-button table-action" aria-label="Edit offer" onClick={() => onEdit(offer)}><Icon name="edit" size={16} /></button>
+                  <button className="icon-button table-action" aria-label="Delete offer" disabled={busyId === offer._id} onClick={() => onDelete(offer)}><Icon name="trash" size={16} /></button>
+                </>}
+                {role === 'customer' && offer.status === 'pending' && <>
+                  <button className="reject-button" disabled={busyId === offer._id} onClick={() => onRespond(offer, 'declined')}>Decline</button>
+                  <button className="approve-button" disabled={busyId === offer._id} onClick={() => onRespond(offer, 'accepted')}>Accept</button>
+                </>}
+              </div></td>
             </tr>
-          ))}
-        </tbody>
+          );
+        })}</tbody>
       </table>
     </div>
   );
 }
 
-function RequestsPage({ role, search, onNavigate, onAction }) {
-  return (
-    <Card>
-      <CardHeading title={role === 'admin' ? 'All marketplace requests' : 'Your sourcing requests'} subtitle={role === 'admin' ? 'Monitor requests across the marketplace' : 'Manage requests and review cargo company offers'} action={<span className="results-count">{customerRequests.length} requests</span>} />
-      <RequestTable rows={customerRequests} onSelect={onNavigate} search={search} />
-      {role === 'customer' && <button className="secondary-button page-bottom-action" onClick={() => onAction('new-request')}><Icon name="plus" size={17} />Create a new request</button>}
-    </Card>
-  );
-}
+function RequestForm({ request, saving, error, onSubmit, onClose }) {
+  const [values, setValues] = useState({
+    product: request?.product || '',
+    sourceCountry: request?.sourceCountry || 'China',
+    destination: request?.destination || '',
+    quantity: request?.quantity || '',
+    details: request?.details || '',
+  });
+  function change(event) {
+    setValues((current) => ({ ...current, [event.target.name]: event.target.value }));
+  }
 
-function CompaniesPage() {
-  const directory = [
-    { name: 'Muna Logistics', initials: 'ML', country: 'China', rating: '4.9', shipments: 128, route: 'Guangzhou → Hargeisa', tag: 'Verified' },
-    { name: 'Orient Cargo', initials: 'OC', country: 'China', rating: '4.8', shipments: 96, route: 'Yiwu → Berbera', tag: 'Verified' },
-    { name: 'Anatolia Cargo', initials: 'AC', country: 'Turkey', rating: '4.7', shipments: 74, route: 'Istanbul → Hargeisa', tag: 'Verified' },
-  ];
-  return (
-    <div className="company-grid">
-      {directory.map((company) => (
-        <Card className="directory-card" key={company.name}>
-          <div className="directory-top"><Avatar initials={company.initials} className="large-avatar" /><span className="verified-badge"><Icon name="check" size={13} />{company.tag}</span></div>
-          <h2>{company.name}</h2>
-          <p className="company-location">{company.country} <i /> {company.route}</p>
-          <div className="company-metrics"><span><strong>{company.rating}</strong> rating</span><span><strong>{company.shipments}</strong> shipments</span></div>
-          <button className="secondary-button full-button">View company <Icon name="arrow" size={16} /></button>
-        </Card>
-      ))}
-    </div>
-  );
-}
-
-function OpportunitiesPage({ search, onAction }) {
-  const filtered = opportunities.filter((item) => `${item.product} ${item.route} ${item.customer}`.toLowerCase().includes(search.toLowerCase()));
-  return (
-    <div className="opportunity-list">
-      {filtered.map((item) => (
-        <Card className="opportunity-card" key={item.id}>
-          <div className="opportunity-card-top"><span className="opportunity-icon"><Icon name="box" /></span><StatusBadge>Open</StatusBadge><span className="opportunity-date"><Icon name="clock" size={15} />{item.date}</span></div>
-          <h2>{item.product}</h2>
-          <div className="opportunity-details"><span><Icon name="globe" size={16} />{item.route}</span><span>Customer: {item.customer}</span><span>Budget: <b>{item.budget}</b></span></div>
-          <div className="opportunity-card-footer"><span>Request <b>{item.id}</b></span><button className="primary-button" onClick={() => onAction(`offer:${item.id}`)}>Send an offer <Icon name="arrow" size={16} /></button></div>
-        </Card>
-      ))}
-      {!filtered.length && <Card className="empty-state"><strong>No matching opportunities</strong><p>Try changing your search.</p></Card>}
-    </div>
-  );
-}
-
-function OffersPage({ onAction }) {
-  const offers = [
-    { id: 'TX-2048', product: '50 business laptops', customer: 'Abdi Hassan', amount: '$19,400', date: 'Oct 25, 2026', status: 'Under review' },
-    { id: 'TX-2038', product: 'Home furniture set', customer: 'Hodan M.', amount: '$2,250', date: 'Oct 19, 2026', status: 'Accepted' },
-    { id: 'TX-2028', product: 'Phone accessories · 300 units', customer: 'Sahra A.', amount: '$1,180', date: 'Oct 14, 2026', status: 'Declined' },
-  ];
-  return <Card><CardHeading title="Offers sent" subtitle="Track customer responses to your quotes" /><div className="table-scroll"><table className="data-table"><thead><tr><th>Request</th><th>Customer</th><th>Your offer</th><th>Sent</th><th>Status</th><th /></tr></thead><tbody>{offers.map((offer) => <tr key={offer.id}><td><span className="table-primary">{offer.product}</span><span className="table-secondary">{offer.id}</span></td><td>{offer.customer}</td><td><b>{offer.amount}</b></td><td>{offer.date}</td><td><StatusBadge>{offer.status}</StatusBadge></td><td><button className="icon-button table-action" aria-label={`View offer ${offer.id}`} onClick={() => onAction(`message:${offer.id}`)}><Icon name="arrow" size={17} /></button></td></tr>)}</tbody></table></div></Card>;
-}
-
-function CustomerOffersPage({ onAction }) {
-  const offers = [
-    { id: 'OF-884', company: 'Muna Logistics', initials: 'ML', rating: '4.9', amount: '$19,400', delivery: '18–22 days', includes: 'Shipping, customs & delivery' },
-    { id: 'OF-882', company: 'Orient Cargo', initials: 'OC', rating: '4.8', amount: '$20,150', delivery: '15–20 days', includes: 'Shipping & customs clearance' },
-    { id: 'OF-879', company: 'Silk Road Shipping', initials: 'SR', rating: '4.7', amount: '$18,950', delivery: '22–28 days', includes: 'Shipping to Hargeisa' },
-  ];
-  return (
-    <div className="offer-review-layout">
-      <Card>
-        <CardHeading title="50 business laptops" subtitle="Request TX-2048 · China → Hargeisa · 50 units" action={<StatusBadge>Offers received</StatusBadge>} />
-        <div className="offer-review-list">
-          {offers.map((offer, index) => (
-            <article className={`offer-review-card${index === 0 ? ' recommended' : ''}`} key={offer.id}>
-              <div className="offer-company">
-                <Avatar initials={offer.initials} />
-                <div><strong>{offer.company}</strong><span>★ {offer.rating} rating <i /> {offer.id}</span></div>
-                {index === 0 && <span className="recommend-label">BEST MATCH</span>}
-              </div>
-              <div className="offer-price"><strong>{offer.amount}</strong><span>Total estimated cost</span></div>
-              <div className="offer-facts"><span><Icon name="clock" size={15} />{offer.delivery}</span><span><Icon name="check" size={15} />{offer.includes}</span></div>
-              <div className="offer-actions"><button className="secondary-button" onClick={() => onAction(`message:${offer.id}`)}>Chat with company</button><button className="primary-button" onClick={() => onAction(`accept:${offer.id}`)}>Accept offer <Icon name="arrow" size={15} /></button></div>
-            </article>
-          ))}
-        </div>
-      </Card>
-      <Card className="offer-summary"><CardHeading title="Your request" /><div className="summary-item"><span>Product</span><strong>Business laptops</strong></div><div className="summary-item"><span>Quantity</span><strong>50 units</strong></div><div className="summary-item"><span>Ship to</span><strong>Hargeisa, Somaliland</strong></div><div className="summary-item"><span>Offers received</span><strong>4 companies</strong></div><button className="secondary-button full-button" onClick={() => onAction('request:TX-2048')}>View request details</button></Card>
-    </div>
-  );
-}
-
-function MessagesPage({ onAction }) {
-  const [selected, setSelected] = useState(0);
-  return (
-    <Card className="messages-card">
-      <div className="conversation-list">
-        <div className="conversation-heading"><h2>Conversations</h2><button className="icon-button" aria-label="New message" onClick={() => onAction('message:new')}><Icon name="plus" /></button></div>
-        {conversations.map((conversation, index) => (
-          <button className={`conversation-row${selected === index ? ' selected' : ''}`} key={conversation.name} onClick={() => setSelected(index)}>
-            <Avatar initials={conversation.initials} />
-            <span className="conversation-copy"><b>{conversation.name}</b><small>{conversation.message}</small></span>
-            <span className="conversation-meta"><time>{conversation.time}</time>{conversation.unread > 0 && <i>{conversation.unread}</i>}</span>
-          </button>
-        ))}
-      </div>
-      <div className="chat-pane">
-        <div className="chat-heading"><Avatar initials={conversations[selected].initials} /><span><b>{conversations[selected].name}</b><small><i /> Online · China</small></span><button className="icon-button" aria-label="Conversation details"><Icon name="dots" /></button></div>
-        <div className="chat-context"><span>Request TX-2048</span><b>50 business laptops</b><button onClick={() => onAction('request:TX-2048')}>View request</button></div>
-        <div className="chat-history"><p className="chat-day">TODAY</p><div className="chat-message received">Hello Abdi, we found the laptop model you requested. I’ve sent a detailed quote.<time>10:34 AM</time></div><div className="chat-message sent">Thanks! Does that include shipping to Hargeisa and customs?<time>10:38 AM</time></div><div className="chat-message received">Yes, the quote includes door-to-door shipping and customs clearance.<time>10:42 AM</time></div></div>
-        <form className="chat-composer" onSubmit={(event) => { event.preventDefault(); onAction('message:sent'); event.currentTarget.reset(); }}><input aria-label="Write a message" placeholder="Write a message…" required /><button className="primary-button" type="submit" aria-label="Send message"><Icon name="send" size={17} /></button></form>
-      </div>
-    </Card>
-  );
-}
-
-function ProfilePage({ onAction }) {
-  return (
-    <div className="profile-layout">
-      <Card className="profile-card"><div className="profile-identity"><Avatar initials="GC" className="profile-avatar" /><div><h2>Global Cargo Ltd</h2><p>Guangzhou, China · Member since 2024</p></div><StatusBadge>Verified</StatusBadge></div><p className="profile-description">Trusted sourcing and cargo partner connecting businesses across China and Somaliland. Our team supports procurement, quality checks, and reliable door-to-door delivery.</p><div className="profile-metrics"><span><b>4.8</b>Average rating</span><span><b>126</b>Completed orders</span><span><b>98%</b>Response rate</span></div><button className="secondary-button" onClick={() => onAction('profile:edit')}>Edit company profile</button></Card><Card><CardHeading title="Services & routes" /><div className="service-list"><span><Icon name="check" size={16} />Product sourcing</span><span><Icon name="check" size={16} />Quality inspection</span><span><Icon name="check" size={16} />Air and sea freight</span><span><Icon name="check" size={16} />Customs clearance</span></div><p className="eyebrow route-label">ACTIVE ROUTES</p><div className="route-chips"><span>Guangzhou → Hargeisa</span><span>Yiwu → Berbera</span></div></Card></div>
-  );
-}
-
-function ReportsPage() {
-  return <><div className="stats-grid"><StatCard label="New accounts" value="348" change="+16.2% vs last month" icon="building" /><StatCard label="Requests posted" value="512" change="+12.8% vs last month" icon="box" tone="green" /><StatCard label="Offer conversion" value="68.4%" change="+4.1% vs last month" icon="chart" tone="amber" /><StatCard label="Avg. time to match" value="4.2 hrs" change="−18% vs last month" icon="clock" tone="navy" /></div><Card><CardHeading title="Marketplace request growth" subtitle="Monthly request volume across the platform" action={<button className="secondary-button"><Icon name="download" size={16} />Export report</button>} /><OverviewChart /></Card></>;
-}
-
-function RequestForm({ onClose, onCreated }) {
   return (
     <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-      <form className="request-modal" onSubmit={(event) => { event.preventDefault(); onCreated(); }}>
-        <div className="modal-heading"><div><p className="eyebrow">NEW SOURCING REQUEST</p><h2>What are you looking for?</h2></div><button type="button" className="icon-button" aria-label="Close dialog" onClick={onClose}><Icon name="close" /></button></div>
-        <p className="page-description">Share a few details and verified companies can prepare an offer for you.</p>
-        <label>Product or item<input required placeholder="e.g. 50 business laptops" /></label>
-        <div className="form-row"><label>Source country<select defaultValue="China"><option>China</option><option>Turkey</option></select></label><label>Delivery to<input required defaultValue="Hargeisa, Somaliland" /></label></div>
-        <label>Quantity<input required placeholder="e.g. 50 units" /></label>
-        <label>Additional details<textarea rows="3" placeholder="Specifications, preferred brands, or other requirements" /></label>
-        <button className="primary-button full-button" type="submit">Post request <Icon name="arrow" size={17} /></button>
+      <form className="request-modal" onSubmit={(event) => { event.preventDefault(); onSubmit(values); }}>
+        <div className="modal-heading"><div><p className="eyebrow">{request ? 'EDIT SHIPPING REQUEST' : 'NEW SHIPPING REQUEST'}</p><h2>{request ? 'Update your request' : 'What are you looking for?'}</h2></div><button type="button" className="icon-button" aria-label="Close dialog" onClick={onClose}><Icon name="close" /></button></div>
+        <label>Product or item<input name="product" value={values.product} onChange={change} maxLength="160" required placeholder="e.g. 50 business laptops" /></label>
+        <div className="form-row"><label>Source country<select name="sourceCountry" value={values.sourceCountry} onChange={change}><option>China</option><option>Turkey</option><option>Other</option></select></label><label>Delivery to<input name="destination" value={values.destination} onChange={change} maxLength="160" required placeholder="City, country" /></label></div>
+        <label>Quantity<input name="quantity" value={values.quantity} onChange={change} maxLength="100" required placeholder="e.g. 50 units" /></label>
+        <label>Additional details<textarea name="details" value={values.details} onChange={change} maxLength="2000" rows="3" /></label>
+        {error && <p className="signin-message" role="alert">{error}</p>}
+        <button className="primary-button full-button" disabled={saving} type="submit">{saving ? 'Saving…' : request ? 'Save changes' : 'Post request'}</button>
       </form>
     </div>
   );
 }
 
-function DashboardWorkspace({ initialRole }) {
-  const routerNavigate = useRouterNavigate();
-  const [activeRole, setActiveRole] = useState(initialRole);
-  const [activeSection, setActiveSection] = useState('overview');
-  const [search, setSearch] = useState('');
-  const [message, setMessage] = useState('');
-  const [requestModalOpen, setRequestModalOpen] = useState(false);
-  const [verifiedCompanies, setVerifiedCompanies] = useState(pendingCompanies);
-  const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const [showDropdown, setShowDropdown] = useState(false);
-  const [showRoleMenu, setShowRoleMenu] = useState(false);
-  const [adminPeriod, setAdminPeriod] = useState('30 days');
-  const [authenticatedUser, setAuthenticatedUser] = useState(null);
-  const currentRole = roles[activeRole];
-  useEffect(() => {
-    document.title = 'Tayonx | Marketplace dashboards';
-  }, []);
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) return undefined;
+function OfferForm({ request, offer, saving, error, onSubmit, onClose }) {
+  const [values, setValues] = useState({ price: offer?.price ?? '', deliveryDays: offer?.deliveryDays ?? '', includes: offer?.includes || '' });
+  function change(event) {
+    setValues((current) => ({ ...current, [event.target.name]: event.target.value }));
+  }
 
-    let isCurrent = true;
-    fetch(`${API_BASE_URL}/api/auth/me`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then(async (response) => {
-        const result = await response.json();
-        if (!isCurrent) return;
-        if (!response.ok) {
-          if (response.status === 401) {
-            localStorage.removeItem('token');
-            localStorage.removeItem('user');
-            setMessage('Your session expired. Please sign in again.');
-          } else {
-            setMessage(result.error || 'Could not verify your account session.');
-          }
+  return (
+    <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+      <form className="request-modal" onSubmit={(event) => { event.preventDefault(); onSubmit(values); }}>
+        <div className="modal-heading"><div><p className="eyebrow">{offer ? 'UPDATE OFFER' : 'SEND OFFER'}</p><h2>{request?.product || offer?.request?.product}</h2></div><button type="button" className="icon-button" aria-label="Close dialog" onClick={onClose}><Icon name="close" /></button></div>
+        <label>Total quote (USD)<input name="price" type="number" min="0.01" step="0.01" value={values.price} onChange={change} required /></label>
+        <label>Delivery time (days)<input name="deliveryDays" type="number" min="1" max="365" step="1" value={values.deliveryDays} onChange={change} required /></label>
+        <label>Included services<textarea name="includes" value={values.includes} onChange={change} maxLength="500" rows="3" placeholder="Shipping, customs, final-mile delivery" /></label>
+        {error && <p className="signin-message" role="alert">{error}</p>}
+        <button className="primary-button full-button" disabled={saving} type="submit">{saving ? 'Saving…' : offer ? 'Update offer' : 'Send offer'}</button>
+      </form>
+    </div>
+  );
+}
+
+export default function DashboardWorkspace({ initialRole }) {
+  const navigate = useNavigate();
+  const [section, setSection] = useState('overview');
+  const [user, setUser] = useState(null);
+  const [requests, setRequests] = useState([]);
+  const [offers, setOffers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [busyId, setBusyId] = useState('');
+  const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
+  const [search, setSearch] = useState('');
+  const [requestModalOpen, setRequestModalOpen] = useState(false);
+  const [editingRequest, setEditingRequest] = useState(null);
+  const [offerRequest, setOfferRequest] = useState(null);
+  const [editingOffer, setEditingOffer] = useState(null);
+  const [formError, setFormError] = useState('');
+  const [selectedRequestId, setSelectedRequestId] = useState('');
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const config = roleConfig[initialRole];
+  const displayName = user?.name || config.label;
+  const customerMode = initialRole === 'customer';
+  const providerMode = initialRole === 'provider';
+  const adminMode = initialRole === 'admin';
+  const title = useMemo(() => ({
+    overview: 'Dashboard',
+    requests: adminMode ? 'All shipping requests' : 'My shipping requests',
+    opportunities: 'Matching requests',
+    offers: customerMode ? 'Offers to review' : adminMode ? 'All marketplace offers' : 'My offers',
+    companies: 'Cargo companies',
+    messages: 'Chat',
+    notifications: 'Notifications',
+    profile: 'Profile',
+  })[section], [section, adminMode, customerMode]);
+  const requestStatusCounts = shipmentStatuses.map((status) => ({
+    status,
+    count: requests.filter((request) => request.status === status).length,
+  }));
+  const activeShipments = requests.filter((request) => ['in_progress', 'purchased', 'shipping'].includes(request.status));
+  const pendingOffers = offers.filter((offer) => offer.status === 'pending');
+  const sourceCountries = [...new Set(requests.map((request) => request.sourceCountry).filter(Boolean))];
+  const recentRequests = [...requests]
+    .sort((first, second) => new Date(second.createdAt || 0) - new Date(first.createdAt || 0))
+    .slice(0, 5);
+  const recentOffers = offers.slice(0, 4);
+  const quotedProviders = [...offers.reduce((providers, offer) => {
+    const provider = offer.provider;
+    if (!provider) return providers;
+    const key = String(provider._id || provider.id || provider.name || '');
+    if (!key) return providers;
+    const existing = providers.get(key) || {
+      id: key,
+      name: provider.name || 'Cargo provider',
+      offers: 0,
+      requestId: offer.request?.id,
+    };
+    existing.offers += 1;
+    providers.set(key, existing);
+    return providers;
+  }, new Map()).values()];
+
+  useEffect(() => {
+    document.title = `Tayonx | ${config.label} dashboard`;
+    if (!localStorage.getItem('token')) {
+      navigate('/login', { replace: true });
+      return undefined;
+    }
+
+    const controller = new AbortController();
+    apiRequest('/api/auth/me', { signal: controller.signal })
+      .then(({ user: account }) => {
+        const accountRole = account.role === 'cargo_provider' ? 'provider' : account.role;
+        if (accountRole !== initialRole) {
+          navigate(account.role === 'cargo_provider' ? '/cargo/dashboard' : `/${account.role}/dashboard`, { replace: true });
           return;
         }
-
-        setAuthenticatedUser(result.user);
-        const role = result.user.role === 'cargo_provider' ? 'provider' : result.user.role;
-        if (roles[role] && role !== initialRole) {
-          routerNavigate(dashboardPaths[result.user.role], { replace: true });
-        }
+        setUser(account);
       })
-      .catch(() => {
-        if (isCurrent) setMessage('Unable to verify your account session. Check that the backend is running.');
+      .catch((requestError) => {
+        if (requestError.name === 'AbortError') return;
+        if (requestError.status === 401) {
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          navigate('/login', { replace: true });
+        } else {
+          setError(requestError.message);
+          setLoading(false);
+        }
       });
+    return () => controller.abort();
+  }, [config.label, initialRole, navigate]);
 
-    return () => {
-      isCurrent = false;
-    };
-  }, [initialRole, routerNavigate]);
-  const pageDetails = useMemo(() => {
-    const titles = {
-      overview: ['Dashboard', 'Welcome back, Abdi Hassan'],
-      requests: ['Requests', 'Keep every sourcing request moving forward.'],
-      companies: ['Cargo companies', 'Discover verified partners for your next order.'],
-      messages: ['Messages', 'Your conversations with customers and cargo partners.'],
-      opportunities: ['Matching opportunities', 'Find requests that match your routes and services.'],
-      offers: ['My offers', 'Follow up on quotes you have sent to customers.'],
-      customerOffers: ['Offers to review', 'Compare cargo company quotes and choose the right partner.'],
-      profile: ['Company profile', 'Manage the details customers see about your business.'],
-      verification: ['Company verification', 'Review submitted documents and approve trusted providers.'],
-      reports: ['Marketplace reports', 'A snapshot of activity and growth across Tayonx.'],
-    };
-    if (activeSection === 'offers' && activeRole === 'customer') return titles.customerOffers;
-    return titles[activeSection] || titles.overview;
-  }, [activeRole, activeSection]);
+  useEffect(() => {
+    if (!user) return undefined;
+    const controller = new AbortController();
+    Promise.all([
+      getRequests(providerMode ? 'opportunities' : undefined, { signal: controller.signal }),
+      getOffers({ signal: controller.signal }),
+    ])
+      .then(([requestResult, offerResult]) => {
+        setRequests(requestResult.requests || []);
+        setOffers(offerResult.offers || []);
+      })
+      .catch((requestError) => {
+        if (requestError.name !== 'AbortError') setError(requestError.message);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
+  }, [user, providerMode]);
 
-  function navigate(section) {
-    if (section === 'new-request') {
-      handleAction('new-request');
-      setMobileNavOpen(false);
-      return;
-    }
-    setActiveSection(section);
-    setMobileNavOpen(false);
+  async function refreshData() {
+    const [requestResult, offerResult] = await Promise.all([
+      getRequests(providerMode ? 'opportunities' : undefined),
+      getOffers(),
+    ]);
+    setRequests(requestResult.requests || []);
+    setOffers(offerResult.offers || []);
   }
 
-  function selectRole(role) {
-    if (role === 'admin' && authenticatedUser?.role !== 'admin') {
-      setMessage('Sign in with an admin account to open the admin dashboard.');
-      return;
-    }
-    setActiveRole(role);
-    setActiveSection('overview');
-    setSearch('');
+  async function performMutation(id, action, successMessage) {
+    setBusyId(id || 'all');
+    setError('');
     setMessage('');
-    setMobileNavOpen(false);
-    const pathRole = role === 'provider' ? 'cargo_provider' : role;
-    routerNavigate(dashboardPaths[pathRole]);
-  }
-
-  function handleAction(action) {
-    if (action === 'new-request') {
-      setRequestModalOpen(true);
-      return;
-    }
-    if (action.startsWith('offer:')) {
-      setMessage(`Offer form opened for ${action.split(':')[1]}.`);
-    } else if (action.startsWith('decline:')) {
-      setMessage(`Request ${action.split(':')[1]} declined.`);
-    } else if (action.startsWith('accept:')) {
-      setMessage(`Offer ${action.split(':')[1]} accepted. The company can now coordinate your order.`);
-    } else if (action.startsWith('message:')) {
-      setMessage(action === 'message:sent' ? 'Message sent.' : 'Conversation opened.');
-    } else if (action.startsWith('profile:')) {
-      setMessage('Profile editing will be available when your account is connected.');
-    } else if (action === 'report:exported') {
-      const rows = [
-        ['ID', 'Customer', 'Product', 'Source', 'Offers', 'Status'],
-        ['REQ-1051', 'Abdi Hassan', 'MacBook Pro x 20', 'China', '4', 'Open'],
-        ['REQ-1042', 'Abdi Hassan', 'Laptops x 50', 'China', '3', 'Offers received'],
-        ['REQ-1037', 'Ahmed Ali', 'Textiles x 2 rolls', 'Turkey', '2', 'In progress'],
-        ['REQ-1029', 'Hodan Yusuf', 'Solar panels x 40', 'China', '5', 'Delivered'],
-      ];
-      const csv = rows.map((row) => row.map((value) => `"${value.replaceAll('"', '""')}"`).join(',')).join('\r\n');
-      const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = 'tayonx-admin-requests.csv';
-      link.click();
-      window.setTimeout(() => URL.revokeObjectURL(url), 0);
-      setMessage('Admin request report exported.');
-    } else if (action.startsWith('attention:')) {
-      setMessage('Attention item opened for review.');
-    } else if (action === 'notifications') {
-      setMessage('You have 3 unread notifications.');
-    } else {
-      setMessage('Request details opened.');
+    try {
+      await action();
+      await refreshData();
+      setMessage(successMessage);
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setBusyId('');
     }
   }
 
-  function approveCompany(id, approved) {
-    const company = verifiedCompanies.find((item) => item.id === id);
-    setVerifiedCompanies((current) => current.filter((item) => item.id !== id));
-    if (company) setMessage(`${company.name} ${approved ? 'approved' : 'declined'}.`);
+  function openCreateRequest() {
+    setEditingRequest(null);
+    setFormError('');
+    setRequestModalOpen(true);
   }
 
-  function renderSection() {
-    if (activeSection === 'overview') {
-      return <Overview role={activeRole} onNavigate={navigate} onAction={handleAction} verifiedCompanies={verifiedCompanies} adminPeriod={adminPeriod} />;
+  async function saveRequest(values) {
+    setSaving(true);
+    setFormError('');
+    try {
+      if (editingRequest) await updateRequest(editingRequest._id, values);
+      else await createRequest(values);
+      await refreshData();
+      setRequestModalOpen(false);
+      setEditingRequest(null);
+      setMessage(editingRequest ? 'Shipping request updated.' : 'Shipping request posted.');
+    } catch (requestError) {
+      setFormError(requestError.message);
+    } finally {
+      setSaving(false);
     }
-    if (activeSection === 'requests') return <RequestsPage role={activeRole} search={search} onNavigate={navigate} onAction={handleAction} />;
-    if (activeSection === 'offers' && activeRole === 'customer') return <CustomerOffersPage onAction={handleAction} />;
-    if (activeSection === 'offers' && activeRole === 'provider') return <OffersPage onAction={handleAction} />;
-    if (activeSection === 'companies' && activeRole === 'admin') return <Card><CardHeading title="Companies awaiting verification" subtitle="Review company documents before providers can send offers" action={<span className="results-count">{verifiedCompanies.length} pending</span>} /><CompanyTable companies={verifiedCompanies} onReview={() => setMessage('Business license preview opened.')} onVerify={(id) => approveCompany(id, true)} onReject={(id) => approveCompany(id, false)} /></Card>;
-    if (activeSection === 'companies') return <CompaniesPage />;
-    if (activeSection === 'messages') return <MessagesPage onAction={handleAction} />;
-    if (activeSection === 'opportunities') return <OpportunitiesPage search={search} onAction={handleAction} />;
-    if (activeSection === 'profile') return <ProfilePage onAction={handleAction} />;
-    if (activeSection === 'verification') return <Card><CardHeading title="Pending company applications" subtitle="Business details and licenses submitted for review" action={<span className="results-count">{verifiedCompanies.length} to review</span>} /><CompanyTable companies={verifiedCompanies} onReview={() => setMessage('Business license preview opened.')} onVerify={(id) => approveCompany(id, true)} onReject={(id) => approveCompany(id, false)} /></Card>;
-    if (activeSection === 'reports') return <ReportsPage />;
-    if (activeSection === 'users') return <Card><CardHeading title="Marketplace users" subtitle="Customer and cargo provider accounts" /><div className="admin-users-summary"><div><strong>1,200</strong><span>Customers</span></div><div><strong>350</strong><span>Cargo companies</span></div><p>User management details are sample data for this concept.</p></div></Card>;
-    if (activeSection === 'settings') return <Card><CardHeading title="System settings" subtitle="Admin workspace configuration" /><div className="admin-users-summary"><p>System settings are managed by the Tayonx operations team.</p></div></Card>;
-    return null;
   }
 
-  const title = activeSection === 'overview'
-    ? `${pageDetails[0]} ${currentRole.name.split(' ')[0]}`
-    : pageDetails[0];
-  const showSearch = ['overview', 'requests', 'opportunities', 'verification'].includes(activeSection);
-  const customerMode = activeRole === 'customer';
-  const providerMode = activeRole === 'provider';
-  const adminMode = activeRole === 'admin';
-  const customerDashboardHeader = customerMode && activeSection === 'overview';
-  const providerDashboardHeader = providerMode && activeSection === 'overview';
-  const adminDashboardHeader = adminMode && activeSection === 'overview';
-  const dashboardHeader = customerDashboardHeader || providerDashboardHeader || adminDashboardHeader;
-  const headerAction = activeRole === 'customer' && ['overview', 'requests'].includes(activeSection)
-    ? <button className="primary-button" onClick={() => handleAction('new-request')}><Icon name="plus" size={17} />New request</button>
-    : activeRole === 'provider' && activeSection === 'opportunities'
-      ? <button className="secondary-button" onClick={() => navigate('offers')}>View my offers <Icon name="arrow" size={16} /></button>
-      : null;
+  async function saveOffer(values) {
+    setSaving(true);
+    setFormError('');
+    try {
+      const payload = { price: Number(values.price), deliveryDays: Number(values.deliveryDays), includes: values.includes };
+      if (editingOffer) await updateOffer(editingOffer._id, payload);
+      else await createOffer(offerRequest._id, payload);
+      await refreshData();
+      setOfferRequest(null);
+      setEditingOffer(null);
+      setMessage(editingOffer ? 'Offer updated.' : 'Offer sent to the customer.');
+    } catch (requestError) {
+      setFormError(requestError.message);
+    } finally {
+      setSaving(false);
+    }
+  }
 
-  function handleSignOut() {
+  function deleteShippingRequest(request) {
+    if (!window.confirm(`Delete "${request.product}" and its offers?`)) return;
+    performMutation(request._id, () => deleteRequest(request._id), 'Shipping request deleted.');
+  }
+
+  function deleteCargoOffer(offer) {
+    if (!window.confirm('Delete this pending offer?')) return;
+    performMutation(offer._id, () => deleteOffer(offer._id), 'Offer deleted.');
+  }
+
+  function handleStatusChange(id, status) {
+    performMutation(id, () => updateShipmentStatus(id, status), `Shipment status changed to ${statusLabel(status)}.`);
+  }
+
+  function handleOfferResponse(offer, status) {
+    performMutation(offer._id, () => respondToOffer(offer._id, status), status === 'accepted'
+      ? 'Offer accepted. The shipment is now in progress.'
+      : 'Offer declined.');
+  }
+
+  function handleDeclineRequest(id) {
+    performMutation(id, () => declineRequest(id), 'Request removed from your opportunities.');
+  }
+
+  function exportRequests() {
+    const rows = [['ID', 'Customer', 'Product', 'Source', 'Destination', 'Quantity', 'Offers', 'Status'], ...requests.map((request) => [
+      request._id, request.customer?.name || '', request.product, request.sourceCountry,
+      request.destination, request.quantity, request.offers?.length || 0, request.status,
+    ])];
+    const csv = rows.map((row) => row.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(',')).join('\r\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'tayonx-shipping-requests.csv';
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+    setMessage(`${requests.length} shipping requests exported.`);
+  }
+
+  function signOut() {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
-    routerNavigate('/login');
+    navigate('/login', { replace: true });
   }
+
+  function renderRequests(rows) {
+    return <RequestTable
+      requests={rows}
+      role={initialRole}
+      search={search}
+      busyId={busyId}
+      onEdit={(request) => { setEditingRequest(request); setRequestModalOpen(true); setFormError(''); }}
+      onDelete={deleteShippingRequest}
+      onSelectOffers={(id) => { setSelectedRequestId(id); setSection('offers'); }}
+      onStatusChange={handleStatusChange}
+      onCreateOffer={(request) => { setOfferRequest(request); setEditingOffer(null); setFormError(''); }}
+      onDeclineRequest={handleDeclineRequest}
+    />;
+  }
+
+  function renderContent() {
+    if (section === 'offers') {
+      const selectedOffers = customerMode && selectedRequestId
+        ? offers.filter((offer) => offer.request.id === selectedRequestId)
+        : offers;
+      return <Card><CardHeading title={title} subtitle={customerMode ? 'Compare quotes, then accept or decline an offer.' : 'Manage pending quotes and update accepted shipment progress.'} />{loading ? <p className="empty-table" role="status">Loading offers…</p> : <OffersTable
+        offers={selectedOffers}
+        role={initialRole}
+        busyId={busyId}
+        onEdit={(offer) => { setEditingOffer(offer); setOfferRequest(null); setFormError(''); }}
+        onDelete={deleteCargoOffer}
+        onRespond={handleOfferResponse}
+        onStatusChange={handleStatusChange}
+      />}</Card>;
+    }
+
+    if (section === 'opportunities') {
+      return <Card><CardHeading title={title} subtitle="Send a real quote or decline requests you cannot fulfil." />{loading ? <p className="empty-table" role="status">Loading matching requests…</p> : renderRequests(requests)}</Card>;
+    }
+
+    if (section === 'requests') {
+      return <Card><CardHeading title={title} subtitle={adminMode ? 'Review and manage requests across the marketplace.' : 'Create, edit, or cancel your shipping requests.'} action={customerMode ? <button className="primary-button" onClick={openCreateRequest}><Icon name="plus" size={16} />New request</button> : null} />{loading ? <p className="empty-table" role="status">Loading shipping requests…</p> : renderRequests(requests)}</Card>;
+    }
+
+    if (customerMode && section === 'companies') {
+      return <Card><CardHeading title="Cargo companies" subtitle="Providers who have sent quotes for your requests." />{loading ? <p className="empty-table" role="status">Loading cargo providers…</p> : quotedProviders.length ? <div className="customer-directory-list">{quotedProviders.map((provider) => <div className="customer-company-row" key={provider.id}><Avatar name={provider.name} className="customer-company-avatar navy" /><span className="customer-row-copy"><strong>{provider.name}</strong><small>{provider.offers} quote{provider.offers === 1 ? '' : 's'} on your requests</small></span><button className="customer-outline-button" disabled={!provider.requestId} onClick={() => { setSelectedRequestId(provider.requestId); setSection('offers'); }}>View quotes</button></div>)}</div> : <div className="empty-state"><strong>No cargo companies yet</strong><p>Companies appear here after they send a quote on one of your requests.</p><button className="small-primary" onClick={() => setSection('requests')}>View requests</button></div>}</Card>;
+    }
+
+    if (customerMode && section === 'notifications') {
+      return <Card><CardHeading title="Notifications" subtitle="Updates from your shipping requests." />{loading ? <p className="empty-table" role="status">Loading updates…</p> : pendingOffers.length ? <div className="customer-directory-list">{pendingOffers.map((offer) => <div className="customer-offer-row" key={offer._id}><span className="customer-company-avatar blue"><Icon name="mail" size={15} /></span><span className="customer-row-copy"><strong>New quote for {offer.request.product}</strong><small>{offer.provider?.name || 'Cargo provider'} · {new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(offer.price)} · {offer.deliveryDays} days</small></span><button className="small-primary" onClick={() => { setSelectedRequestId(offer.request.id); setSection('offers'); }}>Review</button></div>)}</div> : <div className="empty-state"><strong>You’re all caught up</strong><p>New provider quotes for your requests will appear here.</p></div>}</Card>;
+    }
+
+    if (customerMode && section === 'messages') {
+      return <Card><CardHeading title="Chat" subtitle="Message cargo providers about your shipments." /><div className="empty-state customer-unavailable-state"><span className="customer-stat-icon"><Icon name="chat" size={19} /></span><strong>Messaging is not available yet</strong><p>There is no messaging service connected to this account. You can review and respond to provider quotes from your Offers page.</p><button className="small-primary" onClick={() => setSection('offers')}>View offers</button></div></Card>;
+    }
+
+    if (customerMode && section === 'profile') {
+      return <Card><CardHeading title="Profile" subtitle="Your account details." />{user ? <div className="customer-profile-grid"><div><span>Full name</span><strong>{user.name}</strong></div><div><span>Email address</span><strong>{user.email}</strong></div><div><span>Country</span><strong>{user.country}</strong></div><div><span>Account type</span><strong>{config.label}</strong></div></div> : <p className="empty-table" role="status">Loading profile…</p>}</Card>;
+    }
+
+    if (customerMode) {
+      return (
+        <div className="customer-dashboard">
+          <div className="customer-stats-grid">
+            {[
+              ['My requests', requests.length, 'box'],
+              ['Offers waiting', pendingOffers.length, 'mail'],
+              ['Active shipments', offers.filter((offer) => offer.status === 'accepted' && ['in_progress', 'purchased', 'shipping'].includes(offer.request.status)).length, 'package'],
+              ['Completed', requestStatusCounts.find((item) => item.status === 'delivered')?.count || 0, 'check'],
+            ].map(([label, value, icon]) => (
+              <article className="customer-stat-card" key={label} aria-busy={loading}><span className="customer-stat-icon"><Icon name={icon} size={17} /></span><div><strong>{loading ? '—' : value}</strong><span>{label}</span></div></article>
+            ))}
+          </div>
+          {pendingOffers.length > 0 && <section className="offers-notice"><Icon name="mail" size={18} /><div><strong>{pendingOffers.length} offer{pendingOffers.length === 1 ? '' : 's'} ready to review</strong><span>Compare live provider quotes and choose the right option for your shipment.</span></div><button className="small-primary" onClick={() => setSection('offers')}>Review offers</button></section>}
+          <div className="customer-dashboard-grid customer-dashboard-grid-main">
+            <Card className="customer-list-card">
+              <CardHeading title="My recent requests" subtitle="Your latest shipping requests" action={<button className="link-button" onClick={() => setSection('requests')}>View all <Icon name="arrow" size={15} /></button>} />
+              <div className="customer-request-header"><span>Request</span><span>Status</span><span>Actions</span></div>
+              {loading ? <p className="empty-table" role="status">Loading your requests…</p> : recentRequests.length ? <div className="customer-request-list">
+                {recentRequests.map((request) => {
+                  const tone = request.status === 'delivered' ? 'success' : ['open', 'offers_received'].includes(request.status) ? 'info' : 'warning';
+                  return <div className="customer-request-row" key={request._id}>
+                    <span className="customer-request-icon"><Icon name="box" size={18} /></span>
+                    <span className="customer-row-copy"><strong>{request.product}</strong><small>{request.quantity} · {request.sourceCountry} to {request.destination}</small><small>{request.offers?.length || 0} quote{request.offers?.length === 1 ? '' : 's'}</small></span>
+                    <span className={`customer-status customer-status-${tone}`}>{statusLabel(request.status)}</span>
+                    <span className="customer-row-actions">
+                      <button className="icon-button table-action" aria-label={`Edit ${request.product}`} onClick={() => { setEditingRequest(request); setRequestModalOpen(true); setFormError(''); }}><Icon name="edit" size={15} /></button>
+                      <button className="icon-button table-action" aria-label={`Delete ${request.product}`} disabled={busyId === request._id} onClick={() => deleteShippingRequest(request)}><Icon name="trash" size={15} /></button>
+                    </span>
+                  </div>;
+                })}
+              </div> : <div className="empty-state"><strong>No shipping requests yet</strong><p>Create a request to receive quotes from cargo providers.</p><button className="small-primary" onClick={openCreateRequest}>Create request</button></div>}
+            </Card>
+            <Card className="customer-tracking-card">
+              <CardHeading title="Shipment tracking" subtitle="Live progress for your active shipments" />
+              {loading ? <p className="empty-table" role="status">Loading shipment progress…</p> : activeShipments.length ? <div className="customer-tracking-list">{activeShipments.slice(0, 3).map((request) => {
+                const stageIndex = { in_progress: 0, purchased: 1, shipping: 2, delivered: 3 }[request.status] ?? 0;
+                const stages = ['Offer accepted', 'Item purchased', 'In transit', 'Delivered'];
+                return <section className="customer-tracking-item" key={request._id}>
+                  <div className="customer-tracking-heading"><span><strong>{request.product}</strong><small>{request.destination} · {statusLabel(request.status)}</small></span><span className="customer-row-actions">
+                    <button className="icon-button table-action" aria-label={`Edit ${request.product}`} onClick={() => { setEditingRequest(request); setRequestModalOpen(true); setFormError(''); }}><Icon name="edit" size={15} /></button>
+                    <button className="icon-button table-action" aria-label={`Delete ${request.product}`} disabled={busyId === request._id} onClick={() => deleteShippingRequest(request)}><Icon name="trash" size={15} /></button>
+                  </span></div>
+                  <ol className="shipment-tracking">{stages.map((stage, index) => <li className={index < stageIndex ? 'complete' : index === stageIndex ? 'current' : ''} key={stage}><i /><span><strong>{stage}</strong>{index === stageIndex && <small>Current status</small>}</span></li>)}</ol>
+                </section>;
+              })}</div> : <div className="empty-state"><strong>No active shipments</strong><p>Accepted offers will appear here as your shipments progress.</p></div>}
+            </Card>
+          </div>
+          <div className="customer-dashboard-grid customer-dashboard-grid-secondary">
+            <Card className="customer-list-card">
+              <CardHeading title="Cargo providers" subtitle="Companies that have quoted on your requests" action={<button className="link-button" onClick={() => setSection('offers')}>View offers <Icon name="arrow" size={15} /></button>} />
+              {loading ? <p className="empty-table" role="status">Loading providers…</p> : quotedProviders.length ? <div className="customer-compact-list">{quotedProviders.slice(0, 4).map((provider) => <div className="customer-company-row" key={provider.id}><Avatar name={provider.name} className="customer-company-avatar navy" /><span className="customer-row-copy"><strong>{provider.name}</strong><small>{provider.offers} quote{provider.offers === 1 ? '' : 's'} on your requests</small></span><button className="customer-outline-button" disabled={!provider.requestId} onClick={() => { setSelectedRequestId(provider.requestId); setSection('offers'); }}>Offers</button></div>)}</div> : <div className="empty-state"><strong>No provider quotes yet</strong><p>Providers will appear here when they respond to your requests.</p></div>}
+            </Card>
+            <Card className="customer-list-card">
+              <CardHeading title="Latest offers" subtitle="Compare quotes and respond to providers" action={<button className="link-button" onClick={() => setSection('offers')}>View all <Icon name="arrow" size={15} /></button>} />
+              {loading ? <p className="empty-table" role="status">Loading offers…</p> : recentOffers.length ? <div className="customer-compact-list">{recentOffers.map((offer) => <div className="customer-offer-row" key={offer._id}>
+                <span className="customer-company-avatar blue"><Icon name="package" size={15} /></span>
+                <span className="customer-row-copy"><strong>{offer.provider?.name || 'Cargo provider'}</strong><small>{offer.request.product} · {offer.deliveryDays} days</small></span>
+                <span className="customer-offer-amount">{new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(offer.price)}</span>
+                {offer.status === 'pending' ? <span className="customer-offer-actions"><button className="small-primary" disabled={busyId === offer._id} onClick={() => handleOfferResponse(offer, 'accepted')}>Accept</button><button className="icon-button table-action" aria-label={`Decline offer from ${offer.provider?.name || 'cargo provider'}`} disabled={busyId === offer._id} onClick={() => handleOfferResponse(offer, 'declined')}><Icon name="close" size={15} /></button></span> : <StatusBadge>{offer.status}</StatusBadge>}
+              </div>)}</div> : <div className="empty-state"><strong>No offers yet</strong><p>Provider quotes will appear here when submitted.</p></div>}
+            </Card>
+          </div>
+        </div>
+      );
+    }
+
+    if (providerMode) {
+      return (
+        <div className="provider-dashboard">
+          <div className="provider-stats-grid">
+            {[
+              ['Open requests', requests.length, 'box'],
+              ['Offers sent', offers.length, 'mail'],
+              ['Active shipments', activeShipments.length, 'package'],
+              ['Offers accepted', offers.filter((offer) => offer.status === 'accepted').length, 'check'],
+            ].map(([label, value, icon]) => <article className="provider-stat-card" key={label}><span className="provider-stat-icon"><Icon name={icon} size={16} /></span><div><strong>{value}</strong><span>{label}</span></div></article>)}
+          </div>
+          <div className="provider-dashboard-grid">
+            <Card className="provider-requests-card"><CardHeading title="New requests for you" subtitle="Submit a quote for a real customer request or decline it." action={<span className="results-count">{requests.length} available</span>} />{loading ? <p className="empty-table" role="status">Loading opportunities…</p> : renderRequests(requests.slice(0, 8))}</Card>
+            <div className="provider-dashboard-aside">
+              <Card className="provider-list-card"><CardHeading title="Your latest offers" action={<button className="link-button" onClick={() => setSection('offers')}>View all <Icon name="arrow" size={14} /></button>} />{loading ? <p className="empty-table" role="status">Loading offers…</p> : <OffersTable offers={offers.slice(0, 4)} role="provider" busyId={busyId} onEdit={(offer) => { setEditingOffer(offer); setOfferRequest(null); setFormError(''); }} onDelete={deleteCargoOffer} onStatusChange={handleStatusChange} />}</Card>
+              <Card className="provider-performance-card"><CardHeading title="Offer activity" /><div className="provider-performance"><div><span>Pending quotes</span><strong>{pendingOffers.length}</strong></div><div><span>Response rate</span><strong>{offers.length ? `${Math.round((offers.filter((offer) => offer.status !== 'pending').length / offers.length) * 100)}%` : '—'}</strong></div><p>Quote requests matching your cargo services are shown in the list.</p></div></Card>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="admin-dashboard">
+        <div className="admin-kpi-grid">
+          {[
+            ['Total requests', requests.length, 'box', 'admin-kpi-blue'],
+            ['Active shipments', activeShipments.length, 'package', 'admin-kpi-green'],
+            ['Offers submitted', offers.length, 'mail', 'admin-kpi-blue'],
+            ['Awaiting review', pendingOffers.length, 'clock', 'admin-kpi-amber'],
+          ].map(([label, value, icon, tone]) => <article className={`admin-kpi ${tone}`} key={label}><span className="admin-kpi-icon"><Icon name={icon} size={16} /></span><span className="admin-kpi-content"><strong>{value}</strong><span>{label}</span><small>Live database total</small></span></article>)}
+        </div>
+        <div className="admin-insights-grid">
+          <Card className="admin-insight-card"><CardHeading title="Requests by status" /><div className="admin-source-content">{requestStatusCounts.filter((item) => item.count > 0).map((item) => <div className="admin-source-item" key={item.status}><span>{statusLabel(item.status)}</span><strong>{item.count}</strong><i><b style={{ width: `${requests.length ? (item.count / requests.length) * 100 : 0}%` }} /></i></div>)}{!requests.length && <p>No request activity recorded yet.</p>}</div></Card>
+          <Card className="admin-insight-card"><CardHeading title="Source countries" /><div className="admin-source-content">{sourceCountries.map((country) => <div className="admin-source-item" key={country}><span>{country}</span><strong>{requests.filter((request) => request.sourceCountry === country).length}</strong><i><b style={{ width: `${requests.length ? (requests.filter((request) => request.sourceCountry === country).length / requests.length) * 100 : 0}%` }} /></i></div>)}{!sourceCountries.length && <p>No source country data yet.</p>}</div></Card>
+          <Card className="admin-insight-card"><CardHeading title="Offer decisions" /><div className="admin-source-content"><div className="admin-source-item"><span>Pending</span><strong>{pendingOffers.length}</strong></div><div className="admin-source-item"><span>Accepted</span><strong>{offers.filter((offer) => offer.status === 'accepted').length}</strong></div><div className="admin-source-item"><span>Declined</span><strong>{offers.filter((offer) => offer.status === 'declined').length}</strong></div></div></Card>
+        </div>
+        <div className="admin-lower-grid">
+          <Card className="admin-latest-card"><CardHeading title="Latest marketplace requests" action={<button className="link-button" onClick={() => setSection('requests')}>View all <Icon name="arrow" size={14} /></button>} />{loading ? <p className="empty-table" role="status">Loading marketplace data…</p> : renderRequests(requests.slice(0, 6))}</Card>
+          <Card className="admin-attention-card"><CardHeading title="Latest offers" action={<button className="link-button" onClick={() => setSection('offers')}>View all <Icon name="arrow" size={14} /></button>} />{loading ? <p className="empty-table" role="status">Loading offers…</p> : <OffersTable offers={offers.slice(0, 4)} role="admin" busyId={busyId} onEdit={(offer) => { setEditingOffer(offer); setOfferRequest(null); setFormError(''); }} onDelete={deleteCargoOffer} onRespond={handleOfferResponse} onStatusChange={handleStatusChange} />}</Card>
+        </div>
+      </div>
+    );
+  }
+
+  if (!config) return null;
 
   return (
     <div className={`app-shell${customerMode ? ' customer-shell' : ''}${providerMode ? ' provider-shell' : ''}${adminMode ? ' admin-shell' : ''}`}>
       <aside className={`sidebar${mobileNavOpen ? ' sidebar-open' : ''}`}>
-        <a className="sidebar-brand" href="#home" aria-label="Tayonx dashboard home" onClick={() => navigate('overview')}><img src={logo} alt="Tayonx" /></a>
-        {customerMode || providerMode || adminMode ? (
-          <div className="workspace-role-picker">
-            <button className="customer-role-label" aria-expanded={showRoleMenu} aria-haspopup="menu" onClick={() => setShowRoleMenu((open) => !open)}>
-              {providerMode ? 'CARGO PROVIDER' : adminMode ? 'ADMIN' : 'CUSTOMER'}
-            </button>
-            {showRoleMenu && <div className="role-choice-menu" role="menu">{Object.entries(roles).map(([role, config]) => (
-              <button key={role} role="menuitem" onClick={() => { selectRole(role); setShowRoleMenu(false); }}>{config.label}</button>
-            ))}</div>}
-          </div>
-        ) : (
-          <>
-            <div className="workspace-label">WORKSPACE</div>
-            <div className="role-switcher" aria-label="Choose dashboard">
-              {Object.entries(roles).map(([role, config]) => (
-                <button className={`role-switch${activeRole === role ? ' active' : ''}`} key={role} onClick={() => selectRole(role)}>
-                  <Avatar initials={config.initials} className="role-avatar" /><span>{config.label}</span>{activeRole === role && <span className="active-role-dot" />}
-                </button>
-              ))}
-            </div>
-            <div className="nav-divider" />
-            <p className="nav-caption">{currentRole.descriptor}</p>
-          </>
-        )}
-        <nav className="side-nav" aria-label={`${currentRole.label} navigation`}>
-          {currentRole.navigation.map(([section, label, icon]) => (
-            <Fragment key={section}>
-              {customerMode && section === 'profile' && <p className="nav-caption customer-account-caption">Account</p>}
-              {providerMode && section === 'profile' && <p className="nav-caption customer-account-caption">Company</p>}
-              {adminMode && section === 'settings' && <p className="nav-caption customer-account-caption">System</p>}
-              <button
-                className={`nav-item${activeSection === section ? ' active' : ''}`}
-                key={section}
-                onClick={() => section === 'notifications' ? handleAction('notifications') : navigate(section)}
-              >
-                <Icon name={icon} size={customerMode || providerMode || adminMode ? 16 : 19} />
-                <span>{label}</span>
-                {section === 'messages' && !adminMode && <i className="nav-count">{customerMode ? '1' : '5'}</i>}
-                {providerMode && section === 'opportunities' && <i className="nav-count">8</i>}
-                {adminMode && section === 'companies' && <i className="nav-count">6</i>}
-                {section === 'notifications' && <i className="nav-count">3</i>}
+        <a className="sidebar-brand" href="#dashboard" aria-label="Tayonx dashboard home" onClick={(event) => { event.preventDefault(); setSection('overview'); }}><img src={logo} alt="Tayonx" /></a>
+        <div className="workspace-role-picker"><span className="customer-role-label">{config.label.toUpperCase()}</span></div>
+        <nav className="side-nav" aria-label={`${config.label} navigation`}>
+          {config.sections.map(([sectionId, label, icon]) => (
+            <Fragment key={sectionId}>
+              <button className={`nav-item${section === sectionId ? ' active' : ''}`} onClick={() => {
+                if (sectionId === 'new-request') {
+                  openCreateRequest();
+                  setMobileNavOpen(false);
+                  return;
+                }
+                setSection(sectionId);
+                setSearch('');
+                setSelectedRequestId('');
+                setMobileNavOpen(false);
+              }}>
+                <Icon name={icon} size={16} /><span>{label}</span>{customerMode && sectionId === 'notifications' && pendingOffers.length > 0 && <span className="nav-count">{pendingOffers.length}</span>}
               </button>
             </Fragment>
           ))}
         </nav>
         <div className="sidebar-bottom">
-          {!customerMode && !providerMode && !adminMode && <div className="sidebar-help"><span><Icon name="shield" size={18} /></span><div><b>Need a hand?</b><small>Visit our help center</small></div><Icon name="arrow" size={15} /></div>}
-          {showDropdown && (
-            <div className="account-dropdown" role="menu">
-              <button className="signout-button" onClick={handleSignOut} role="menuitem">
-                <span>Sign out</span>
-              </button>
-            </div>
-          )}
-          {customerMode || providerMode || adminMode ? (
-            <button className="customer-signout" onClick={handleSignOut}><Icon name="arrow" size={15} />Log out</button>
-          ) : <div className="sidebar-user">
-            <Avatar initials={currentRole.initials} />
-            <span><b>{currentRole.name}</b><small>{currentRole.label}</small></span>
-            <button
-              aria-expanded={showDropdown}
-              aria-haspopup="menu"
-              aria-label="Open account menu"
-              className="account-menu-button"
-              onClick={() => setShowDropdown((isOpen) => !isOpen)}
-            >
-              <Icon name="dots" size={18} />
-            </button>
-          </div>}
+          <button className="customer-signout" onClick={signOut}><Icon name="arrow" size={15} />Log out</button>
         </div>
       </aside>
 
@@ -942,40 +632,25 @@ function DashboardWorkspace({ initialRole }) {
       <div className="app-main">
         <header className="topbar">
           <button className="mobile-menu icon-button" aria-label="Open navigation" onClick={() => setMobileNavOpen(true)}><Icon name="menu" /></button>
-          {customerDashboardHeader ? (
-            <div className="customer-topbar-title"><strong>Dashboard</strong><span>Welcome back, Abdi Hassan</span></div>
-          ) : providerDashboardHeader ? (
-            <div className="customer-topbar-title"><strong>Dashboard</strong><span>Welcome back, Global Cargo Ltd</span></div>
-          ) : adminDashboardHeader ? (
-            <div className="customer-topbar-title"><strong>Admin dashboard</strong><span>Welcome, Super Admin</span></div>
-          ) : (
-            <div className="breadcrumb"><span>{currentRole.label}</span><Icon name="arrow" size={14} /><b>{pageDetails[0]}</b></div>
-          )}
+          <div className="customer-topbar-title"><strong>{title}</strong><span>Welcome back, {displayName}</span></div>
           <div className="topbar-actions">
-            {customerDashboardHeader && <span className="customer-country-chip"><b>SO</b>Somaliland</span>}
-            {providerDashboardHeader && <><span className="customer-country-chip"><b>CN</b>China</span><span className="provider-verified-chip"><Icon name="check" size={13} />Verified company</span></>}
-            {adminDashboardHeader && <>
-              <div className="admin-period-switch" aria-label="Dashboard date range">{['7 days', '30 days', 'All time'].map((period) => <button aria-pressed={adminPeriod === period} className={adminPeriod === period ? 'active' : ''} key={period} onClick={() => setAdminPeriod(period)}>{period}</button>)}</div>
-              <button className="admin-export-button" onClick={() => handleAction('report:exported')}><Icon name="download" size={13} />Export</button>
-            </>}
-            {showSearch && !dashboardHeader && <label className="search-box"><Icon name="search" size={17} /><input aria-label="Search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search anything…" /><kbd>⌘ K</kbd></label>}
-            {!providerDashboardHeader && !adminDashboardHeader && <button className="icon-button notification-button" aria-label="Notifications"><Icon name="bell" size={19} /><i /></button>}
-            {customerDashboardHeader && headerAction}
-            <Avatar initials={currentRole.initials} className={providerDashboardHeader || adminDashboardHeader ? 'topbar-avatar provider-topbar-avatar' : 'topbar-avatar'} />
+            {adminMode && <button className="admin-export-button" onClick={exportRequests}><Icon name="download" size={13} />Export</button>}
+            {(section === 'requests' || section === 'opportunities') && <label className="search-box"><Icon name="search" size={17} /><input aria-label="Search requests" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search requests…" /></label>}
+            {customerMode && <button className="notification-button" aria-label={`${pendingOffers.length} pending offer notifications`} title="Notifications" onClick={() => setSection('notifications')}><Icon name="bell" size={16} />{pendingOffers.length > 0 && <i />}</button>}
+            {customerMode && section === 'overview' && <button className="primary-button" onClick={openCreateRequest}><Icon name="plus" size={16} />New request</button>}
+            <Avatar name={displayName} className={`topbar-avatar${providerMode || adminMode ? ' provider-topbar-avatar' : ''}`} />
           </div>
         </header>
-
-        <main className={`dashboard-main${customerDashboardHeader ? ' customer-dashboard-main' : ''}${providerDashboardHeader ? ' provider-dashboard-main' : ''}${adminDashboardHeader ? ' admin-dashboard-main' : ''}`}>
-          {!dashboardHeader && <PageTitle eyebrow={`${currentRole.label} dashboard`} title={title} description={pageDetails[1]} action={headerAction} />}
+        <main className={`dashboard-main${customerMode ? ' customer-dashboard-main' : ''}${providerMode ? ' provider-dashboard-main' : ''}${adminMode ? ' admin-dashboard-main' : ''}`}>
+          {error && <div className="toast-message toast-error" role="alert"><Icon name="alert" size={17} />{error}<button aria-label="Dismiss error" onClick={() => setError('')}><Icon name="close" size={16} /></button></div>}
           {message && <div className="toast-message" role="status"><Icon name="check" size={17} />{message}<button aria-label="Dismiss message" onClick={() => setMessage('')}><Icon name="close" size={16} /></button></div>}
-          <div className={`dashboard-content${customerDashboardHeader ? ' customer-dashboard-content' : ''}${providerDashboardHeader ? ' provider-dashboard-content' : ''}${adminDashboardHeader ? ' admin-dashboard-content' : ''}`}>{renderSection()}</div>
-          {!dashboardHeader && <footer className="dashboard-footer"><span>© 2026 Tayonx</span><span>Connect · Request · Chat · Get it done</span><button onClick={() => setMessage('Help center opened.')}>Help & support</button></footer>}
+          <div className={`dashboard-content${customerMode ? ' customer-dashboard-content' : ''}${providerMode ? ' provider-dashboard-content' : ''}${adminMode ? ' admin-dashboard-content' : ''}`}>{renderContent()}</div>
+          <footer className="dashboard-footer"><span>Tayonx</span><span>Connect · Request · Ship · Get it done</span></footer>
         </main>
       </div>
 
-      {requestModalOpen && <RequestForm onClose={() => setRequestModalOpen(false)} onCreated={() => { setRequestModalOpen(false); setMessage('Your request has been saved as a draft.'); }} />}
+      {requestModalOpen && <RequestForm request={editingRequest} saving={saving} error={formError} onSubmit={saveRequest} onClose={() => { setRequestModalOpen(false); setEditingRequest(null); setFormError(''); }} />}
+      {(offerRequest || editingOffer) && <OfferForm request={offerRequest || editingOffer?.request} offer={editingOffer} saving={saving} error={formError} onSubmit={saveOffer} onClose={() => { setOfferRequest(null); setEditingOffer(null); setFormError(''); }} />}
     </div>
   );
 }
-
-export default DashboardWorkspace;
