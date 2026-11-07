@@ -3072,6 +3072,15 @@ a:focus-visible {
   gap: 2px;
 }
 
+.provider-shell .sidebar-section-label {
+  margin: 13px 0 5px;
+  padding-left: 8px;
+  color: #7889a1;
+  font-family: var(--font-display);
+  font-size: 7px;
+  letter-spacing: 0.1em;
+}
+
 .provider-shell .nav-item {
   min-height: 27px;
   gap: 8px;
@@ -3150,6 +3159,30 @@ a:focus-visible {
   font-size: 9px;
   font-weight: 700;
   white-space: nowrap;
+}
+
+.provider-country-chip {
+  display: inline-flex;
+  height: 23px;
+  align-items: center;
+  gap: 5px;
+  padding: 0 6px 0 3px;
+  border-radius: 3px;
+  color: #304a75;
+  background: #e3e9f4;
+  font-size: 9px;
+  white-space: nowrap;
+}
+
+.provider-country-chip b {
+  display: grid;
+  width: 17px;
+  height: 15px;
+  place-items: center;
+  border-radius: 2px;
+  color: #fff;
+  background: #0a1a33;
+  font-size: 7px;
 }
 
 .provider-shell .provider-topbar-avatar {
@@ -3288,10 +3321,15 @@ a:focus-visible {
   box-shadow: 0 1px 2px rgba(10, 26, 51, 0.08);
 }
 
+.provider-request-list {
+  display: flex;
+  flex-direction: column;
+}
+
 .provider-request-row {
   display: flex;
   min-width: 0;
-  min-height: 73px;
+  min-height: 72px;
   align-items: center;
   gap: 8px;
   padding: 8px 10px;
@@ -3300,6 +3338,17 @@ a:focus-visible {
 
 .provider-request-row:last-child {
   border-bottom: 0;
+}
+
+.provider-request-icon {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  flex: none;
+  place-items: center;
+  border-radius: 4px;
+  color: #304a75;
+  background: #e9eef7;
 }
 
 .provider-request-info {
@@ -3404,6 +3453,30 @@ a:focus-visible {
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+.provider-unavailable-state {
+  display: flex;
+  min-height: 190px;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 8px;
+  padding: 24px;
+  text-align: center;
+}
+
+.provider-unavailable-state > strong {
+  color: #0a1a33;
+  font-size: 13px;
+}
+
+.provider-unavailable-state > p {
+  max-width: 460px;
+  margin: 0;
+  color: #64728a;
+  font-size: 10px;
+  line-height: 16px;
 }
 
 .provider-list-card .card-heading {
@@ -3520,6 +3593,10 @@ a:focus-visible {
   }
 
   .provider-verified-chip {
+    display: none;
+  }
+
+  .provider-country-chip {
     display: none;
   }
 

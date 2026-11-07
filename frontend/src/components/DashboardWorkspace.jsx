@@ -34,7 +34,15 @@ const roleConfig = {
   },
   provider: {
     label: 'Cargo provider',
-    sections: [['overview', 'Overview', 'home'], ['opportunities', 'Requests', 'box'], ['offers', 'My offers', 'mail']],
+    sections: [
+      ['overview', 'Dashboard', 'home'],
+      ['opportunities', 'Requests', 'box'],
+      ['offers', 'My offers', 'mail'],
+      ['orders', 'Orders & shipping', 'package'],
+      ['messages', 'Chats', 'chat'],
+      ['company', 'Company profile', 'building'],
+      ['settings', 'Settings', 'user'],
+    ],
   },
   admin: {
     label: 'Admin',
@@ -251,6 +259,7 @@ export default function DashboardWorkspace({ initialRole }) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [adminPeriod, setAdminPeriod] = useState('30 days');
   const [currentTime, setCurrentTime] = useState(dashboardLoadedAt);
+  const [providerCountryFilter, setProviderCountryFilter] = useState('All');
   const config = roleConfig[initialRole];
   const displayName = user?.name || config.label;
   const customerMode = initialRole === 'customer';
@@ -268,6 +277,8 @@ export default function DashboardWorkspace({ initialRole }) {
     users: 'Users',
     analytics: 'Analytics',
     settings: 'Settings',
+    orders: 'Orders & shipping',
+    company: 'Company profile',
   })[section], [section, adminMode, customerMode]);
   const requestStatusCounts = shipmentStatuses.map((status) => ({
     status,
@@ -275,6 +286,19 @@ export default function DashboardWorkspace({ initialRole }) {
   }));
   const activeShipments = requests.filter((request) => ['in_progress', 'purchased', 'shipping'].includes(request.status));
   const pendingOffers = offers.filter((offer) => offer.status === 'pending');
+  const providerCountries = [...new Set(requests.map((request) => request.sourceCountry).filter(Boolean))].sort();
+  const visibleProviderRequests = providerCountryFilter === 'All'
+    ? requests
+    : requests.filter((request) => request.sourceCountry === providerCountryFilter);
+  const providerActiveShipments = offers.filter((offer) => offer.status === 'accepted' && ['in_progress', 'purchased', 'shipping'].includes(offer.request.status));
+  const providerCustomerIds = new Set(offers.map((offer) => offer.request.customer?._id || offer.request.customer?.id).filter(Boolean).map(String));
+  const providerCurrentMonthOffers = offers.filter((offer) => {
+    const createdAt = new Date(offer.createdAt || 0);
+    const now = new Date(currentTime);
+    return createdAt.getFullYear() === now.getFullYear() && createdAt.getMonth() === now.getMonth();
+  });
+  const providerAcceptedCount = offers.filter((offer) => offer.status === 'accepted').length;
+  const providerAcceptanceRate = offers.length ? Math.round((providerAcceptedCount / offers.length) * 100) : 0;
   const adminRangeStart = adminPeriod === 'All time'
     ? 0
     : currentTime - (adminPeriod === '7 days' ? 7 : 30) * 24 * 60 * 60 * 1000;
@@ -560,6 +584,20 @@ export default function DashboardWorkspace({ initialRole }) {
       return <Card><CardHeading title={title} subtitle="Send a real quote or decline requests you cannot fulfil." />{loading ? <p className="empty-table" role="status">Loading matching requests…</p> : renderRequests(requests)}</Card>;
     }
 
+    if (providerMode && section === 'orders') {
+      const orders = offers.filter((offer) => offer.status === 'accepted');
+      return <Card><CardHeading title="Orders & shipping" subtitle="Accepted offers and their live shipment status." />{loading ? <p className="empty-table" role="status">Loading accepted orders…</p> : orders.length ? <OffersTable offers={orders} role="provider" busyId={busyId} onEdit={(offer) => { setEditingOffer(offer); setOfferRequest(null); setFormError(''); }} onDelete={deleteCargoOffer} onStatusChange={handleStatusChange} /> : <div className="empty-state"><strong>No accepted orders yet</strong><p>When a customer accepts one of your offers, the order and shipping progress will appear here.</p><button className="small-primary" onClick={() => setSection('opportunities')}>Browse requests</button></div>}</Card>;
+    }
+
+    if (providerMode && ['messages', 'settings'].includes(section)) {
+      const feature = section === 'messages' ? 'Chats' : 'Settings';
+      return <Card><CardHeading title={feature} /><div className="provider-unavailable-state"><span className="provider-stat-icon"><Icon name={section === 'messages' ? 'chat' : 'user'} size={18} /></span><strong>{feature} are not connected yet</strong><p>The current backend does not provide {section === 'messages' ? 'customer messaging' : 'cargo company settings'} endpoints. Your real offers and customer request details are available in My offers and Requests.</p><button className="small-primary" onClick={() => setSection(section === 'messages' ? 'offers' : 'company')}>{section === 'messages' ? 'View my offers' : 'View company account'}</button></div></Card>;
+    }
+
+    if (providerMode && section === 'company') {
+      return <Card><CardHeading title="Company profile" subtitle="Account details currently available to this dashboard." />{user ? <div className="customer-profile-grid"><div><span>Account name</span><strong>{user.name}</strong></div><div><span>Country</span><strong>{user.country}</strong></div><div><span>Account type</span><strong>{config.label}</strong></div><div><span>Company verification</span><strong>Not available</strong></div></div> : <p className="empty-table" role="status">Loading company account…</p>}</Card>;
+    }
+
     if (section === 'requests') {
       return <Card><CardHeading title={title} subtitle={adminMode ? 'Review and manage requests across the marketplace.' : 'Create, edit, or cancel your shipping requests.'} action={customerMode ? <button className="primary-button" onClick={openCreateRequest}><Icon name="plus" size={16} />New request</button> : null} />{loading ? <p className="empty-table" role="status">Loading shipping requests…</p> : renderRequests(requests)}</Card>;
     }
@@ -678,17 +716,40 @@ export default function DashboardWorkspace({ initialRole }) {
         <div className="provider-dashboard">
           <div className="provider-stats-grid">
             {[
-              ['Open requests', requests.length, 'box'],
-              ['Offers sent', offers.length, 'mail'],
-              ['Active shipments', activeShipments.length, 'package'],
-              ['Offers accepted', offers.filter((offer) => offer.status === 'accepted').length, 'check'],
-            ].map(([label, value, icon]) => <article className="provider-stat-card" key={label}><span className="provider-stat-icon"><Icon name={icon} size={16} /></span><div><strong>{value}</strong><span>{label}</span></div></article>)}
+              ['New requests', requests.length, 'box'],
+              ['Offers sent', offers.length, 'chat'],
+              ['Customers quoted', providerCustomerIds.size, 'check'],
+              ['Offer win rate', `${providerAcceptanceRate}%`, 'star'],
+            ].map(([label, value, icon]) => <article className="provider-stat-card" key={label} aria-busy={loading}><span className={`provider-stat-icon${icon === 'star' ? ' amber' : ''}`}><Icon name={icon} size={16} /></span><div><strong>{loading ? '—' : value}</strong><span>{label}</span></div></article>)}
           </div>
           <div className="provider-dashboard-grid">
-            <Card className="provider-requests-card"><CardHeading title="New requests for you" subtitle="Submit a quote for a real customer request or decline it." action={<span className="results-count">{requests.length} available</span>} />{loading ? <p className="empty-table" role="status">Loading opportunities…</p> : renderRequests(requests.slice(0, 8))}</Card>
+            <Card className="provider-requests-card">
+              <CardHeading title="New requests for you" action={<div className="provider-request-filters">{['All', ...providerCountries].map((country) => <button className={providerCountryFilter === country ? 'active' : ''} aria-pressed={providerCountryFilter === country} key={country} onClick={() => setProviderCountryFilter(country)}>{country}</button>)}</div>} />
+              {loading ? <p className="empty-table" role="status">Loading opportunities…</p> : visibleProviderRequests.length ? <div className="provider-request-list">{visibleProviderRequests.slice(0, 8).map((request) => {
+                const age = Math.max(0, dashboardLoadedAt - new Date(request.createdAt || 0).getTime());
+                const timeLabel = age < 60 * 60 * 1000 ? `${Math.max(1, Math.floor(age / 60000))} min ago` : age < 24 * 60 * 60 * 1000 ? `${Math.floor(age / (60 * 60 * 1000))} hr ago` : new Date(request.createdAt).toLocaleDateString();
+                return <div className="provider-request-row" key={request._id}>
+                  <span className="provider-request-icon"><Icon name="laptop" size={18} /></span>
+                  <div className="provider-request-info">
+                    <span className="provider-request-title"><strong>{request.product} · {request.quantity}</strong>{age < 24 * 60 * 60 * 1000 && <span>New</span>}</span>
+                    <small>{request.details || `${request.sourceCountry} to ${request.destination}`}</small>
+                    <span className="provider-request-meta"><span><b>{request.sourceCountry.slice(0, 2).toUpperCase()}</b>{request.destination}</span><small>{timeLabel}</small></span>
+                  </div>
+                  <div className="provider-request-actions"><button className="customer-outline-button" disabled={busyId === request._id} onClick={() => handleDeclineRequest(request._id)}>Decline</button><button className="small-primary" disabled={busyId === request._id} onClick={() => { setOfferRequest(request); setEditingOffer(null); setFormError(''); }}>Send offer</button></div>
+                </div>;
+              })}</div> : <div className="empty-state"><strong>{requests.length ? `No requests from ${providerCountryFilter}` : 'No new requests right now'}</strong><p>{requests.length ? 'Choose another source country to browse available requests.' : 'New customer requests will appear here when available.'}</p></div>}
+            </Card>
             <div className="provider-dashboard-aside">
-              <Card className="provider-list-card"><CardHeading title="Your latest offers" action={<button className="link-button" onClick={() => setSection('offers')}>View all <Icon name="arrow" size={14} /></button>} />{loading ? <p className="empty-table" role="status">Loading offers…</p> : <OffersTable offers={offers.slice(0, 4)} role="provider" busyId={busyId} onEdit={(offer) => { setEditingOffer(offer); setOfferRequest(null); setFormError(''); }} onDelete={deleteCargoOffer} onStatusChange={handleStatusChange} />}</Card>
-              <Card className="provider-performance-card"><CardHeading title="Offer activity" /><div className="provider-performance"><div><span>Pending quotes</span><strong>{pendingOffers.length}</strong></div><div><span>Response rate</span><strong>{offers.length ? `${Math.round((offers.filter((offer) => offer.status !== 'pending').length / offers.length) * 100)}%` : '—'}</strong></div><p>Quote requests matching your cargo services are shown in the list.</p></div></Card>
+              <Card className="provider-list-card">
+                <CardHeading title="Recent customer activity" action={<button className="link-button" onClick={() => setSection('offers')}>My offers <Icon name="arrow" size={14} /></button>} />
+                {loading ? <p className="empty-table" role="status">Loading offer activity…</p> : offers.length ? <div className="customer-compact-list">{offers.slice(0, 3).map((offer) => <div className="customer-chat-row" key={offer._id}><Avatar name={offer.request.customer?.name} className="provider-chat-avatar" /><span className="customer-row-copy"><strong>{offer.request.customer?.name || 'Customer'}</strong><small>{offer.request.product} · {offer.status === 'accepted' ? 'Offer accepted' : offer.status === 'declined' ? 'Offer declined' : 'Quote submitted'}</small></span><StatusBadge>{offer.status}</StatusBadge></div>)}</div> : <div className="empty-state"><strong>No customer activity yet</strong><p>Your submitted quotes and customer responses will appear here.</p></div>}
+              </Card>
+              <Card className="provider-performance-card"><CardHeading title="This month" /><div className="provider-performance">
+                <div><span>Offer win rate</span><strong>{loading ? '—' : `${providerAcceptanceRate}%`}</strong><i><b style={{ width: `${providerAcceptanceRate}%` }} /></i></div>
+                <div><span>Active shipments</span><strong>{loading ? '—' : providerActiveShipments.length}</strong></div>
+                <div><span>Quotes sent this month</span><strong>{loading ? '—' : providerCurrentMonthOffers.length}</strong></div>
+                <p>Calculated from your live offers and accepted shipments.</p>
+              </div></Card>
             </div>
           </div>
         </div>
@@ -755,7 +816,8 @@ export default function DashboardWorkspace({ initialRole }) {
           {config.sections.map(([sectionId, label, icon]) => (
             <Fragment key={sectionId}>
               {adminMode && sectionId === 'settings' && <span className="sidebar-section-label">SYSTEM</span>}
-              <button className={`nav-item${section === sectionId ? ' active' : ''}`} onClick={() => {
+          {providerMode && sectionId === 'company' && <span className="sidebar-section-label">COMPANY</span>}
+          <button className={`nav-item${section === sectionId ? ' active' : ''}`} onClick={() => {
                 if (sectionId === 'new-request') {
                   openCreateRequest();
                   setMobileNavOpen(false);
@@ -766,7 +828,9 @@ export default function DashboardWorkspace({ initialRole }) {
                 setSelectedRequestId('');
                 setMobileNavOpen(false);
               }}>
-                <Icon name={icon} size={16} /><span>{label}</span>{customerMode && sectionId === 'notifications' && pendingOffers.length > 0 && <span className="nav-count">{pendingOffers.length}</span>}
+                <Icon name={icon} size={16} /><span>{label}</span>
+                {customerMode && sectionId === 'notifications' && pendingOffers.length > 0 && <span className="nav-count">{pendingOffers.length}</span>}
+                {providerMode && sectionId === 'opportunities' && requests.length > 0 && <span className="nav-count">{requests.length}</span>}
               </button>
             </Fragment>
           ))}
@@ -782,6 +846,7 @@ export default function DashboardWorkspace({ initialRole }) {
           <button className="mobile-menu icon-button" aria-label="Open navigation" onClick={() => setMobileNavOpen(true)}><Icon name="menu" /></button>
           <div className="customer-topbar-title"><strong>{title}</strong><span>Welcome back, {displayName}</span></div>
           <div className="topbar-actions">
+            {providerMode && <span className="provider-country-chip"><b>{user?.country?.slice(0, 2).toUpperCase() || '—'}</b>{user?.country || 'Country not set'}</span>}
             {adminMode && section === 'overview' && <div className="admin-period-switch" role="group" aria-label="Filter dashboard period">
               {['7 days', '30 days', 'All time'].map((period) => <button
                 className={adminPeriod === period ? 'active' : ''}
