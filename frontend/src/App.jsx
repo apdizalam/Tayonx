@@ -1,37 +1,22 @@
-import React, { useEffect, useState } from 'react';
-import { socket } from './socket';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import AdminDashboard from './pages/admin/AdminDashboard.jsx';
+import CargoDashboard from './pages/cargo/CargoDashboard.jsx';
+import CustomerDashboard from './pages/customer/CustomerDashboard.jsx';
+import LoginPage from './pages/Login.jsx';
+import RegisterPage from './pages/Register.jsx';
 
-function App() {
-  const [isConnected, setIsConnected] = useState(socket.connected);
-
-  useEffect(() => {
-    socket.on('connect', () => {
-      setIsConnected(true);
-      console.log('Connected to Tayonx Socket Server:', socket.id);
-    });
-
-    socket.on('disconnect', () => {
-      setIsConnected(false);
-      console.log('Disconnected from Socket Server');
-    });
-
-    return () => {
-      socket.off('connect');
-      socket.off('disconnect');
-    };
-  }, []);
-
+export default function App() {
   return (
-    <div style={{ padding: '40px', fontFamily: 'Arial', textAlign: 'center' }}>
-      <h1>Tayonx Multivendor Cargo Platform</h1>
-      <p style={{ fontSize: '18px', marginTop: '20px' }}>
-        Backend Socket Status: {' '}
-        <span style={{ color: isConnected ? 'green' : 'red', fontWeight: 'bold' }}>
-          {isConnected ? '🟢 Connected (Real-Time Active)' : '🔴 Disconnected'}
-        </span>
-      </p>
-    </div>
+    <BrowserRouter>
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+        <Route path="/admin/dashboard" element={<AdminDashboard />} />
+        <Route path="/customer/dashboard" element={<CustomerDashboard />} />
+        <Route path="/cargo/dashboard" element={<CargoDashboard />} />
+        <Route path="/" element={<Navigate to="/login" replace />} />
+        <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
+    </BrowserRouter>
   );
 }
-
-export default App;
