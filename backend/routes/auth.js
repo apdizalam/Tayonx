@@ -3,10 +3,23 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
 const User = require('../models/User');
+const UploadedFile = require('../models/UploadedFile');
+const publicUser = require('../lib/publicUser');
+const {
+  ACCOUNT_ROLES,
+  normalizeRole,
+  validateAccountFields,
+  validatePassword,
+} = require('../constants/accounts');
+const {
+  IMAGE_TYPES,
+  acceptUploads,
+  checkFileType,
+  saveUploadedFile,
+  uploadedFile,
+} = require('../lib/uploads');
 
 const router = express.Router();
-const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const allowedCountries = ['Somaliland', 'Somalia', 'Other', 'China', 'Turkey'];
 const tokenLifetime = '1h';
 
 function getJwtSecret() {
@@ -17,16 +30,6 @@ function getJwtSecret() {
   return secret;
 }
 
-function publicUser(user) {
-  return {
-    id: user.id,
-    name: user.name,
-    email: user.email,
-    role: user.role,
-    country: user.country,
-  };
-}
-
 function sendAuthError(res, error) {
   if (error.message === 'JWT_SECRET must be set to at least 32 characters.') {
     return res.status(503).json({ error: 'Authentication is not configured.' });
@@ -35,45 +38,51 @@ function sendAuthError(res, error) {
   return res.status(500).json({ error: 'Authentication could not be completed.' });
 }
 
-router.post('/register', async (req, res) => {
-  const name = typeof req.body.name === 'string' ? req.body.name.trim() : '';
-  const email = typeof req.body.email === 'string' ? req.body.email.trim().toLowerCase() : '';
-  const password = typeof req.body.password === 'string' ? req.body.password : '';
-  const requestedRole = typeof req.body.role === 'string' ? req.body.role.trim().toLowerCase() : 'customer';
-  const role = requestedRole === 'cargo company' ? 'cargo_provider' : requestedRole;
-  const country = typeof req.body.country === 'string' ? req.body.country : '';
+// Public sign-up. Accepts JSON or multipart/form-data (customers may attach a profile photo).
+router.post('/register', acceptUploads(['profilePhoto']), async (req, res) => {
+  const body = req.body && typeof req.body === 'object' ? req.body : {};
+  const role = normalizeRole(body.role || 'customer');
+  if (!ACCOUNT_ROLES.includes(role)) {
+    return res.status(400).json({ error: 'Choose a valid account type.', field: 'role' });
+  }
 
-  if (!name || name.length > 100) {
-    return res.status(400).json({ error: 'Name is required and must be 100 characters or fewer.' });
+  const { fields, error, field } = validateAccountFields(body, { role });
+  if (error) return res.status(400).json({ error, field });
+
+  const passwordError = validatePassword(body.password);
+  if (passwordError) return res.status(400).json({ error: passwordError, field: 'password' });
+
+  const photo = uploadedFile(req, 'profilePhoto');
+  if (photo && role !== 'customer') {
+    return res.status(400).json({ error: 'Only customer accounts can upload a profile picture at sign-up.', field: 'profilePhoto' });
   }
-  if (!emailPattern.test(email) || email.length > 254) {
-    return res.status(400).json({ error: 'Enter a valid email address.' });
-  }
-  if (password.length < 8 || Buffer.byteLength(password, 'utf8') > 72) {
-    return res.status(400).json({ error: 'Password must be at least 8 characters and no more than 72 UTF-8 bytes.' });
-  }
-  if (!['customer', 'cargo_provider'].includes(role)) {
-    return res.status(400).json({ error: 'Choose a valid account type.' });
-  }
-  if (!allowedCountries.includes(country)) {
-    return res.status(400).json({ error: 'Choose a valid country.' });
+  if (photo) {
+    const typeError = checkFileType(photo, IMAGE_TYPES);
+    if (typeError) return res.status(400).json({ error: typeError, field: 'profilePhoto' });
   }
   if (mongoose.connection.readyState !== 1) {
     return res.status(503).json({ error: 'The account service is unavailable.' });
   }
 
+  let photoId = null;
   try {
+    if (await User.exists({ email: fields.email })) {
+      return res.status(409).json({ error: 'An account with this email already exists.', field: 'email' });
+    }
+    if (photo) photoId = await saveUploadedFile(photo, { owner: null, purpose: 'profile_photo' });
+
     const user = await User.create({
-      name,
-      email,
-      password: await bcrypt.hash(password, 12),
+      ...fields,
       role,
-      country,
+      password: await bcrypt.hash(body.password, 12),
+      profilePhoto: photoId,
     });
+    if (photoId) await UploadedFile.updateOne({ _id: photoId }, { owner: user._id });
     return res.status(201).json({ message: 'Account created successfully.', user: publicUser(user) });
   } catch (error) {
+    if (photoId) await UploadedFile.deleteOne({ _id: photoId }).catch(() => {});
     if (error.code === 11000) {
-      return res.status(409).json({ error: 'An account with this email already exists.' });
+      return res.status(409).json({ error: 'An account with this email already exists.', field: 'email' });
     }
     return sendAuthError(res, error);
   }
