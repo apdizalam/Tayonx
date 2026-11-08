@@ -22,9 +22,149 @@
   line-height: 18px;
 }
 
+/* ---------- Sidebar: wider, roomier, aligned with the top bar ---------- */
+
+/* One width drives both the sidebar and the content offset, so they always line up. */
+.app-shell {
+  --sidebar-width: 248px;
+}
+
+@media (min-width: 681px) {
+  .app-shell .sidebar {
+    width: var(--sidebar-width);
+    padding: 0 16px 20px;
+  }
+
+  .app-shell .app-main {
+    margin-left: var(--sidebar-width);
+  }
+
+  /* Brand row is exactly as tall as the top bar, with a matching divider. */
+  .app-shell .sidebar-brand {
+    display: flex;
+    width: auto;
+    height: 76px;
+    align-items: center;
+    margin: 0 -16px 18px;
+    padding: 0 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 0;
+    background: transparent;
+  }
+
+  .app-shell .sidebar-brand img {
+    height: 30px;
+    padding: 6px 10px;
+    border-radius: 7px;
+    background: #fff;
+    box-sizing: content-box;
+  }
+}
+
+.app-shell .workspace-role-picker .customer-role-label {
+  margin: 0 4px 10px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+}
+
+.app-shell .side-nav {
+  gap: 4px;
+}
+
 .app-shell .sidebar .nav-item {
-  font-size: 12px;
+  min-height: 44px;
+  gap: 12px;
+  padding: 0 14px;
+  border-radius: 9px;
+  font-size: 14px;
   white-space: nowrap;
+}
+
+.app-shell .sidebar .nav-item .icon {
+  width: 19px;
+  height: 19px;
+  flex: none;
+}
+
+.app-shell .sidebar .nav-item > span:not(.nav-count):not(.nav-dot) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.app-shell .sidebar .nav-count {
+  min-width: 22px;
+  height: 22px;
+  margin-left: auto;
+  padding: 0 6px;
+  border-radius: 11px;
+  font-size: 11px;
+}
+
+.app-shell .sidebar .sidebar-section-label {
+  margin: 20px 0 8px;
+  padding-left: 14px;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+}
+
+.app-shell .sidebar .customer-signout {
+  min-height: 48px;
+  gap: 12px;
+  padding: 14px 14px 0;
+  font-size: 14px;
+}
+
+.app-shell .sidebar .customer-signout .icon {
+  width: 18px;
+  height: 18px;
+}
+
+/* Tablet: keep the sidebar visible but a little narrower. */
+@media (min-width: 681px) and (max-width: 1160px) {
+  .app-shell {
+    --sidebar-width: 220px;
+  }
+
+  .app-shell .sidebar {
+    padding-right: 12px;
+    padding-left: 12px;
+  }
+
+  .app-shell .sidebar-brand {
+    margin-right: -12px;
+    margin-left: -12px;
+  }
+
+  .app-shell .sidebar .nav-item {
+    min-height: 42px;
+    gap: 10px;
+    padding: 0 12px;
+    font-size: 13px;
+  }
+}
+
+@media (min-width: 681px) and (max-width: 900px) {
+  .app-shell {
+    --sidebar-width: 200px;
+  }
+
+  .app-shell .sidebar .nav-item {
+    font-size: 13px;
+  }
+}
+
+/* Large screens: a touch more room. */
+@media (min-width: 1600px) {
+  .app-shell {
+    --sidebar-width: 264px;
+  }
+
+  .app-shell .sidebar .nav-item {
+    min-height: 46px;
+    font-size: 15px;
+  }
 }
 
 /* Top bar controls */
@@ -90,14 +230,14 @@
   max-width: 1840px;
   min-height: calc(100vh - 76px);
   flex-direction: column;
-  padding: 28px 32px 22px;
+  padding: 32px 36px 24px;
 }
 
 .app-shell .dashboard-content {
   display: flex;
   flex: 1 0 auto;
   flex-direction: column;
-  gap: 24px;
+  gap: 28px;
 }
 
 /* Each dashboard stretches to the bottom; its last row takes the leftover height. */
@@ -106,7 +246,7 @@
 .app-shell .provider-dashboard,
 .app-shell .admin-analytics-view {
   flex: 1 0 auto;
-  gap: 24px;
+  gap: 28px;
 }
 
 .app-shell .admin-lower-grid,
@@ -142,7 +282,7 @@
 .app-shell .customer-dashboard-grid,
 .app-shell .provider-dashboard-grid,
 .app-shell .provider-dashboard-aside {
-  gap: 24px;
+  gap: 28px;
 }
 
 .app-shell .dashboard-footer {
@@ -157,7 +297,7 @@
 }
 
 .app-shell .dashboard-card .card-heading {
-  min-height: 60px;
+  min-height: 64px;
   padding: 14px 20px;
 }
 
@@ -202,9 +342,9 @@
 .app-shell .admin-kpi,
 .app-shell .customer-stat-card,
 .app-shell .provider-stat-card {
-  min-height: 124px;
+  min-height: 140px;
   gap: 18px;
-  padding: 22px 24px;
+  padding: 26px 28px;
   border-radius: 12px;
 }
 
@@ -232,7 +372,7 @@
 .app-shell .admin-kpi-content > strong,
 .app-shell .customer-stat-card strong,
 .app-shell .provider-stat-card strong {
-  font-size: 32px;
+  font-size: 34px;
   line-height: 38px;
 }
 
@@ -274,26 +414,26 @@
 
 /* Requests overview donut */
 .app-shell .admin-request-overview {
-  min-height: 300px;
+  min-height: 330px;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 24px 28px;
-  padding: 24px;
+  gap: 20px 24px;
+  padding: 20px;
 }
 
 .app-shell .admin-legend {
-  min-width: 130px;
+  min-width: 120px;
 }
 
 .app-shell .admin-donut {
-  width: 168px;
-  height: 168px;
+  width: 156px;
+  height: 156px;
 }
 
 .app-shell .admin-donut > span {
-  width: 112px;
-  height: 112px;
-  font-size: 28px;
+  width: 104px;
+  height: 104px;
+  font-size: 26px;
 }
 
 .app-shell .admin-legend {
@@ -359,7 +499,7 @@
 }
 
 .app-shell .admin-activity-list > li {
-  min-height: 64px;
+  min-height: 68px;
   gap: 14px;
 }
 
@@ -459,7 +599,7 @@
 }
 
 .app-shell .data-table td {
-  height: 64px;
+  height: 68px;
   padding: 14px 18px;
   font-size: 14px;
 }
@@ -548,7 +688,7 @@
 .app-shell .customer-chat-row,
 .app-shell .customer-offer-row,
 .app-shell .provider-request-row {
-  min-height: 76px;
+  min-height: 80px;
   gap: 14px;
   padding: 14px 20px;
 }
