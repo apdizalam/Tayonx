@@ -1,10 +1,16 @@
-import { Fragment, useEffect, useMemo, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import logo from '../assets/tayonx-logo.png';
 import Icon from './Icon.jsx';
 import AdminChats from './AdminChats.jsx';
 import AdminSettings from './AdminSettings.jsx';
 import Chat from './Chat.jsx';
+import AccountFields from './AccountFields.jsx';
+import AdminVerifications from './AdminVerifications.jsx';
+import VerificationCenter from './VerificationCenter.jsx';
+import { ProtectedAvatar } from './ProtectedFile.jsx';
+import { createChatSocket } from '../socket.js';
+import { ACCOUNT_TYPES, ROLE_LABELS, VERIFICATION_LABELS, cleanText, normalizePhone, validateAccount } from '../lib/accountFields.js';
 import {
   apiRequest,
   createOffer,
@@ -17,6 +23,7 @@ import {
   getOffers,
   getRequests,
   getUsers,
+  getVerificationRequests,
   respondToOffer,
   updateOffer,
   updateRequest,
@@ -25,6 +32,7 @@ import {
 } from '../lib/api.js';
 import '../App.css';
 import '../dashboard-sizing.css';
+import '../account-forms.css';
 
 const roleConfig = {
   customer: {
@@ -60,6 +68,7 @@ const roleConfig = {
       ['companies', 'Cargo companies', 'building'],
       ['offers', 'Offers', 'mail'],
       ['users', 'Users', 'users'],
+      ['verifications', 'Verifications', 'shield'],
       ['messages', 'Chats & reports', 'chat'],
       ['analytics', 'Analytics', 'chart'],
       ['settings', 'Settings', 'user'],
@@ -68,11 +77,6 @@ const roleConfig = {
 };
 
 const shipmentStatuses = ['open', 'offers_received', 'in_progress', 'purchased', 'shipping', 'delivered', 'cancelled'];
-const managedUserRoles = [
-  ['customer', 'Customer'],
-  ['cargo_provider', 'Cargo provider'],
-  ['individual_cargo', 'Individual cargo'],
-];
 const dashboardLoadedAt = Date.now();
 
 function statusLabel(status) {
@@ -96,12 +100,11 @@ function StatusBadge({ children }) {
 }
 
 function userRoleLabel(role) {
-  return {
-    customer: 'Customer',
-    cargo_provider: 'Cargo provider',
-    individual_cargo: 'Individual cargo',
-    admin: 'Administrator',
-  }[role] || role;
+  return ROLE_LABELS[role] || role;
+}
+
+function VerificationChip({ status = 'unverified' }) {
+  return <span className={`verification-chip verification-${status}`}><Icon name="shield" size={13} />{VERIFICATION_LABELS[status] || status}</span>;
 }
 
 function Card({ children, className = '' }) {
@@ -260,34 +263,97 @@ function OfferForm({ request, offer, saving, error, onSubmit, onClose }) {
   );
 }
 
+/**
+ * Admin create/edit user dialog. Fields adapt to the selected account role.
+ * When editing, only changed fields are sent, so older accounts are not forced
+ * to meet newer rules (e.g. three-part names) unless that field is edited.
+ */
 function UserForm({ user, saving, error, onSubmit, onClose }) {
-  const [values, setValues] = useState({
+  const initial = {
     name: user?.name || '',
+    phone: user?.phone || '',
     email: user?.email || '',
     country: user?.country || 'Somaliland',
-    role: user?.role || 'customer',
     password: '',
-  });
-  function change(event) {
-    setValues((current) => ({ ...current, [event.target.name]: event.target.value }));
+    profilePhoto: null,
+  };
+  const [role, setRole] = useState(user?.role || 'customer');
+  const [values, setValues] = useState(initial);
+  const [localErrors, setErrors] = useState({});
+  const roleOptions = [...Object.entries(ACCOUNT_TYPES).map(([value, type]) => [value, type.label]), ...(user?.role === 'admin' ? [['admin', 'Administrator']] : [])];
+  // A field error from the server (e.g. duplicate email) shows on that field until the field is edited.
+  const errors = error?.field && !Object.hasOwn(localErrors, error.field)
+    ? { ...localErrors, [error.field]: error.message }
+    : localErrors;
+
+  function updateField(field, value) {
+    setValues((current) => ({ ...current, [field]: value }));
+    setErrors((current) => ({ ...current, [field]: '' }));
   }
+
+  function changedFields() {
+    return ['name', 'phone', 'email', 'country'].filter((field) => cleanText(values[field]) !== cleanText(initial[field]));
+  }
+
+  function handleSubmit(event) {
+    event.preventDefault();
+    const only = user ? [...changedFields(), 'password', 'profilePhoto'] : undefined;
+    const validationErrors = Object.fromEntries(Object.entries(validateAccount(values, role, { requirePassword: !user, only })).filter(([, message]) => message));
+    setErrors(validationErrors);
+    const firstInvalid = Object.keys(validationErrors)[0];
+    if (firstInvalid) {
+      document.getElementById(`user-form-${firstInvalid === 'profilePhoto' ? 'photo' : firstInvalid}`)?.focus();
+      return;
+    }
+
+    const fields = user ? changedFields() : ['name', 'phone', 'email', 'country'];
+    const payload = {};
+    for (const field of fields) payload[field] = field === 'phone' ? normalizePhone(values[field]) : cleanText(values[field]);
+    if (!user || role !== user.role) payload.role = role;
+    if (values.password) payload.password = values.password;
+    const photo = ACCOUNT_TYPES[role]?.profilePhoto ? values.profilePhoto : null;
+
+    if (user && !Object.keys(payload).length && !photo) {
+      onClose();
+      return;
+    }
+    if (photo) {
+      const formData = new FormData();
+      for (const [key, value] of Object.entries(payload)) formData.append(key, value);
+      formData.append('profilePhoto', photo);
+      onSubmit(formData);
+    } else {
+      onSubmit(payload);
+    }
+  }
+
+  const generalError = error && !error.field ? error.message : '';
 
   return (
     <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-      <form className="request-modal user-modal" onSubmit={(event) => { event.preventDefault(); onSubmit(values); }}>
+      <form className="request-modal user-modal account-form" onSubmit={handleSubmit} noValidate>
         <div className="modal-heading"><div><p className="eyebrow">{user ? 'EDIT ACCOUNT' : 'NEW ACCOUNT'}</p><h2>{user ? 'Update user' : 'Create user'}</h2></div><button type="button" className="icon-button" aria-label="Close dialog" onClick={onClose}><Icon name="close" /></button></div>
-        <label>Full name<input autoComplete="name" name="name" value={values.name} onChange={change} maxLength="100" required /></label>
-        <label>Email address<input autoComplete="email" name="email" type="email" value={values.email} onChange={change} maxLength="254" required /></label>
-        <div className="form-row">
-          <label>Account role<select name="role" value={values.role} onChange={change} required>
-            {managedUserRoles.map(([role, label]) => <option value={role} key={role}>{label}</option>)}
-            {user?.role === 'admin' && <option value="admin">Administrator</option>}
-          </select></label>
-          <label>Country<input name="country" value={values.country} onChange={change} maxLength="100" /></label>
+        <div className="account-field">
+          <label className="account-field-label" htmlFor="user-form-role">Account role</label>
+          <div className="account-input with-icon">
+            <Icon name="users" size={16} />
+            <select id="user-form-role" value={role} onChange={(event) => { setRole(event.target.value); setErrors({}); }} disabled={user?.role === 'admin'}>
+              {roleOptions.map(([value, label]) => <option value={value} key={value}>{label}</option>)}
+            </select>
+          </div>
+          {ACCOUNT_TYPES[role] && <small className="account-field-hint">{ACCOUNT_TYPES[role].description}</small>}
         </div>
-        <label>{user ? 'New password (optional)' : 'Temporary password'}<input autoComplete="new-password" name="password" type="password" value={values.password} onChange={change} minLength="8" maxLength="72" required={!user} placeholder={user ? 'Leave blank to keep current password' : 'At least 8 characters'} /></label>
-        {error && <p className="signin-message" role="alert">{error}</p>}
-        <button className="primary-button full-button" disabled={saving} type="submit">{saving ? 'Saving…' : user ? 'Save changes' : 'Create user'}</button>
+        <AccountFields role={role} values={values} errors={errors} onChange={updateField} idPrefix="user-form" />
+        <div className={`account-field${errors.password ? ' has-error' : ''}`}>
+          <label className="account-field-label" htmlFor="user-form-password">{user ? 'New password (optional)' : 'Temporary password'}</label>
+          <div className="account-input with-icon">
+            <Icon name="shield" size={16} />
+            <input id="user-form-password" autoComplete="new-password" type="password" value={values.password} onChange={(event) => updateField('password', event.target.value)} maxLength="72" placeholder={user ? 'Leave blank to keep current password' : 'At least 8 characters'} aria-invalid={Boolean(errors.password)} />
+          </div>
+          {errors.password && <p className="account-field-error" role="alert">{errors.password}</p>}
+        </div>
+        {generalError && <p className="signin-message" role="alert">{generalError}</p>}
+        <button className="primary-button full-button" disabled={saving} type="submit">{saving ? 'Saving…' : user ? 'Save changes' : `Create ${(ACCOUNT_TYPES[role]?.label || 'user').toLowerCase()}`}</button>
       </form>
     </div>
   );
@@ -317,6 +383,12 @@ export default function DashboardWorkspace({ initialRole }) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [userModalOpen, setUserModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
+  const [userFormError, setUserFormError] = useState(null);
+  const [pendingVerifications, setPendingVerifications] = useState(0);
+  const [verificationRefreshKey, setVerificationRefreshKey] = useState(0);
+  const [verificationPromptHidden, setVerificationPromptHidden] = useState(() => {
+    try { return sessionStorage.getItem('tayonx-hide-verification-prompt') === '1'; } catch { return false; }
+  });
   const [adminPeriod, setAdminPeriod] = useState('30 days');
   const [currentTime, setCurrentTime] = useState(dashboardLoadedAt);
   const [providerCountryFilter, setProviderCountryFilter] = useState('All');
@@ -335,6 +407,7 @@ export default function DashboardWorkspace({ initialRole }) {
     notifications: 'Notifications',
     profile: 'Profile',
     users: 'Users',
+    verifications: 'Verifications',
     analytics: 'Analytics',
     settings: 'Settings',
     orders: 'Orders & shipping',
@@ -505,6 +578,53 @@ export default function DashboardWorkspace({ initialRole }) {
     return () => controller.abort();
   }, [adminMode, section]);
 
+  // Admin: how many verification requests are waiting (sidebar badge + overview alert).
+  useEffect(() => {
+    if (!adminMode || !user) return undefined;
+    const controller = new AbortController();
+    getVerificationRequests('pending', { signal: controller.signal })
+      .then((result) => setPendingVerifications(result.pendingCount || 0))
+      .catch(() => {});
+    return () => controller.abort();
+  }, [adminMode, user]);
+
+  // Live events: admins hear about new verification requests, cargo accounts about review results.
+  useEffect(() => {
+    if (!user || !(adminMode || providerMode)) return undefined;
+    const token = localStorage.getItem('token');
+    if (!token) return undefined;
+    const socket = createChatSocket(token);
+    if (adminMode) {
+      socket.on('verification_submitted', (request) => {
+        setPendingVerifications((count) => count + 1);
+        setVerificationRefreshKey((key) => key + 1);
+        setMessage(`New verification request from ${request.user?.name || 'a cargo account'}. Open Verifications to review it.`);
+      });
+      socket.on('verification_updated', () => setVerificationRefreshKey((key) => key + 1));
+    }
+    if (providerMode) {
+      socket.on('verification_reviewed', ({ verification }) => {
+        setUser((current) => (current ? { ...current, verification } : current));
+        if (verification.status === 'approved') setMessage('Good news: your account has been verified by Tayonx.');
+        else setError(`Your verification needs changes: ${verification.reviewNote || 'see Settings for details.'}`);
+      });
+    }
+    socket.connect();
+    return () => {
+      socket.removeAllListeners();
+      socket.disconnect();
+    };
+    // Reconnect only when the signed-in account changes, not on every profile update.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, adminMode, providerMode]);
+
+  const handlePendingCountChange = useCallback((count) => setPendingVerifications(count), []);
+
+  function hideVerificationPrompt() {
+    setVerificationPromptHidden(true);
+    try { sessionStorage.setItem('tayonx-hide-verification-prompt', '1'); } catch { /* storage unavailable */ }
+  }
+
   async function refreshData() {
     const [requestResult, offerResult] = await Promise.all([
       getRequests(providerMode ? 'opportunities' : undefined),
@@ -584,18 +704,12 @@ export default function DashboardWorkspace({ initialRole }) {
     }
   }
 
-  async function saveUser(values) {
+  // `payload` is a plain object or FormData (when a profile photo is attached), built by UserForm.
+  async function saveUser(payload) {
     setSaving(true);
-    setFormError('');
+    setUserFormError(null);
     setError('');
     setMessage('');
-    const payload = {
-      name: values.name.trim(),
-      email: values.email.trim(),
-      country: values.country.trim(),
-      role: values.role,
-    };
-    if (!editingUser || values.password) payload.password = values.password;
     try {
       const result = editingUser
         ? await updateUser(editingUser.id, payload)
@@ -607,7 +721,7 @@ export default function DashboardWorkspace({ initialRole }) {
       setEditingUser(null);
       setMessage(editingUser ? 'User updated successfully.' : 'User created successfully.');
     } catch (requestError) {
-      setFormError(requestError.message);
+      setUserFormError({ message: requestError.message, field: requestError.field || '' });
     } finally {
       setSaving(false);
     }
@@ -722,11 +836,18 @@ export default function DashboardWorkspace({ initialRole }) {
     }
 
     if (providerMode && section === 'settings') {
-      return <Card><CardHeading title="Settings" /><div className="provider-unavailable-state"><span className="provider-stat-icon"><Icon name="user" size={18} /></span><strong>Settings are not connected yet</strong><p>The current backend does not provide cargo company settings endpoints.</p><button className="small-primary" onClick={() => setSection('company')}>View company account</button></div></Card>;
+      return user
+        ? <VerificationCenter user={user} onVerificationChange={(verification) => setUser((current) => ({ ...current, verification }))} />
+        : <Card><p className="empty-table" role="status">Loading settings…</p></Card>;
     }
 
     if (providerMode && section === 'company') {
-      return <Card><CardHeading title="Company profile" subtitle="Account details currently available to this dashboard." />{user ? <div className="customer-profile-grid"><div><span>Account name</span><strong>{user.name}</strong></div><div><span>Country</span><strong>{user.country}</strong></div><div><span>Account type</span><strong>{config.label}</strong></div><div><span>Company verification</span><strong>Not available</strong></div></div> : <p className="empty-table" role="status">Loading company account…</p>}</Card>;
+      const isCompany = user?.role === 'cargo_provider';
+      return <Card><CardHeading title={isCompany ? 'Company profile' : 'Provider profile'} subtitle="Your account details as customers and administrators see them." action={user && <VerificationChip status={user.verification?.status} />} />{user ? <div className="customer-profile-grid"><div><span>{isCompany ? 'Company name' : 'Full name'}</span><strong>{user.name}</strong></div><div><span>Account type</span><strong>{userRoleLabel(user.role)}</strong></div><div><span>Phone number</span><strong>{user.phone || 'Not provided'}</strong></div><div><span>Email address</span><strong>{user.email}</strong></div><div><span>Country</span><strong>{user.country}</strong></div><div><span>Verification</span><strong>{VERIFICATION_LABELS[user.verification?.status || 'unverified']}{user.verification?.status !== 'approved' && <button type="button" className="link-button profile-verify-link" onClick={() => setSection('settings')}>{user.verification?.status === 'pending' ? 'View status' : 'Get verified'} <Icon name="arrow" size={13} /></button>}</strong></div></div> : <p className="empty-table" role="status">Loading company account…</p>}</Card>;
+    }
+
+    if (adminMode && section === 'verifications') {
+      return <AdminVerifications refreshKey={verificationRefreshKey} onPendingCountChange={handlePendingCountChange} onMessage={setMessage} />;
     }
 
     if (section === 'requests') {
@@ -738,20 +859,21 @@ export default function DashboardWorkspace({ initialRole }) {
     }
 
     if (adminMode && section === 'users') {
-      return <Card className="admin-users-card"><CardHeading title="Users" subtitle={`${users.length} registered account${users.length === 1 ? '' : 's'}`} action={<button className="primary-button" onClick={() => { setEditingUser(null); setFormError(''); setUserModalOpen(true); }}><Icon name="plus" size={15} />Create user</button>} />
-        {usersLoading ? <p className="empty-table" role="status">Loading registered users…</p> : usersError ? <div className="empty-state"><strong>Could not load registered users</strong><p>{usersError}</p><button className="small-primary" onClick={refreshUsers}>Try again</button></div> : <div className="table-scroll"><table className="data-table admin-users-table"><thead><tr><th>User</th><th>Email</th><th>Role</th><th>Country</th><th>Joined</th><th>Actions</th></tr></thead><tbody>
+      return <Card className="admin-users-card"><CardHeading title="Users" subtitle={`${users.length} registered account${users.length === 1 ? '' : 's'}`} action={<button className="primary-button" onClick={() => { setEditingUser(null); setUserFormError(null); setUserModalOpen(true); }}><Icon name="plus" size={15} />Create user</button>} />
+        {usersLoading ? <p className="empty-table" role="status">Loading registered users…</p> : usersError ? <div className="empty-state"><strong>Could not load registered users</strong><p>{usersError}</p><button className="small-primary" onClick={refreshUsers}>Try again</button></div> : <div className="table-scroll"><table className="data-table admin-users-table"><thead><tr><th>User</th><th>Contact</th><th>Role</th><th>Verification</th><th>Country</th><th>Joined</th><th>Actions</th></tr></thead><tbody>
           {users.map((account) => <tr key={account.id}>
-            <td><span className="table-primary">{account.name}</span></td>
-            <td>{account.email}</td>
+            <td><span className="verification-applicant"><ProtectedAvatar fileId={account.profilePhoto} name={account.name} /><span className="table-primary">{account.name}</span></span></td>
+            <td><span className="table-primary">{account.email}</span><span className="table-secondary">{account.phone || 'No phone'}</span></td>
             <td><span className={`admin-user-role admin-user-role-${account.role}`}>{userRoleLabel(account.role)}</span></td>
+            <td>{['cargo_provider', 'individual_cargo'].includes(account.role) ? <VerificationChip status={account.verification?.status} /> : <span className="table-secondary">—</span>}</td>
             <td>{account.country || '—'}</td>
             <td>{account.createdAt ? new Date(account.createdAt).toLocaleDateString() : '—'}</td>
             <td><div className="table-buttons">
-              <button className="icon-button table-action" aria-label={`Edit ${account.name}`} disabled={busyId === account.id} onClick={() => { setEditingUser(account); setFormError(''); setUserModalOpen(true); }}><Icon name="edit" size={16} /></button>
+              <button className="icon-button table-action" aria-label={`Edit ${account.name}`} disabled={busyId === account.id} onClick={() => { setEditingUser(account); setUserFormError(null); setUserModalOpen(true); }}><Icon name="edit" size={16} /></button>
               <button className="icon-button table-action" aria-label={`Delete ${account.name}`} disabled={busyId === account.id || account.id === user?.id} onClick={() => removeUser(account)}><Icon name="trash" size={16} /></button>
             </div></td>
           </tr>)}
-          {!users.length && <tr><td className="empty-table" colSpan="6">No registered users found.</td></tr>}
+          {!users.length && <tr><td className="empty-table" colSpan="7">No registered users found.</td></tr>}
         </tbody></table></div>}
       </Card>;
     }
@@ -786,7 +908,7 @@ export default function DashboardWorkspace({ initialRole }) {
     }
 
     if (customerMode && section === 'profile') {
-      return <Card><CardHeading title="Profile" subtitle="Your account details." />{user ? <div className="customer-profile-grid"><div><span>Full name</span><strong>{user.name}</strong></div><div><span>Email address</span><strong>{user.email}</strong></div><div><span>Country</span><strong>{user.country}</strong></div><div><span>Account type</span><strong>{config.label}</strong></div></div> : <p className="empty-table" role="status">Loading profile…</p>}</Card>;
+      return <Card><CardHeading title="Profile" subtitle="Your account details." />{user ? <><div className="profile-identity-row"><ProtectedAvatar fileId={user.profilePhoto} name={user.name} className="profile-avatar-large" /><div><strong>{user.name}</strong><span>{config.label} · {user.country}</span></div></div><div className="customer-profile-grid"><div><span>Full name</span><strong>{user.name}</strong></div><div><span>Phone number</span><strong>{user.phone || 'Not provided'}</strong></div><div><span>Email address</span><strong>{user.email}</strong></div><div><span>Country</span><strong>{user.country}</strong></div></div></> : <p className="empty-table" role="status">Loading profile…</p>}</Card>;
     }
 
     if (customerMode) {
@@ -942,8 +1064,9 @@ export default function DashboardWorkspace({ initialRole }) {
             </tbody></table></div>}
           </Card>
           <Card className="admin-attention-card">
-            <CardHeading title="Needs attention" action={<span className="admin-attention-count">{loading ? '—' : adminAttentionRequests.length}</span>} />
-            {loading ? <p className="empty-table" role="status">Checking open requests…</p> : adminAttentionRequests.length ? <div className="admin-attention-list">{adminAttentionRequests.map((request) => <div className="admin-attention-item" key={request._id}><Icon name="clock" size={15} /><span><strong>Request without offers for 3+ days</strong><small>{request.product} · {request.sourceCountry} to {request.destination}</small></span><button className="customer-outline-button" onClick={() => { setSearch(request.product); setSection('requests'); }}>Review</button></div>)}</div> : <p className="admin-empty-note">No aged open requests without offers.</p>}
+            <CardHeading title="Needs attention" action={<span className="admin-attention-count">{loading ? '—' : adminAttentionRequests.length + (pendingVerifications ? 1 : 0)}</span>} />
+            {pendingVerifications > 0 && <div className="admin-attention-item admin-attention-verification"><Icon name="shield" size={15} /><span><strong>{pendingVerifications} verification request{pendingVerifications === 1 ? '' : 's'} waiting</strong><small>Cargo accounts submitted documents for review.</small></span><button className="small-primary" onClick={() => setSection('verifications')}>Review</button></div>}
+            {loading ? <p className="empty-table" role="status">Checking open requests…</p> : adminAttentionRequests.length ? <div className="admin-attention-list">{adminAttentionRequests.map((request) => <div className="admin-attention-item" key={request._id}><Icon name="clock" size={15} /><span><strong>Request without offers for 3+ days</strong><small>{request.product} · {request.sourceCountry} to {request.destination}</small></span><button className="customer-outline-button" onClick={() => { setSearch(request.product); setSection('requests'); }}>Review</button></div>)}</div> : !pendingVerifications && <p className="admin-empty-note">No aged open requests without offers.</p>}
           </Card>
         </div>
       </div>
@@ -980,6 +1103,8 @@ export default function DashboardWorkspace({ initialRole }) {
                 <Icon name={icon} size={16} /><span>{label}</span>
                 {customerMode && sectionId === 'notifications' && pendingOffers.length > 0 && <span className="nav-count">{pendingOffers.length}</span>}
                 {providerMode && sectionId === 'opportunities' && requests.length > 0 && <span className="nav-count">{requests.length}</span>}
+                {adminMode && sectionId === 'verifications' && pendingVerifications > 0 && <span className="nav-count nav-count-alert" aria-label={`${pendingVerifications} pending`}>{pendingVerifications}</span>}
+                {providerMode && sectionId === 'settings' && ['unverified', 'rejected'].includes(user?.verification?.status) && <span className="nav-dot" aria-label="Verification needed" />}
               </button>
             </Fragment>
           ))}
@@ -1017,6 +1142,25 @@ export default function DashboardWorkspace({ initialRole }) {
         <main className={`dashboard-main dashboard-main-wide${customerMode ? ' customer-dashboard-main' : ''}${providerMode ? ' provider-dashboard-main' : ''}${adminMode ? ' admin-dashboard-main' : ''}`}>
           {error && <div className="toast-message toast-error" role="alert"><Icon name="alert" size={17} />{error}<button aria-label="Dismiss error" onClick={() => setError('')}><Icon name="close" size={16} /></button></div>}
           {message && <div className="toast-message" role="status"><Icon name="check" size={17} />{message}<button aria-label="Dismiss message" onClick={() => setMessage('')}><Icon name="close" size={16} /></button></div>}
+          {providerMode && user && section !== 'settings' && !verificationPromptHidden && ['unverified', 'rejected'].includes(user.verification?.status) && (
+            <div className={`verification-prompt${user.verification.status === 'rejected' ? ' rejected' : ''}`} role="status">
+              <span className="verification-prompt-icon"><Icon name="shield" size={22} /></span>
+              <div>
+                <strong>{user.verification.status === 'rejected' ? 'Your verification needs changes' : `Get your ${user.role === 'cargo_provider' ? 'company' : 'account'} verified`}</strong>
+                <span>
+                  {user.verification.status === 'rejected'
+                    ? (user.verification.reviewNote ? `Feedback: “${user.verification.reviewNote}” ` : '') + 'Update your documents in Settings and resubmit.'
+                    : user.role === 'cargo_provider'
+                      ? 'Want to be officially verified and approved? Upload your business license, ID/passport photo and company legal document in Settings.'
+                      : 'Want to be officially verified and approved? Upload your ID/passport photo and personal details in Settings.'}
+                </span>
+              </div>
+              <div className="verification-prompt-actions">
+                <button type="button" className="small-primary" onClick={() => setSection('settings')}>{user.verification.status === 'rejected' ? 'Fix in Settings' : 'Verify now'}</button>
+                <button type="button" className="text-button" onClick={hideVerificationPrompt}>Later</button>
+              </div>
+            </div>
+          )}
           <div className={`dashboard-content dashboard-layout-wide${customerMode ? ' customer-dashboard-content' : ''}${providerMode ? ' provider-dashboard-content' : ''}${adminMode ? ' admin-dashboard-content' : ''}`}>{renderContent()}</div>
           <footer className="dashboard-footer"><span>Tayonx</span><span>Connect · Request · Ship · Get it done</span></footer>
         </main>
@@ -1024,7 +1168,7 @@ export default function DashboardWorkspace({ initialRole }) {
 
       {requestModalOpen && <RequestForm request={editingRequest} saving={saving} error={formError} onSubmit={saveRequest} onClose={() => { setRequestModalOpen(false); setEditingRequest(null); setFormError(''); }} />}
       {(offerRequest || editingOffer) && <OfferForm request={offerRequest || editingOffer?.request} offer={editingOffer} saving={saving} error={formError} onSubmit={saveOffer} onClose={() => { setOfferRequest(null); setEditingOffer(null); setFormError(''); }} />}
-      {userModalOpen && <UserForm user={editingUser} saving={saving} error={formError} onSubmit={saveUser} onClose={() => { setUserModalOpen(false); setEditingUser(null); setFormError(''); }} />}
+      {userModalOpen && <UserForm key={editingUser?.id || 'new'} user={editingUser} saving={saving} error={userFormError} onSubmit={saveUser} onClose={() => { setUserModalOpen(false); setEditingUser(null); setUserFormError(null); }} />}
     </div>
   );
 }
