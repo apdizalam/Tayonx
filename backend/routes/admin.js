@@ -214,7 +214,7 @@ router.get('/settings', async (req, res) => {
     const settings = await PlatformSettings.findOneAndUpdate(
       { key: 'platform' },
       { $setOnInsert: defaultSettings },
-      { upsert: true, new: true, setDefaultsOnInsert: true, runValidators: true },
+      { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true, runValidators: true },
     );
     return res.json({ settings: publicSettings(settings) });
   } catch (error) {
@@ -250,7 +250,7 @@ router.put('/settings', async (req, res) => {
         $set: { siteName, supportEmail, systemNotifications: body.systemNotifications, platformFeeRate },
         $setOnInsert: { key: 'platform' },
       },
-      { upsert: true, new: true, runValidators: true },
+      { upsert: true, returnDocument: 'after', runValidators: true },
     );
     return res.json({ settings: publicSettings(settings) });
   } catch (error) {
