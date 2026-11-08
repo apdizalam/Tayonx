@@ -1,16 +1,15 @@
 <div align="center">
 
-# Hi, I'm Mohamed Abdirahman 👋
+# Hi, I'm Abdisalam Mohamed 👋
 
 <a href="https://github.com/apdizalam">
-  <img src="https://readme-typing-svg.demolab.com?font=Fira+Code&weight=600&size=22&pause=1000&color=2F81F7&center=true&vCenter=true&width=600&lines=Full-stack+Software+Engineer;AI+Engineer;Building+web+%26+mobile+products+end+to+end" alt="Typing intro" />
+  <img src="https://readme-typing-svg.demolab.com?font=Fira+Code&weight=600&size=22&pause=1000&color=2F81F7&center=true&vCenter=true&width=600&lines=Software+Engineering+Graduate;Full-Stack+Developer;Building+practical+software+solutions" alt="Typing intro" />
 </a>
 
 <p>
-  <a href="https://engmohamed.tech"><img src="https://img.shields.io/badge/Portfolio-engmohamed.tech-000000?style=for-the-badge&logo=vercel&logoColor=white" alt="Portfolio" /></a>
-  <a href="mailto:contact@engmohamed.tech"><img src="https://img.shields.io/badge/Email-contact@engmohamed.tech-D14836?style=for-the-badge&logo=maildotru&logoColor=white" alt="Email" /></a>
-  <a href="https://www.linkedin.com/in/mohamed-abdirahman-mohamed-8985682b6/"><img src="https://img.shields.io/badge/LinkedIn-0A66C2?style=for-the-badge&logo=linkedin&logoColor=white" alt="LinkedIn" /></a>
-  <img src="https://img.shields.io/badge/Borama,_Somaliland-1f2328?style=for-the-badge&logo=googlemaps&logoColor=white" alt="Location" />
+  <a href="https://github.com/apdizalam"><img src="https://img.shields.io/badge/GitHub-apdizalam-181717?style=for-the-badge&logo=github&logoColor=white" alt="GitHub" /></a>
+  <a href="mailto:apdizalammohameth@gmail.com"><img src="https://img.shields.io/badge/Email-apdizalammohameth@gmail.com-D14836?style=for-the-badge&logo=gmail&logoColor=white" alt="Email" /></a>
+  <a href="https://www.linkedin.com/in/abdisalam-m-muhumed-4b6351307"><img src="https://img.shields.io/badge/LinkedIn-0A66C2?style=for-the-badge&logo=linkedin&logoColor=white" alt="LinkedIn" /></a>
 </p>
 
 <img src="https://komarev.com/ghpvc/?username=apdizalam&style=flat-square&color=2F81F7&label=Profile+views" alt="Profile views" />
@@ -21,40 +20,38 @@
 
 ## 🧑‍💻 About Me
 
-I'm a **Full-stack Software Engineer & AI Engineer** based in **Borama, Somaliland**. I build web and mobile products end to end, from the database and APIs to polished interfaces, and I integrate large language models into real products for teachers, businesses and health organizations.
+I'm a **Software Engineering graduate from Amoud University** and a **Full-Stack Developer** with an interest in designing and building practical software solutions.
 
-- 🤖 Focused on **AI/LLM integration**: turning models into features people actually use
-- 🌍 Shipping software for local businesses, schools and health institutes in the Horn of Africa
-- 🌱 Always learning: system design, performance, and clean, testable code
-- 💬 Ask me about **React, Next.js, Node.js, TypeScript, Flutter and AI apps**
-- 🌐 Portfolio: **[engmohamed.tech](https://engmohamed.tech)**
-- 📫 Reach me at **[contact@engmohamed.tech](mailto:contact@engmohamed.tech)** or on [LinkedIn](https://www.linkedin.com/in/mohamed-abdirahman-mohamed-8985682b6/)
+- 💡 I enjoy turning ideas into working applications and solving problems through code
+- 🛠️ Experience with web apps, mobile apps, database-driven systems and AI-assisted customer support
+- 📐 Focused on maintainable code and the full software development lifecycle
+- 🌱 Looking for software engineering internships and entry-level opportunities
+- 📫 Reach me at **[apdizalammohameth@gmail.com](mailto:apdizalammohameth@gmail.com)** or on [LinkedIn](https://www.linkedin.com/in/abdisalam-m-muhumed-4b6351307)
+
+---
+
+## 🚀 Featured Projects
+
+**1. [Shaba Water Billing Management System](https://github.com/apdizalam/shaba-water-system-)**
+A web-based system for water billing operations, customer management and payment records.
+<sub>Focus: web development, database-driven features, business process management</sub>
+
+**2. Shaba Customer Mobile Application**
+A mobile app that lets Shaba customers view their billing information and related services.
+<sub>Focus: mobile development and integration with the web management system</sub>
+
+**3. AI Assistant & Customer Support System**
+A team project building an AI-powered assistant for customer interactions. I worked on the **backend**.
+<sub>Focus: server-side development and team collaboration</sub>
+
+**4. [Tayonx](https://github.com/apdizalam/Tayonx)**
+A JavaScript web application with chat reporting and admin settings management.
 
 ---
 
 ## 🛠️ Tech Stack
 
-**Languages**
-
-<img src="https://skillicons.dev/icons?i=ts,js,python,dart,html,css" alt="Languages" />
-
-**Frontend**
-
-<img src="https://skillicons.dev/icons?i=react,nextjs,tailwind,vite" alt="Frontend" />
-
-**Backend & Databases**
-
-<img src="https://skillicons.dev/icons?i=nodejs,express,mongodb,postgres,supabase" alt="Backend and databases" />
-
-**Mobile**
-
-<img src="https://skillicons.dev/icons?i=flutter,react" alt="Mobile" />
-<sub>Flutter · React Native</sub>
-
-**AI & Tools**
-
-<img src="https://img.shields.io/badge/LLM_Integration-412991?style=for-the-badge&logo=openai&logoColor=white" alt="LLM integration" />
-<img src="https://skillicons.dev/icons?i=git,github,vercel,docker,figma,vscode" alt="Tools" />
+<img src="https://skillicons.dev/icons?i=js,html,css,react,nodejs,mongodb,git,github,vscode" alt="Tech stack" />
 
 ---
 
@@ -75,14 +72,6 @@ I'm a **Full-stack Software Engineer & AI Engineer** based in **Borama, Somalila
 
 <img src="https://streak-stats.demolab.com?user=apdizalam&hide_border=true&theme=github-dark-blue" alt="GitHub streak" />
 
-### 🧾 Profile Summary
-
-<img width="100%" src="https://github-profile-summary-cards.vercel.app/api/cards/profile-details?username=apdizalam&theme=github_dark" alt="Profile summary" />
-
-<img height="170" src="https://github-profile-summary-cards.vercel.app/api/cards/repos-per-language?username=apdizalam&theme=github_dark" alt="Repos per language" />
-<img height="170" src="https://github-profile-summary-cards.vercel.app/api/cards/most-commit-language?username=apdizalam&theme=github_dark" alt="Most commit language" />
-<img height="170" src="https://github-profile-summary-cards.vercel.app/api/cards/productive-time?username=apdizalam&theme=github_dark&utcOffset=3" alt="Productive time" />
-
 ### 🟦 Contribution Graph
 
 <img width="100%" src="https://ghchart.rshah.org/2F81F7/apdizalam" alt="Contribution chart" />
@@ -91,16 +80,25 @@ I'm a **Full-stack Software Engineer & AI Engineer** based in **Borama, Somalila
 
 ---
 
+## 🎯 Current Goals
+
+- Strengthen my full-stack development skills
+- Improve backend architecture, API development and database design
+- Build reliable, scalable and user-friendly software
+- Collaborate with other developers on meaningful projects
+
+---
+
 <div align="center">
 
-### 🤝 Let's build something together
+### 🤝 Let's connect
 
-I'm open to freelance work, collaborations and full-time opportunities.
+I'm always happy to connect with fellow developers, collaborate on projects and explore new opportunities.
 
-<a href="https://engmohamed.tech"><img src="https://img.shields.io/badge/Visit_my_Portfolio-000000?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Visit my portfolio" /></a>
-<a href="mailto:contact@engmohamed.tech"><img src="https://img.shields.io/badge/Email_Me-D14836?style=for-the-badge&logo=maildotru&logoColor=white" alt="Email me" /></a>
-<a href="https://www.linkedin.com/in/mohamed-abdirahman-mohamed-8985682b6/"><img src="https://img.shields.io/badge/Connect_on_LinkedIn-0A66C2?style=for-the-badge&logo=linkedin&logoColor=white" alt="Connect on LinkedIn" /></a>
+<a href="mailto:apdizalammohameth@gmail.com"><img src="https://img.shields.io/badge/Email_Me-D14836?style=for-the-badge&logo=gmail&logoColor=white" alt="Email me" /></a>
+<a href="https://www.linkedin.com/in/abdisalam-m-muhumed-4b6351307"><img src="https://img.shields.io/badge/Connect_on_LinkedIn-0A66C2?style=for-the-badge&logo=linkedin&logoColor=white" alt="Connect on LinkedIn" /></a>
+<a href="https://github.com/apdizalam"><img src="https://img.shields.io/badge/My_Repositories-181717?style=for-the-badge&logo=github&logoColor=white" alt="My repositories" /></a>
 
-<sub>⭐ If you like my work, give a repo a star. It means a lot!</sub>
+<sub>Always learning, building, and improving.</sub>
 
 </div>
