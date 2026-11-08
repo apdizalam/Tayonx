@@ -9,6 +9,8 @@ const requestRoutes = require('./routes/requests');
 const userRoutes = require('./routes/users');
 const chatRoutes = require('./routes/chats');
 const adminRoutes = require('./routes/admin');
+const fileRoutes = require('./routes/files');
+const verificationRoutes = require('./routes/verification');
 const registerChatSocket = require('./socket');
 
 const app = express();
@@ -31,6 +33,8 @@ app.use('/api/requests', requestRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/chats', chatRoutes.router);
 app.use('/api/admin', adminRoutes);
+app.use('/api/files', fileRoutes);
+app.use('/api/verification', verificationRoutes);
 
 // Socket.io Setup (Real-Time)
 const io = new Server(server, {
@@ -39,6 +43,8 @@ const io = new Server(server, {
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE']
   }
 });
+// Routes use this to push live events (e.g. new verification requests to admins).
+app.set('io', io);
 
 // MongoDB Atlas Connection
 mongoose.connect(process.env.MONGO_URI)

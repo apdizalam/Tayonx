@@ -33,6 +33,8 @@ function registerChatSocket(io) {
   io.on('connection', (socket) => {
     const sender = socket.data.user;
     socket.join(`user:${sender.id}`);
+    // Administrators receive live verification alerts.
+    if (sender.role === 'admin') socket.join('admins');
 
     socket.on('send_message', async (payload, acknowledge) => {
       const reply = typeof acknowledge === 'function' ? acknowledge : () => {};
