@@ -18,6 +18,7 @@ export async function apiRequest(path, options = {}) {
   if (!response.ok) {
     const error = new Error(result.error || result.message || 'The request could not be completed.');
     error.status = response.status;
+    if (typeof result.field === 'string') error.field = result.field;
     throw error;
   }
   return result;
@@ -114,4 +115,36 @@ export function getAdminSettings(options) {
 
 export function updateAdminSettings(values) {
   return apiRequest('/api/admin/settings', { method: 'PUT', body: values });
+}
+
+export function getMyVerification(options) {
+  return apiRequest('/api/verification/me', options);
+}
+
+export function submitVerification(formData) {
+  return apiRequest('/api/verification', { method: 'POST', body: formData });
+}
+
+export function getVerificationRequests(status = 'all', options) {
+  return apiRequest(`/api/verification/requests?status=${encodeURIComponent(status)}`, options);
+}
+
+export function reviewVerification(id, decision, note = '') {
+  return apiRequest(`/api/verification/requests/${encodeURIComponent(id)}`, { method: 'PATCH', body: { decision, note } });
+}
+
+// Uploaded files need the bearer token, so load them as a blob and return an object URL.
+// The caller must URL.revokeObjectURL() it when done.
+export async function loadFileUrl(fileId, options = {}) {
+  const headers = new Headers();
+  const token = localStorage.getItem('token');
+  if (token) headers.set('Authorization', `Bearer ${token}`);
+  const response = await fetch(`${API_BASE_URL}/api/files/${encodeURIComponent(fileId)}`, { ...options, headers });
+  if (!response.ok) {
+    const result = await response.json().catch(() => ({}));
+    const error = new Error(result.error || 'The file could not be loaded.');
+    error.status = response.status;
+    throw error;
+  }
+  return URL.createObjectURL(await response.blob());
 }

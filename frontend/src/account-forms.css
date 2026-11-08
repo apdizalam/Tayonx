@@ -1,0 +1,967 @@
+/*
+ * Role-based account forms, uploads and verification UI.
+ * Used by the sign-up page, the admin Create/Edit user dialog,
+ * cargo Settings → Verification and admin → Verifications.
+ */
+
+/* ---------- Role picker (sign-up) ---------- */
+
+.signup-role-picker.role-picker-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.role-picker-3 .signup-role-option {
+  min-height: 96px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 9px;
+}
+
+.role-picker-3 .signup-role-option b {
+  font-size: 13px;
+}
+
+.role-picker-3 .signup-role-option small {
+  font-size: 11px;
+}
+
+.signup-role-picker legend,
+.signup-heading p {
+  font-size: 13px;
+}
+
+/* ---------- Fields ---------- */
+
+.account-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.account-fields-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.account-field {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.account-field-label {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  color: #263750;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.account-field-label em {
+  color: #8490a2;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 500;
+}
+
+.account-field-label b {
+  color: #c2261c;
+}
+
+.account-field-hint {
+  color: #718099;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.account-field-error {
+  margin: 0;
+  color: #b42318;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.account-input {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.account-input > .icon {
+  position: absolute;
+  left: 12px;
+  color: #8490a2;
+  pointer-events: none;
+}
+
+.account-form .account-input input,
+.account-form .account-input select {
+  width: 100%;
+  height: 46px;
+  padding: 0 12px;
+  border: 1px solid #cbd4e1;
+  border-radius: 8px;
+  outline: 0;
+  color: #132541;
+  background: #fff;
+  font: inherit;
+  font-size: 14px;
+}
+
+.account-form .account-input.with-icon input,
+.account-form .account-input.with-icon select {
+  padding-left: 38px;
+}
+
+.account-form .account-input input:focus,
+.account-form .account-input select:focus {
+  border-color: #1f6bff;
+  box-shadow: 0 0 0 3px #e5eeff;
+}
+
+.account-form .account-input select:disabled {
+  color: #64728a;
+  background: #f4f7fc;
+}
+
+.account-field.has-error .account-input input,
+.account-field.has-error .account-input select {
+  border-color: #d92d20;
+  box-shadow: 0 0 0 3px #fee4e2;
+}
+
+.account-field.has-error .account-input > .icon {
+  color: #d92d20;
+}
+
+/* ---------- File pickers ---------- */
+
+/* Visually hidden but focusable; specific enough to beat `.signup-form input` and `.request-modal input`. */
+.account-form input.file-picker-input,
+input.file-picker-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.photo-picker-body {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.photo-picker-preview {
+  display: grid;
+  width: 72px;
+  height: 72px;
+  flex: none;
+  place-items: center;
+  overflow: hidden;
+  border: 2px dashed #cbd4e1;
+  border-radius: 50%;
+  color: #8490a2;
+  background: #f7f9fc;
+}
+
+.photo-picker-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.photo-picker-actions {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.photo-picker-actions small {
+  flex-basis: 100%;
+  color: #718099;
+  font-size: 12px;
+}
+
+.file-picker-button {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  gap: 7px;
+  padding: 0 14px;
+  border: 1px solid #1f6bff;
+  border-radius: 7px;
+  color: #1f6bff;
+  background: #fff;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.file-picker-button:hover {
+  background: #f5f8ff;
+}
+
+.file-picker-input:focus-visible + .file-picker-button,
+.photo-picker-actions:focus-within .file-picker-button {
+  outline: 2px solid #5b95ff;
+  outline-offset: 2px;
+}
+
+.file-picker-remove {
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  color: #b42318;
+  background: none;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.document-dropzone {
+  display: flex;
+  min-height: 84px;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border: 1.5px dashed #b9c5d6;
+  border-radius: 10px;
+  background: #f9fbfe;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.document-dropzone:hover,
+.document-dropzone.dragging {
+  border-color: #1f6bff;
+  background: #f2f6ff;
+}
+
+.document-dropzone.has-file {
+  border-style: solid;
+  border-color: #9fd8bd;
+  background: #f3fbf7;
+}
+
+.document-picker:focus-within .document-dropzone {
+  outline: 2px solid #5b95ff;
+  outline-offset: 2px;
+}
+
+.document-picker.has-error .document-dropzone {
+  border-color: #d92d20;
+  background: #fff8f7;
+}
+
+.document-thumb {
+  display: grid;
+  width: 52px;
+  height: 52px;
+  flex: none;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 8px;
+  color: #1f6bff;
+  background: #eaf1ff;
+}
+
+.document-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.document-meta {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.document-meta strong {
+  color: #132541;
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+/* File names stay on one line; the empty-state prompt may wrap. */
+.document-dropzone.has-file .document-meta strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.document-meta small {
+  color: #718099;
+  font-size: 12px;
+}
+
+/* ---------- Sign-in success message ---------- */
+
+.signin-success {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid #b7e4cd;
+  border-radius: 7px;
+  color: #0f6b43;
+  background: #effaf4;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* ---------- Status chips ---------- */
+
+.verification-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 16px;
+  white-space: nowrap;
+}
+
+.verification-unverified { color: #4b5a70; background: #eef1f6; }
+.verification-pending { color: #9a5b00; background: #fff4dc; }
+.verification-approved { color: #0f6b43; background: #e3f6ec; }
+.verification-rejected { color: #b42318; background: #fde9e7; }
+
+/* ---------- Alerts ---------- */
+
+.verification-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 0;
+  padding: 16px 18px;
+  border: 1px solid;
+  border-radius: 10px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.verification-alert > .icon {
+  flex: none;
+  margin-top: 1px;
+}
+
+.verification-alert > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.verification-alert strong {
+  font-size: 15px;
+}
+
+.verification-alert small {
+  font-size: 13px;
+  opacity: 0.9;
+}
+
+.verification-alert.info { border-color: #f5d48a; color: #7a4a00; background: #fff8e6; }
+.verification-alert.success { border-color: #a6dcc0; color: #0f6b43; background: #effaf4; }
+.verification-alert.warning { border-color: #f4b7b0; color: #8f1d13; background: #fff4f2; }
+.verification-alert.error { border-color: #f4b7b0; color: #b42318; background: #fff4f2; }
+
+.verification-alert.highlight {
+  animation: verification-pop 0.5s ease;
+}
+
+@keyframes verification-pop {
+  0% { transform: scale(0.98); box-shadow: 0 0 0 0 rgba(245, 180, 0, 0.45); }
+  100% { transform: scale(1); box-shadow: 0 0 0 10px rgba(245, 180, 0, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .verification-alert.highlight { animation: none; }
+}
+
+/* ---------- Cargo: Settings → Verification ---------- */
+
+.app-shell .verification-center {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Don't stretch a short status card down the whole page. */
+.app-shell .dashboard-content > .verification-center {
+  flex: 0 0 auto;
+}
+
+.app-shell .dashboard-content > .verification-center > .card-heading {
+  margin-bottom: 0;
+}
+
+.verification-form {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.verification-steps {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #8490a2;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.verification-steps span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  white-space: nowrap;
+}
+
+.verification-steps b {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border-radius: 50%;
+  color: #64728a;
+  background: #eef1f6;
+  font-size: 12px;
+}
+
+.verification-steps .active {
+  color: #132541;
+}
+
+.verification-steps .active b {
+  color: #fff;
+  background: #1f6bff;
+}
+
+.verification-steps i {
+  height: 1px;
+  flex: 1;
+  max-width: 60px;
+  background: #d5ddea;
+}
+
+.verification-section {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 16px;
+  margin: 0;
+  padding: 20px;
+  border: 1px solid #e3e8f0;
+  border-radius: 12px;
+}
+
+.verification-section legend {
+  padding: 0 6px;
+  color: #132541;
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.verification-documents {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.verification-documents.single {
+  grid-template-columns: minmax(0, 520px);
+}
+
+.verification-documents > div {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.verification-submit {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.verification-submit small {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #64728a;
+  font-size: 13px;
+}
+
+.verification-submit .primary-button {
+  min-height: 44px;
+  padding: 0 22px;
+  font-size: 14px;
+}
+
+/* Banner on cargo dashboards until they are verified */
+.verification-prompt {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 22px;
+  padding: 16px 20px;
+  border: 1px solid #c8d8ff;
+  border-radius: 12px;
+  color: #132541;
+  background: linear-gradient(90deg, #eef4ff, #f7f9ff);
+}
+
+.verification-prompt.rejected {
+  border-color: #f4b7b0;
+  background: linear-gradient(90deg, #fff1ef, #fff8f7);
+}
+
+.verification-prompt-icon {
+  display: grid;
+  width: 46px;
+  height: 46px;
+  flex: none;
+  place-items: center;
+  border-radius: 12px;
+  color: #1f6bff;
+  background: #fff;
+}
+
+.verification-prompt.rejected .verification-prompt-icon {
+  color: #b42318;
+}
+
+.verification-prompt > div:nth-child(2) {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.verification-prompt strong {
+  font-size: 15px;
+}
+
+.verification-prompt span {
+  color: #4b5a70;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.verification-prompt-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 10px;
+}
+
+.verification-prompt-actions .small-primary {
+  min-height: 38px;
+  padding: 0 16px;
+  font-size: 13px;
+}
+
+.verification-prompt-actions .text-button {
+  font-size: 13px;
+}
+
+.nav-dot {
+  width: 8px;
+  height: 8px;
+  margin-left: auto;
+  border-radius: 50%;
+  background: #f5a524;
+  box-shadow: 0 0 0 3px rgba(245, 165, 36, 0.25);
+}
+
+.nav-count.nav-count-alert {
+  color: #fff;
+  background: #e5484d;
+}
+
+.profile-verify-link {
+  margin-left: 10px;
+  font-size: 13px;
+}
+
+/* ---------- Avatars ---------- */
+
+.protected-avatar {
+  display: inline-grid;
+  width: 36px;
+  height: 36px;
+  flex: none;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 50%;
+  color: #fff;
+  background: #142744;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.protected-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.protected-avatar.profile-avatar-large {
+  width: 72px;
+  height: 72px;
+  font-size: 22px;
+}
+
+.profile-identity-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.profile-identity-row > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.profile-identity-row strong {
+  color: #132541;
+  font-size: 18px;
+}
+
+.profile-identity-row span {
+  color: #64728a;
+  font-size: 13px;
+}
+
+.verification-applicant {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+}
+
+.verification-applicant > span:last-child {
+  min-width: 0;
+}
+
+/* ---------- Admin: overview alert ---------- */
+
+.app-shell .admin-attention-verification {
+  border-bottom: 1px solid #f5d48a;
+  background: #fff8e6;
+}
+
+.app-shell .admin-attention-verification > .icon {
+  color: #9a5b00;
+}
+
+/* ---------- Admin: Verifications page ---------- */
+
+.app-shell .admin-verifications .card-heading {
+  flex-wrap: wrap;
+}
+
+.verification-review-modal {
+  width: min(100%, 860px);
+  max-height: calc(100vh - 44px);
+  overflow-y: auto;
+  gap: 20px;
+}
+
+.verification-review-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.verification-review-section {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 18px;
+  border: 1px solid #e3e8f0;
+  border-radius: 10px;
+}
+
+.verification-review-section h3 {
+  margin: 0;
+  color: #132541;
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.verification-review-section dl {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+}
+
+.verification-review-section dl > div {
+  display: grid;
+  grid-template-columns: 140px minmax(0, 1fr);
+  gap: 10px;
+  font-size: 13px;
+}
+
+.verification-review-section dt {
+  color: #64728a;
+}
+
+.verification-review-section dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: #132541;
+  font-weight: 600;
+}
+
+.verification-review-section dd a {
+  color: #1f6bff;
+}
+
+.verification-review-documents {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 14px;
+}
+
+.document-preview {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #e3e8f0;
+  border-radius: 10px;
+  background: #fbfcfe;
+}
+
+.document-preview.missing {
+  border-style: dashed;
+  color: #b42318;
+}
+
+.document-preview-thumb {
+  display: flex;
+  width: 100%;
+  height: 130px;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 8px;
+  color: #1f6bff;
+  background: #eaf1ff;
+}
+
+.document-preview-thumb img {
+  width: 100%;
+  height: 100%;
+  background: #f4f7fc;
+  object-fit: contain;
+}
+
+.document-preview .document-open {
+  align-self: flex-start;
+}
+
+.document-preview-meta {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.document-preview-meta strong {
+  color: #132541;
+  font-size: 13px;
+}
+
+.document-preview-meta small {
+  overflow: hidden;
+  color: #64728a;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.document-preview-error {
+  color: #b42318 !important;
+}
+
+.document-open {
+  display: inline-flex;
+  min-height: 32px;
+  flex: none;
+  align-items: center;
+  gap: 5px;
+  padding: 0 12px;
+  font-size: 12px;
+  text-decoration: none;
+}
+
+.document-open.disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.verification-note-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: #263750;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.verification-note-field em {
+  color: #8490a2;
+  font-style: normal;
+  font-weight: 500;
+}
+
+.verification-note-field textarea {
+  width: 100%;
+  padding: 11px 12px;
+  border: 1px solid #cbd4e1;
+  border-radius: 8px;
+  outline: 0;
+  color: #132541;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 400;
+  resize: vertical;
+}
+
+.verification-note-field textarea:focus {
+  border-color: #1f6bff;
+  box-shadow: 0 0 0 3px #e5eeff;
+}
+
+.verification-review-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.verification-review-actions button {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 7px;
+  padding: 0 20px;
+  font-size: 14px;
+}
+
+.verification-reject {
+  border: 1px solid #f4b7b0;
+  border-radius: 7px;
+  color: #b42318;
+  background: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+}
+
+.verification-reject:hover {
+  background: #fff4f2;
+}
+
+/* Wider user dialog for the extra fields */
+.request-modal.user-modal.account-form {
+  width: min(100%, 600px);
+  max-height: calc(100vh - 44px);
+  overflow-y: auto;
+}
+
+/* ---------- Responsive ---------- */
+
+@media (max-width: 1100px) {
+  .verification-documents {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .signup-role-picker.role-picker-3 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .role-picker-3 .signup-role-option {
+    min-height: 0;
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .verification-review-grid,
+  .verification-documents,
+  .verification-documents.single {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .verification-prompt {
+    flex-wrap: wrap;
+  }
+
+  .verification-prompt-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+
+@media (max-width: 560px) {
+  .account-fields-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .verification-section {
+    padding: 16px 14px;
+  }
+
+  .verification-steps {
+    font-size: 12px;
+  }
+
+  .verification-steps i {
+    display: none;
+  }
+
+  .verification-review-section dl > div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+
+  .verification-review-actions {
+    flex-direction: column-reverse;
+  }
+
+  .verification-review-actions button {
+    justify-content: center;
+  }
+
+  .verification-submit .primary-button {
+    width: 100%;
+  }
+}
