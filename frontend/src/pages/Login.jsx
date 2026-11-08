@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import logo from '../assets/tayonx-logo.png';
 import '../App.css';
 
@@ -8,8 +8,10 @@ const dashboardPaths = { admin: '/admin/dashboard', customer: '/customer/dashboa
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const registered = location.state?.registered === true;
   const [message, setMessage] = useState('');
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(typeof location.state?.email === 'string' ? location.state.email : '');
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -63,6 +65,7 @@ export default function LoginPage() {
         <p className="eyebrow">CUSTOMER PORTAL</p>
         <h1>Welcome back</h1>
         <p className="page-description">Sign in to continue to your Tayonx workspace.</p>
+        {registered && <p className="signin-success" role="status">Your account was created. Sign in to continue.</p>}
         <label htmlFor="signin-email">Email address<input autoComplete="email" id="signin-email" name="email" onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" required type="email" value={email} /></label>
         <label htmlFor="signin-password">Password<input autoComplete="current-password" id="signin-password" name="password" onChange={(event) => setPassword(event.target.value)} placeholder="Enter your password" required type="password" value={password} /></label>
         <button className="primary-button full-button" disabled={isSubmitting} type="submit">{isSubmitting ? 'Signing in…' : 'Sign in'}</button>
