@@ -24,6 +24,7 @@ import {
   updateUser,
 } from '../lib/api.js';
 import '../App.css';
+import '../dashboard-sizing.css';
 
 const roleConfig = {
   customer: {
