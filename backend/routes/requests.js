@@ -197,7 +197,7 @@ router.post('/:id/decline', requireRole(...cargoProviderRoles), async (req, res)
         'offers.provider': { $ne: req.user._id },
       },
       { $addToSet: { declinedBy: req.user._id } },
-      { new: true },
+      { returnDocument: 'after' },
     );
     if (!request) return res.status(404).json({ error: 'This request is no longer available.' });
     return res.json({ message: 'Request declined.', requestId: request.id });
