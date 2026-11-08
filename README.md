@@ -2,7 +2,7 @@
 
 # Hi, I'm Mohamed Abdirahman 👋
 
-<a href="https://github.com/Eng-Mohamed-abdirahman">
+<a href="https://github.com/apdizalam">
   <img src="https://readme-typing-svg.demolab.com?font=Fira+Code&weight=600&size=22&pause=1000&color=2F81F7&center=true&vCenter=true&width=600&lines=Full-stack+Software+Engineer;AI+Engineer;Building+web+%26+mobile+products+end+to+end" alt="Typing intro" />
 </a>
 
@@ -13,7 +13,7 @@
   <img src="https://img.shields.io/badge/Borama,_Somaliland-1f2328?style=for-the-badge&logo=googlemaps&logoColor=white" alt="Location" />
 </p>
 
-<img src="https://komarev.com/ghpvc/?username=Eng-Mohamed-abdirahman&style=flat-square&color=2F81F7&label=Profile+views" alt="Profile views" />
+<img src="https://komarev.com/ghpvc/?username=apdizalam&style=flat-square&color=2F81F7&label=Profile+views" alt="Profile views" />
 
 </div>
 
@@ -64,28 +64,28 @@ I'm a **Full-stack Software Engineer & AI Engineer** based in **Borama, Somalila
 
 ### 🏆 GitHub Trophies
 
-<img src="https://github-trophies.vercel.app/?username=Eng-Mohamed-abdirahman&theme=darkhub&no-frame=true&no-bg=true&column=7&margin-w=10" alt="GitHub trophies" />
+<img src="https://github-trophies.vercel.app/?username=apdizalam&theme=darkhub&no-frame=true&no-bg=true&column=7&margin-w=10" alt="GitHub trophies" />
 
 ### 📈 Stats & Top Languages
 
-<img height="180" src="https://github-stats-extended.vercel.app/api?username=Eng-Mohamed-abdirahman&show_icons=true&theme=github_dark&hide_border=true&count_private=true&include_all_commits=true&show=prs_merged,prs_merged_percentage,reviews" alt="GitHub stats" />
-<img height="180" src="https://github-stats-extended.vercel.app/api/top-langs/?username=Eng-Mohamed-abdirahman&layout=compact&langs_count=8&theme=github_dark&hide_border=true" alt="Top languages" />
+<img height="180" src="https://github-stats-extended.vercel.app/api?username=apdizalam&show_icons=true&theme=github_dark&hide_border=true&count_private=true&include_all_commits=true&show=prs_merged,prs_merged_percentage,reviews" alt="GitHub stats" />
+<img height="180" src="https://github-stats-extended.vercel.app/api/top-langs/?username=apdizalam&layout=compact&langs_count=8&theme=github_dark&hide_border=true" alt="Top languages" />
 
 ### 🔥 Contribution Streak
 
-<img src="https://streak-stats.demolab.com?user=Eng-Mohamed-abdirahman&hide_border=true&theme=github-dark-blue" alt="GitHub streak" />
+<img src="https://streak-stats.demolab.com?user=apdizalam&hide_border=true&theme=github-dark-blue" alt="GitHub streak" />
 
 ### 🧾 Profile Summary
 
-<img width="100%" src="https://github-profile-summary-cards.vercel.app/api/cards/profile-details?username=Eng-Mohamed-abdirahman&theme=github_dark" alt="Profile summary" />
+<img width="100%" src="https://github-profile-summary-cards.vercel.app/api/cards/profile-details?username=apdizalam&theme=github_dark" alt="Profile summary" />
 
-<img height="170" src="https://github-profile-summary-cards.vercel.app/api/cards/repos-per-language?username=Eng-Mohamed-abdirahman&theme=github_dark" alt="Repos per language" />
-<img height="170" src="https://github-profile-summary-cards.vercel.app/api/cards/most-commit-language?username=Eng-Mohamed-abdirahman&theme=github_dark" alt="Most commit language" />
-<img height="170" src="https://github-profile-summary-cards.vercel.app/api/cards/productive-time?username=Eng-Mohamed-abdirahman&theme=github_dark&utcOffset=3" alt="Productive time" />
+<img height="170" src="https://github-profile-summary-cards.vercel.app/api/cards/repos-per-language?username=apdizalam&theme=github_dark" alt="Repos per language" />
+<img height="170" src="https://github-profile-summary-cards.vercel.app/api/cards/most-commit-language?username=apdizalam&theme=github_dark" alt="Most commit language" />
+<img height="170" src="https://github-profile-summary-cards.vercel.app/api/cards/productive-time?username=apdizalam&theme=github_dark&utcOffset=3" alt="Productive time" />
 
 ### 🟦 Contribution Graph
 
-<img width="100%" src="https://ghchart.rshah.org/2F81F7/Eng-Mohamed-abdirahman" alt="Contribution chart" />
+<img width="100%" src="https://ghchart.rshah.org/2F81F7/apdizalam" alt="Contribution chart" />
 
 </div>
 
