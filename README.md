@@ -1,104 +1,157 @@
 <div align="center">
 
-# Hi, I'm Abdisalam Mohamed 👋
+<img src="frontend/src/assets/tayonx-logo.png" alt="Tayonx logo" width="120" />
 
-<a href="https://github.com/apdizalam">
-  <img src="https://readme-typing-svg.demolab.com?font=Fira+Code&weight=600&size=22&pause=1000&color=2F81F7&center=true&vCenter=true&width=600&lines=Software+Engineering+Graduate;Full-Stack+Developer;Building+practical+software+solutions" alt="Typing intro" />
-</a>
+# Tayonx
+
+**A shipping marketplace that connects customers with cargo providers.**
+
+Customers post what they want shipped, cargo providers send price quotes, and both sides chat in real time until the order is delivered.
 
 <p>
-  <a href="https://github.com/apdizalam"><img src="https://img.shields.io/badge/GitHub-apdizalam-181717?style=for-the-badge&logo=github&logoColor=white" alt="GitHub" /></a>
-  <a href="mailto:apdizalammohameth@gmail.com"><img src="https://img.shields.io/badge/Email-apdizalammohameth@gmail.com-D14836?style=for-the-badge&logo=gmail&logoColor=white" alt="Email" /></a>
-  <a href="https://www.linkedin.com/in/abdisalam-m-muhumed-4b6351307"><img src="https://img.shields.io/badge/LinkedIn-0A66C2?style=for-the-badge&logo=linkedin&logoColor=white" alt="LinkedIn" /></a>
+  <img src="https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=black" alt="React 19" />
+  <img src="https://img.shields.io/badge/Vite-8-646CFF?style=flat-square&logo=vite&logoColor=white" alt="Vite 8" />
+  <img src="https://img.shields.io/badge/Node.js-Express_5-339933?style=flat-square&logo=nodedotjs&logoColor=white" alt="Node.js and Express 5" />
+  <img src="https://img.shields.io/badge/MongoDB-Mongoose-47A248?style=flat-square&logo=mongodb&logoColor=white" alt="MongoDB" />
+  <img src="https://img.shields.io/badge/Socket.IO-realtime-010101?style=flat-square&logo=socketdotio&logoColor=white" alt="Socket.IO" />
 </p>
-
-<img src="https://komarev.com/ghpvc/?username=apdizalam&style=flat-square&color=2F81F7&label=Profile+views" alt="Profile views" />
 
 </div>
 
 ---
 
-## 🧑‍💻 About Me
+## ✨ Features
 
-I'm a **Software Engineering graduate from Amoud University** and a **Full-Stack Developer** with an interest in designing and building practical software solutions.
+**For customers**
+- Create, edit, cancel and delete shipping requests (product, source country, destination, quantity, details)
+- Compare quotes from cargo providers and accept or decline them
+- Track each shipment: `open` → `offers_received` → `in_progress` → `purchased` → `shipping` → `delivered`
 
-- 💡 I enjoy turning ideas into working applications and solving problems through code
-- 🛠️ Experience with web apps, mobile apps, database-driven systems and AI-assisted customer support
-- 📐 Focused on maintainable code and the full software development lifecycle
-- 🌱 Looking for software engineering internships and entry-level opportunities
-- 📫 Reach me at **[apdizalammohameth@gmail.com](mailto:apdizalammohameth@gmail.com)** or on [LinkedIn](https://www.linkedin.com/in/abdisalam-m-muhumed-4b6351307)
+**For cargo providers** (companies and individuals)
+- Browse open shipping opportunities and decline ones you don't want
+- Send quotes with a price, delivery time and what is included
+- Update the shipment status after a quote is accepted
 
----
+**For everyone**
+- Real-time chat between customers and providers connected by an offer, plus support chat with admins
+- Report a conversation for harassment, spam, fraud or inappropriate content
 
-## 🚀 Featured Projects
-
-**1. [Shaba Water Billing Management System](https://github.com/apdizalam/shaba-water-system-)**
-A web-based system for water billing operations, customer management and payment records.
-<sub>Focus: web development, database-driven features, business process management</sub>
-
-**2. Shaba Customer Mobile Application**
-A mobile app that lets Shaba customers view their billing information and related services.
-<sub>Focus: mobile development and integration with the web management system</sub>
-
-**3. AI Assistant & Customer Support System**
-A team project building an AI-powered assistant for customer interactions. I worked on the **backend**.
-<sub>Focus: server-side development and team collaboration</sub>
-
-**4. [Tayonx](https://github.com/apdizalam/Tayonx)**
-A JavaScript web application with chat reporting and admin settings management.
+**For admins**
+- Manage user accounts (create, edit, delete) with safety rules: the last admin can't be removed
+- Moderate chats: read conversations and review, resolve or dismiss reports
+- Platform settings: site name, support email, notifications and platform fee rate
 
 ---
 
 ## 🛠️ Tech Stack
 
-<img src="https://skillicons.dev/icons?i=js,html,css,react,nodejs,mongodb,git,github,vscode" alt="Tech stack" />
+| Part | Technologies |
+|---|---|
+| Frontend | React 19, React Router 7, Vite 8, Socket.IO client, Oxlint |
+| Backend | Node.js, Express 5, Socket.IO, JSON Web Tokens, bcryptjs |
+| Database | MongoDB (Mongoose) |
 
 ---
 
-## 📊 GitHub Stats
+## 📁 Project Structure
 
-<div align="center">
-
-### 🏆 GitHub Trophies
-
-<img src="https://github-trophies.vercel.app/?username=apdizalam&theme=darkhub&no-frame=true&no-bg=true&column=7&margin-w=10" alt="GitHub trophies" />
-
-### 📈 Stats & Top Languages
-
-<img height="180" src="https://github-stats-extended.vercel.app/api?username=apdizalam&show_icons=true&theme=github_dark&hide_border=true&count_private=true&include_all_commits=true&show=prs_merged,prs_merged_percentage,reviews" alt="GitHub stats" />
-<img height="180" src="https://github-stats-extended.vercel.app/api/top-langs/?username=apdizalam&layout=compact&langs_count=8&theme=github_dark&hide_border=true" alt="Top languages" />
-
-### 🔥 Contribution Streak
-
-<img src="https://streak-stats.demolab.com?user=apdizalam&hide_border=true&theme=github-dark-blue" alt="GitHub streak" />
-
-### 🟦 Contribution Graph
-
-<img width="100%" src="https://ghchart.rshah.org/2F81F7/apdizalam" alt="Contribution chart" />
-
-</div>
+```
+Tayonx/
+├── backend/
+│   ├── middleware/      # JWT authentication
+│   ├── models/          # User, ShippingRequest, Chat, ChatReport, PlatformSettings
+│   ├── routes/          # auth, requests, users, chats, admin
+│   ├── socket.js        # real-time chat events
+│   ├── seedAdmin.js     # creates the admin account
+│   └── server.js        # Express + Socket.IO server
+└── frontend/
+    └── src/
+        ├── components/  # Chat, AdminChats, AdminSettings, DashboardWorkspace
+        ├── pages/       # Login, Register, admin / customer / cargo dashboards
+        ├── lib/api.js   # API client
+        └── socket.js    # Socket.IO client
+```
 
 ---
 
-## 🎯 Current Goals
+## 🚀 Getting Started
 
-- Strengthen my full-stack development skills
-- Improve backend architecture, API development and database design
-- Build reliable, scalable and user-friendly software
-- Collaborate with other developers on meaningful projects
+### Requirements
+- [Node.js](https://nodejs.org/) 20 or newer
+- A MongoDB database (local or [MongoDB Atlas](https://www.mongodb.com/atlas))
+
+### 1. Clone the project
+
+```bash
+git clone https://github.com/apdizalam/Tayonx.git
+cd Tayonx
+```
+
+### 2. Set up the backend
+
+```bash
+cd backend
+npm install
+```
+
+Copy `.env.example` to `.env` and fill in your own values:
+
+| Variable | What it is |
+|---|---|
+| `PORT` | API port (default `5000`) |
+| `MONGO_URI` | Your MongoDB connection string |
+| `JWT_SECRET` | A random secret, at least 32 characters |
+| `FRONTEND_ORIGIN` | Frontend URL allowed by CORS (default `http://localhost:5173`) |
+| `ADMIN_EMAIL` / `ADMIN_NAME` / `ADMIN_PASSWORD` | The admin account created by the seed script |
+
+Create the admin account, then start the API:
+
+```bash
+npm run seed:admin
+npm run dev
+```
+
+The API runs at `http://localhost:5000`.
+
+### 3. Set up the frontend
+
+Open a second terminal:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Open `http://localhost:5173`. In development, Vite forwards `/api` and `/socket.io` to the backend automatically. If your API runs somewhere else, set `VITE_API_URL`.
 
 ---
 
-<div align="center">
+## 👥 User Roles
 
-### 🤝 Let's connect
+| Role | Dashboard | Can do |
+|---|---|---|
+| `customer` | `/customer/dashboard` | Post shipping requests, accept quotes, chat |
+| `cargo_provider` | `/cargo/dashboard` | Send quotes, update shipments, chat |
+| `individual_cargo` | `/cargo/dashboard` | Same as a cargo provider, for individuals |
+| `admin` | `/admin/dashboard` | Manage users, moderate chats, change settings |
 
-I'm always happy to connect with fellow developers, collaborate on projects and explore new opportunities.
+---
 
-<a href="mailto:apdizalammohameth@gmail.com"><img src="https://img.shields.io/badge/Email_Me-D14836?style=for-the-badge&logo=gmail&logoColor=white" alt="Email me" /></a>
-<a href="https://www.linkedin.com/in/abdisalam-m-muhumed-4b6351307"><img src="https://img.shields.io/badge/Connect_on_LinkedIn-0A66C2?style=for-the-badge&logo=linkedin&logoColor=white" alt="Connect on LinkedIn" /></a>
-<a href="https://github.com/apdizalam"><img src="https://img.shields.io/badge/My_Repositories-181717?style=for-the-badge&logo=github&logoColor=white" alt="My repositories" /></a>
+## 🔌 API Overview
 
-<sub>Always learning, building, and improving.</sub>
+| Area | Base path | Description |
+|---|---|---|
+| Auth | `/api/auth` | Register, log in, get the current user |
+| Requests & offers | `/api/requests` | Shipping requests, quotes and shipment status |
+| Users | `/api/users` | Admin user management |
+| Chats | `/api/chats` | Contacts, message history and reports |
+| Admin | `/api/admin` | Chat moderation and platform settings |
 
-</div>
+Every endpoint except register and login needs a `Bearer` token. See **[backend/README.md](backend/README.md)** for the full API reference and the Socket.IO events.
+
+---
+
+## 👤 Author
+
+**Abdisalam Mohamed**: [GitHub](https://github.com/apdizalam) · [LinkedIn](https://www.linkedin.com/in/abdisalam-m-muhumed-4b6351307) · [Email](mailto:apdizalammohameth@gmail.com)
