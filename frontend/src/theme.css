@@ -2143,3 +2143,25 @@ input[type="radio"] {
     width: 100%;
   }
 }
+
+/* ========================================================================
+   19. Provider country scope
+   ======================================================================== */
+.app-shell .provider-country-scope {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  color: var(--navy-900);
+  background: var(--surface-sunken);
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.app-shell .card-heading p .provider-country-scope {
+  margin-top: 4px;
+}
