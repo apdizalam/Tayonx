@@ -1858,3 +1858,288 @@ input[type="radio"] {
     transition: none !important;
   }
 }
+
+/* ========================================================================
+   18. Offer details, actions & confirmation dialog
+   ======================================================================== */
+
+/* Clickable offer rows */
+.app-shell .offers-table .offer-row-clickable {
+  cursor: pointer;
+}
+
+.app-shell .offers-table .offer-row-clickable:hover {
+  background: var(--blue-50);
+}
+
+.app-shell .offer-actions {
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.app-shell .offer-actions .customer-outline-button {
+  min-height: 34px;
+  padding: 0 12px;
+  font-size: 13px;
+}
+
+.app-shell .offer-actions .reject-button,
+.app-shell .offer-actions .approve-button {
+  min-height: 34px;
+  padding: 0 12px;
+  font-size: 13px;
+}
+
+/* Read-only label (admin) */
+.app-shell .offer-readonly-chip {
+  display: inline-flex;
+  height: 28px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  border-radius: var(--radius-pill);
+  color: var(--navy-800);
+  background: var(--navy-100);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.app-shell .offer-readonly-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  color: var(--navy-800);
+  background: var(--navy-50);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* Details modal */
+.app-shell .request-modal.offer-details-modal {
+  width: min(100%, 760px);
+  max-height: calc(100vh - 44px);
+  gap: 18px;
+  overflow-y: auto;
+}
+
+.app-shell .request-modal.offer-details-modal > * {
+  flex-shrink: 0;
+}
+
+.offer-details-chips {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.offer-details-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.app-shell .offer-details-section {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: #ffffff;
+}
+
+.app-shell .offer-details-section h3 {
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.offer-details-section dl {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  margin: 0;
+}
+
+.offer-details-section dl > div {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+}
+
+.offer-details-section dt {
+  color: var(--ink-muted);
+}
+
+.offer-details-section dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.offer-details-services {
+  margin: 0;
+  color: var(--neutral-700);
+  font-size: 15px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.app-shell .offer-details-pricing > div > span {
+  font-weight: 600;
+}
+
+.offer-details-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  color: var(--neutral-700);
+  background: var(--surface-sunken);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.offer-details-hint > .icon {
+  flex: none;
+  margin-top: 2px;
+}
+
+.offer-details-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.app-shell .offer-actions-modal {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.app-shell .offer-actions-modal button {
+  min-height: 40px;
+  padding: 0 16px;
+  font-size: 14px;
+}
+
+/* Confirmation dialog */
+.confirm-backdrop {
+  z-index: 60;
+}
+
+.app-shell .request-modal.confirm-dialog {
+  width: min(100%, 440px);
+  align-items: flex-start;
+  gap: 12px;
+  padding: 28px;
+}
+
+.confirm-dialog-icon {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border-radius: var(--radius-md);
+}
+
+.confirm-danger .confirm-dialog-icon {
+  color: var(--red-700);
+  background: var(--red-100);
+}
+
+.confirm-primary .confirm-dialog-icon {
+  color: var(--blue-700);
+  background: var(--blue-100);
+}
+
+.confirm-dialog h2 {
+  margin: 4px 0 0;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.confirm-dialog p {
+  margin: 0;
+  color: var(--neutral-700);
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+.confirm-dialog-actions {
+  display: flex;
+  width: 100%;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.app-shell .confirm-dialog-actions button {
+  min-height: 42px;
+  padding: 0 18px;
+  font-size: 15px;
+}
+
+.app-shell .confirm-danger-button {
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  color: #ffffff;
+  background: var(--red-700);
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-weight: 700;
+}
+
+.app-shell .confirm-danger-button:hover {
+  background: var(--red-800);
+}
+
+.app-shell .confirm-danger-button:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+@media (max-width: 680px) {
+  .offer-details-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .offer-details-section dl > div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+
+  .app-shell .offer-actions-modal {
+    justify-content: stretch;
+  }
+
+  .app-shell .offer-actions-modal button {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+
+  .confirm-dialog-actions {
+    flex-direction: column-reverse;
+  }
+
+  .app-shell .confirm-dialog-actions button {
+    width: 100%;
+  }
+}
