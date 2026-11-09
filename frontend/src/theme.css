@@ -3149,3 +3149,42 @@ input[type="radio"] {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* ========================================================================
+   25. Shipment lifecycle: provider status dropdown & delivered tracking
+   ======================================================================== */
+.app-shell .data-table select.shipment-status-select {
+  min-width: 136px;
+  min-height: 34px;
+  padding: 0 30px 0 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  color: var(--ink);
+  background-color: #ffffff;
+  box-shadow: var(--shadow-xs);
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.app-shell .data-table select.shipment-status-select:hover {
+  border-color: var(--navy-400);
+}
+
+.app-shell .data-table select.shipment-status-select:focus {
+  border-color: var(--accent);
+  outline: 0;
+  box-shadow: var(--ring, 0 0 0 3px rgba(31, 107, 255, 0.22));
+}
+
+.app-shell .tracking-delivered-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--emerald-700);
+  font-weight: 700;
+}
+
+.app-shell .customer-tracking-item.delivered .shipment-tracking li.complete:last-child strong {
+  color: var(--emerald-800);
+}
