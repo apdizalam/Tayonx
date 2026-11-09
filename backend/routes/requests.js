@@ -2,6 +2,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const ShippingRequest = require('../models/ShippingRequest');
 const { authenticate, requireRole } = require('../middleware/authenticate');
+const { parseQuantity, readOfferBody, roundMoney } = require('../lib/offerPricing');
 
 const router = express.Router();
 const requestStatuses = ['open', 'offers_received', 'in_progress', 'purchased', 'shipping', 'delivered', 'cancelled'];
@@ -160,6 +161,19 @@ router.put('/:id', async (req, res) => {
     const error = fieldsError(fields);
     if (error) return res.status(400).json({ error });
     Object.assign(request, fields);
+    // Keep unit-price quotes consistent with the new quantity.
+    const newCount = parseQuantity(request.quantity);
+    for (const offer of request.offers) {
+      if (offer.status !== 'pending' || !offer.unitPrice) continue;
+      if (newCount) {
+        offer.quantityCount = newCount;
+        offer.price = roundMoney(offer.unitPrice * newCount);
+      } else {
+        // The quantity is no longer a number: keep the last total, drop the per-unit breakdown.
+        offer.unitPrice = null;
+        offer.quantityCount = null;
+      }
+    }
     await request.save();
     await request.populate('customer', 'name');
     return res.json({ request });
@@ -211,16 +225,6 @@ router.post('/:id/offers', requireRole(...cargoProviderRoles), async (req, res) 
   if (mongoose.connection.readyState !== 1) return databaseUnavailable(res);
 
   const body = req.body && typeof req.body === 'object' ? req.body : {};
-  const price = Number(body.price);
-  const deliveryDays = Number(body.deliveryDays);
-  const includes = typeof body.includes === 'string' ? body.includes.trim() : '';
-  if (!Number.isFinite(price) || price <= 0 || price > 1000000000) {
-    return res.status(400).json({ error: 'Enter a valid offer price greater than zero.' });
-  }
-  if (!Number.isInteger(deliveryDays) || deliveryDays < 1 || deliveryDays > 365) {
-    return res.status(400).json({ error: 'Delivery time must be between 1 and 365 days.' });
-  }
-  if (includes.length > 500) return res.status(400).json({ error: 'Offer details must be 500 characters or fewer.' });
 
   try {
     const request = await ShippingRequest.findOne({
@@ -230,7 +234,9 @@ router.post('/:id/offers', requireRole(...cargoProviderRoles), async (req, res) 
       'offers.provider': { $ne: req.user._id },
     });
     if (!request) return res.status(404).json({ error: 'This request is unavailable or you have already responded.' });
-    request.offers.push({ provider: req.user._id, price, deliveryDays, includes });
+    const { fields, error, field } = readOfferBody(body, request.quantity);
+    if (error) return res.status(400).json({ error, field });
+    request.offers.push({ provider: req.user._id, ...fields });
     request.status = 'offers_received';
     await request.save();
     const offer = request.offers[request.offers.length - 1];
@@ -245,12 +251,6 @@ router.put('/offers/:offerId', requireRole(...cargoProviderRoles, 'admin'), asyn
   if (mongoose.connection.readyState !== 1) return databaseUnavailable(res);
 
   const body = req.body && typeof req.body === 'object' ? req.body : {};
-  const price = Number(body.price);
-  const deliveryDays = Number(body.deliveryDays);
-  const includes = typeof body.includes === 'string' ? body.includes.trim() : '';
-  if (!Number.isFinite(price) || price <= 0 || price > 1000000000) return res.status(400).json({ error: 'Enter a valid offer price greater than zero.' });
-  if (!Number.isInteger(deliveryDays) || deliveryDays < 1 || deliveryDays > 365) return res.status(400).json({ error: 'Delivery time must be between 1 and 365 days.' });
-  if (includes.length > 500) return res.status(400).json({ error: 'Offer details must be 500 characters or fewer.' });
 
   try {
     const filter = req.user.role === 'admin'
@@ -260,7 +260,9 @@ router.put('/offers/:offerId', requireRole(...cargoProviderRoles, 'admin'), asyn
     if (!request) return res.status(404).json({ error: 'Offer not found.' });
     const offer = request.offers.id(req.params.offerId);
     if (offer.status !== 'pending') return res.status(409).json({ error: 'Only pending offers can be edited.' });
-    Object.assign(offer, { price, deliveryDays, includes });
+    const { fields, error, field } = readOfferBody(body, request.quantity);
+    if (error) return res.status(400).json({ error, field });
+    Object.assign(offer, fields);
     await request.save();
     return res.json({ offer: { ...offer.toObject(), request: request.id } });
   } catch (error) {
