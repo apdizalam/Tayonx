@@ -5,6 +5,7 @@ import Icon from './Icon.jsx';
 import AdminChats from './AdminChats.jsx';
 import AdminSettings from './AdminSettings.jsx';
 import Chat from './Chat.jsx';
+import ConfirmDialog from './ConfirmDialog.jsx';
 import AccountFields from './AccountFields.jsx';
 import AdminVerifications from './AdminVerifications.jsx';
 import VerificationCenter from './VerificationCenter.jsx';
@@ -207,47 +208,171 @@ function RequestTable({ requests, role, search, busyId, onEdit, onDelete, onSele
   );
 }
 
-function OffersTable({ offers, role, busyId, onEdit, onDelete, onRespond, onStatusChange, onChat }) {
+/**
+ * What each role may do with an offer (mirrors the server rules):
+ *  - customer: accept/decline pending, reconsider declined (while nothing is accepted),
+ *              remove pending/declined, chat on accepted;
+ *  - provider: edit/withdraw own pending offers;
+ *  - admin:    read-only.
+ */
+function offerPermissions(offer, role) {
+  const requestOpen = ['open', 'offers_received'].includes(offer.request?.status);
+  return {
+    canRespond: role === 'customer' && offer.status === 'pending',
+    canReconsider: role === 'customer' && offer.status === 'declined' && requestOpen,
+    canRemove: role === 'customer' && ['pending', 'declined'].includes(offer.status) && offer.request?.status !== 'cancelled',
+    canChat: role === 'customer' && offer.status === 'accepted' && Boolean(offer.provider),
+    canEdit: role === 'provider' && offer.status === 'pending',
+    canWithdraw: role === 'provider' && offer.status === 'pending',
+  };
+}
+
+/** Action buttons for one offer; used in the table row and in the details modal. */
+function OfferActions({ offer, role, busy, onView, onEdit, onDelete, onRespond, onReconsider, onRemove, onChat, inModal = false }) {
+  const can = offerPermissions(offer, role);
+  const providerName = offer.provider?.name || 'the cargo provider';
+  const stop = (handler) => (event) => { event.stopPropagation(); handler(offer); };
+  return (
+    <div className={`table-buttons offer-actions${inModal ? ' offer-actions-modal' : ''}`}>
+      {!inModal && onView && (
+        <button type="button" className="icon-button table-action" aria-label={`View offer details for ${offer.request.product}`} title="View details" onClick={stop(onView)}><Icon name="eye" size={16} /></button>
+      )}
+      {can.canEdit && onEdit && <button type="button" className={inModal ? 'customer-outline-button' : 'icon-button table-action'} aria-label="Edit offer" title="Edit offer" onClick={stop(onEdit)}><Icon name="edit" size={16} />{inModal && 'Edit offer'}</button>}
+      {can.canWithdraw && onDelete && <button type="button" className={inModal ? 'reject-button' : 'icon-button table-action'} aria-label="Withdraw offer" title="Withdraw offer" disabled={busy} onClick={stop(onDelete)}><Icon name="trash" size={16} />{inModal && 'Withdraw'}</button>}
+      {can.canRespond && <>
+        <button type="button" className="reject-button" disabled={busy} onClick={stop((item) => onRespond(item, 'declined'))}>Decline</button>
+        <button type="button" className="approve-button" disabled={busy} onClick={stop((item) => onRespond(item, 'accepted'))}>Accept</button>
+      </>}
+      {can.canReconsider && onReconsider && <button type="button" className="customer-outline-button" disabled={busy} title="Move this offer back to pending" onClick={stop(onReconsider)}><Icon name="refresh" size={15} />Reconsider</button>}
+      {can.canRemove && onRemove && <button type="button" className={inModal ? 'reject-button' : 'icon-button table-action'} aria-label={`Remove offer from ${providerName}`} title="Remove offer" disabled={busy} onClick={stop(onRemove)}><Icon name="trash" size={16} />{inModal && 'Remove offer'}</button>}
+      {can.canChat && onChat && (
+        <button type="button" className="offer-chat-button" onClick={stop(onChat)} aria-label={`Chat with ${providerName} about ${offer.request.product}`} title={`Chat with ${providerName}`}>
+          <Icon name="chat" size={15} />Chat
+        </button>
+      )}
+    </div>
+  );
+}
+
+function OffersTable({ offers, role, busyId, onView, onEdit, onDelete, onRespond, onReconsider, onRemove, onStatusChange, onChat }) {
   if (!offers.length) {
-    return <p className="empty-table">{role === 'customer' ? 'No offers have been submitted for your requests.' : 'You have not sent any offers yet.'}</p>;
+    return <p className="empty-table">{role === 'customer' ? 'No offers have been submitted for your requests.' : role === 'admin' ? 'No offers have been submitted on the marketplace yet.' : 'You have not sent any offers yet.'}</p>;
   }
 
   return (
     <div className="table-scroll">
-      <table className="data-table">
+      <table className="data-table offers-table">
         <thead><tr><th>Request</th><th>{role === 'customer' || role === 'admin' ? 'Cargo provider' : 'Customer'}</th><th>Quote</th><th>Delivery</th><th>Status / shipment</th><th>Actions</th></tr></thead>
         <tbody>{offers.map((offer) => {
           const nextStatus = { in_progress: 'purchased', purchased: 'shipping', shipping: 'delivered' }[offer.request.status];
           return (
-            <tr key={offer._id}>
+            <tr key={offer._id} className={onView ? 'offer-row-clickable' : undefined} onClick={onView ? () => onView(offer) : undefined}>
               <td><span className="request-cell"><RequestThumb photoId={offer.request.productPhoto} product={offer.request.product} size="sm" /><span><span className="table-primary">{offer.request.product}</span><span className="table-secondary">{offer.request.quantity}</span><DeliveryMethodChip method={offer.request.deliveryMethod} compact /></span></span></td>
               <td>{role === 'customer' || role === 'admin' ? offer.provider?.name || 'Cargo provider' : offer.request.customer?.name || 'Customer'}</td>
               <td><OfferPriceBreakdown offer={offer} /></td>
               <td>{offer.deliveryDays} days</td>
-              <td>{role === 'provider' && offer.status === 'accepted' && nextStatus
+              <td onClick={(event) => event.stopPropagation()}>{role === 'provider' && offer.status === 'accepted' && nextStatus
                 ? <select aria-label="Update shipment progress" value={offer.request.status} disabled={busyId === offer.request.id} onChange={(event) => onStatusChange(offer.request.id, event.target.value)}>
                   <option value={offer.request.status}>{displayStatus(offer.request.status)}</option><option value={nextStatus}>{displayStatus(nextStatus)}</option>
                 </select>
                 : <StatusBadge>{role === 'provider' && offer.status === 'accepted' ? offer.request.status : offer.status}</StatusBadge>}</td>
-              <td><div className="table-buttons">
-                {(role === 'provider' || role === 'admin') && offer.status === 'pending' && <>
-                  <button className="icon-button table-action" aria-label="Edit offer" onClick={() => onEdit(offer)}><Icon name="edit" size={16} /></button>
-                  <button className="icon-button table-action" aria-label="Delete offer" disabled={busyId === offer._id} onClick={() => onDelete(offer)}><Icon name="trash" size={16} /></button>
-                </>}
-                {role === 'customer' && offer.status === 'pending' && <>
-                  <button className="reject-button" disabled={busyId === offer._id} onClick={() => onRespond(offer, 'declined')}>Decline</button>
-                  <button className="approve-button" disabled={busyId === offer._id} onClick={() => onRespond(offer, 'accepted')}>Accept</button>
-                </>}
-                {role === 'customer' && offer.status === 'accepted' && onChat && offer.provider && (
-                  <button type="button" className="offer-chat-button" onClick={() => onChat(offer)} aria-label={`Chat with ${offer.provider.name || 'the cargo provider'} about ${offer.request.product}`} title={`Chat with ${offer.provider.name || 'the cargo provider'}`}>
-                    <Icon name="chat" size={15} />Chat
-                  </button>
-                )}
-              </div></td>
+              <td><OfferActions offer={offer} role={role} busy={busyId === offer._id} onView={onView} onEdit={onEdit} onDelete={onDelete} onRespond={onRespond} onReconsider={onReconsider} onRemove={onRemove} onChat={onChat} /></td>
             </tr>
           );
         })}</tbody>
       </table>
+    </div>
+  );
+}
+
+function formatDateTime(value) {
+  return value ? new Date(value).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : '—';
+}
+
+/** Full breakdown of one offer. Admins get a read-only view (no actions). */
+function OfferDetailsModal({ offer, role, busy, onClose, ...actions }) {
+  useEffect(() => {
+    const onKey = (event) => { if (event.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  const price = offerBreakdown(offer);
+  const request = offer.request || {};
+  const unitLabel = quantityUnitLabel(request.quantity, price.quantityCount);
+  const showCustomer = role !== 'customer';
+  const showProvider = role !== 'provider';
+  const can = offerPermissions(offer, role);
+  const hasActions = Object.values(can).some(Boolean);
+
+  return (
+    <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+      <section className="request-modal offer-details-modal" role="dialog" aria-modal="true" aria-labelledby="offer-details-title">
+        <div className="modal-heading offer-modal-heading">
+          <div className="offer-request-summary">
+            <RequestThumb photoId={request.productPhoto} product={request.product} size="lg" />
+            <div>
+              <p className="eyebrow">OFFER DETAILS</p>
+              <h2 id="offer-details-title">{request.product}</h2>
+              <span className="offer-details-chips"><StatusBadge>{offer.status}</StatusBadge><DeliveryMethodChip method={request.deliveryMethod} /></span>
+            </div>
+          </div>
+          <button type="button" className="icon-button" aria-label="Close dialog" onClick={onClose}><Icon name="close" /></button>
+        </div>
+
+        {role === 'admin' && <p className="offer-readonly-note"><Icon name="eye" size={15} />Read-only · administrators can review offers but not change them.</p>}
+
+        <div className="offer-details-grid">
+          <section className="offer-details-section">
+            <h3>Request</h3>
+            <dl>
+              <div><dt>Item</dt><dd>{request.product}</dd></div>
+              <div><dt>Quantity</dt><dd>{request.quantity || '—'}</dd></div>
+              <div><dt>Route</dt><dd>{request.sourceCountry || '—'} → {request.destination || '—'}</dd></div>
+              <div><dt>Shipping</dt><dd>{request.deliveryMethod ? <DeliveryMethodChip method={request.deliveryMethod} /> : 'Not specified'}</dd></div>
+              <div><dt>Request status</dt><dd>{request.status ? displayStatus(request.status) : '—'}</dd></div>
+              {showCustomer && <div><dt>Customer</dt><dd>{request.customer?.name || 'Customer'}</dd></div>}
+            </dl>
+          </section>
+          <section className="offer-details-section">
+            <h3>Offer</h3>
+            <dl>
+              {showProvider && <div><dt>Cargo provider</dt><dd>{offer.provider?.name || 'Cargo provider'}</dd></div>}
+              <div><dt>Delivery time</dt><dd>{offer.deliveryDays} day{offer.deliveryDays === 1 ? '' : 's'}</dd></div>
+              <div><dt>Submitted</dt><dd>{formatDateTime(offer.createdAt)}</dd></div>
+              <div><dt>Last updated</dt><dd>{formatDateTime(offer.updatedAt)}</dd></div>
+              <div><dt>Status</dt><dd><StatusBadge>{offer.status}</StatusBadge></dd></div>
+            </dl>
+          </section>
+        </div>
+
+        <section className="offer-summary offer-details-pricing" aria-label="Price breakdown">
+          {price.hasUnits ? (
+            <>
+              <div><span>Unit price<small>Price per item</small></span><strong>{formatUsd(price.unitPrice)}</strong></div>
+              <div><span>Product subtotal<small>{price.quantityCount.toLocaleString('en-US')} {unitLabel} × {formatUsd(price.unitPrice)}</small></span><strong>{formatUsd(price.subtotal)}</strong></div>
+              <div><span>Delivery fee</span><strong>{price.deliveryFee === null ? 'Included' : price.deliveryFee > 0 ? formatUsd(price.deliveryFee) : 'Free'}</strong></div>
+            </>
+          ) : (
+            <div><span>Quote<small>This offer was sent before itemised pricing, so only the total is available.</small></span><strong>{formatUsd(price.total)}</strong></div>
+          )}
+          <div className="offer-summary-total"><span>Total quote</span><strong>{formatUsd(price.total)}</strong></div>
+        </section>
+
+        <section className="offer-details-section">
+          <h3>Included services</h3>
+          <p className="offer-details-services">{offer.includes?.trim() || 'No services listed.'}</p>
+        </section>
+
+        {offer.status === 'accepted' && role === 'customer' && <p className="offer-details-hint"><Icon name="check" size={15} />You accepted this offer. The shipment is in progress, so it can’t be removed. Use Chat to coordinate with the provider.</p>}
+        {offer.status === 'declined' && role === 'customer' && !can.canReconsider && <p className="offer-details-hint"><Icon name="alert" size={15} />You accepted another offer for this request, so this one can’t be reconsidered.</p>}
+
+        {role !== 'admin' && hasActions && (
+          <div className="offer-details-footer">
+            <OfferActions offer={offer} role={role} busy={busy} inModal {...actions} />
+          </div>
+        )}
+      </section>
     </div>
   );
 }
@@ -635,6 +760,10 @@ export default function DashboardWorkspace({ initialRole }) {
   const [selectedRequestId, setSelectedRequestId] = useState('');
   // Conversation to open when going to Chat from an accepted offer.
   const [chatContactId, setChatContactId] = useState('');
+  // Offer shown in the details modal (looked up from `offers` so it stays fresh after changes).
+  const [viewingOfferId, setViewingOfferId] = useState('');
+  const [confirmState, setConfirmState] = useState(null);
+  const viewingOffer = viewingOfferId ? offers.find((offer) => offer._id === viewingOfferId) || null : null;
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [userModalOpen, setUserModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
@@ -903,6 +1032,7 @@ export default function DashboardWorkspace({ initialRole }) {
     }
   }
 
+  // Returns true when the change succeeded (used to close confirmation dialogs).
   async function performMutation(id, action, successMessage) {
     setBusyId(id || 'all');
     setError('');
@@ -911,11 +1041,25 @@ export default function DashboardWorkspace({ initialRole }) {
       await action();
       await refreshData();
       setMessage(successMessage);
+      return true;
     } catch (requestError) {
       setError(requestError.message);
+      return false;
     } finally {
       setBusyId('');
     }
+  }
+
+  // Shows the confirmation dialog; `run` performs the change and returns true on success.
+  function askToConfirm(options) {
+    setConfirmState({ ...options, busy: false });
+  }
+
+  async function runConfirmed() {
+    if (!confirmState) return;
+    setConfirmState((current) => ({ ...current, busy: true }));
+    const ok = await confirmState.run();
+    setConfirmState(ok ? null : (current) => current && { ...current, busy: false });
   }
 
   function openCreateRequest() {
@@ -1007,9 +1151,39 @@ export default function DashboardWorkspace({ initialRole }) {
     performMutation(request._id, () => deleteRequest(request._id), 'Shipping request deleted.');
   }
 
+  // Provider withdraws their own pending offer.
   function deleteCargoOffer(offer) {
-    if (!window.confirm('Delete this pending offer?')) return;
-    performMutation(offer._id, () => deleteOffer(offer._id), 'Offer deleted.');
+    askToConfirm({
+      title: 'Withdraw this offer?',
+      message: `Your ${formatUsd(offer.price)} offer for “${offer.request?.product}” will be removed and the customer will no longer see it.`,
+      confirmLabel: 'Withdraw offer',
+      tone: 'danger',
+      run: async () => {
+        const ok = await performMutation(offer._id, () => deleteOffer(offer._id), 'Offer withdrawn.');
+        if (ok) setViewingOfferId('');
+        return ok;
+      },
+    });
+  }
+
+  // Customer removes a pending or declined offer from their own request.
+  function removeCustomerOffer(offer) {
+    askToConfirm({
+      title: 'Remove this offer?',
+      message: `The ${formatUsd(offer.price)} offer from ${offer.provider?.name || 'this cargo provider'} for “${offer.request?.product}” will be removed from your request. This can’t be undone.`,
+      confirmLabel: 'Remove offer',
+      tone: 'danger',
+      run: async () => {
+        const ok = await performMutation(offer._id, () => deleteOffer(offer._id), 'Offer removed.');
+        if (ok) setViewingOfferId('');
+        return ok;
+      },
+    });
+  }
+
+  // Customer moves a declined offer back to pending to decide again.
+  function reconsiderOffer(offer) {
+    performMutation(offer._id, () => respondToOffer(offer._id, 'pending'), `Offer from ${offer.provider?.name || 'the provider'} is pending again.`);
   }
 
   function handleStatusChange(id, status) {
@@ -1026,9 +1200,18 @@ export default function DashboardWorkspace({ initialRole }) {
   }
 
   function handleOfferResponse(offer, status) {
-    performMutation(offer._id, () => respondToOffer(offer._id, status), status === 'accepted'
-      ? 'Offer accepted. The shipment is now in progress.'
-      : 'Offer declined.');
+    if (status === 'accepted') {
+      // Accepting is a big step: it starts the shipment and declines the other offers.
+      askToConfirm({
+        title: 'Accept this offer?',
+        message: `You’re accepting ${formatUsd(offer.price)} from ${offer.provider?.name || 'this cargo provider'} for “${offer.request?.product}”. Other pending offers for this request will be declined and the shipment will start.`,
+        confirmLabel: 'Accept offer',
+        tone: 'primary',
+        run: () => performMutation(offer._id, () => respondToOffer(offer._id, 'accepted'), 'Offer accepted. The shipment is now in progress.'),
+      });
+      return;
+    }
+    performMutation(offer._id, () => respondToOffer(offer._id, status), 'Offer declined. You can reconsider it while no other offer is accepted.');
   }
 
   function handleDeclineRequest(id) {
@@ -1077,13 +1260,21 @@ export default function DashboardWorkspace({ initialRole }) {
       const selectedOffers = customerMode && selectedRequestId
         ? offers.filter((offer) => offer.request.id === selectedRequestId)
         : offers;
-      return <Card><CardHeading title={title} subtitle={customerMode ? 'Compare quotes, then accept or decline an offer.' : 'Manage pending quotes and update accepted shipment progress.'} />{loading ? <p className="empty-table" role="status">Loading offers…</p> : <OffersTable
+      const offersSubtitle = customerMode
+        ? 'Click an offer to see the full breakdown, then accept, decline or chat with the provider.'
+        : adminMode
+          ? 'Read-only overview of every offer on the marketplace. Click an offer to audit its details.'
+          : 'Manage pending quotes and update accepted shipment progress.';
+      return <Card><CardHeading title={title} subtitle={offersSubtitle} action={adminMode ? <span className="offer-readonly-chip"><Icon name="eye" size={14} />Read-only</span> : null} />{loading ? <p className="empty-table" role="status">Loading offers…</p> : <OffersTable
         offers={selectedOffers}
         role={initialRole}
         busyId={busyId}
+        onView={(offer) => setViewingOfferId(offer._id)}
         onEdit={(offer) => { setEditingOffer(offer); setOfferRequest(null); setFormError(''); }}
         onDelete={deleteCargoOffer}
         onRespond={handleOfferResponse}
+        onReconsider={reconsiderOffer}
+        onRemove={removeCustomerOffer}
         onStatusChange={handleStatusChange}
         onChat={openChatWithProvider}
       />}</Card>;
@@ -1095,7 +1286,7 @@ export default function DashboardWorkspace({ initialRole }) {
 
     if (providerMode && section === 'orders') {
       const orders = offers.filter((offer) => offer.status === 'accepted');
-      return <Card><CardHeading title="Orders & shipping" subtitle="Accepted offers and their live shipment status." />{loading ? <p className="empty-table" role="status">Loading accepted orders…</p> : orders.length ? <OffersTable offers={orders} role="provider" busyId={busyId} onEdit={(offer) => { setEditingOffer(offer); setOfferRequest(null); setFormError(''); }} onDelete={deleteCargoOffer} onStatusChange={handleStatusChange} /> : <div className="empty-state"><strong>No accepted orders yet</strong><p>When a customer accepts one of your offers, the order and shipping progress will appear here.</p><button className="small-primary" onClick={() => setSection('opportunities')}>Browse requests</button></div>}</Card>;
+      return <Card><CardHeading title="Orders & shipping" subtitle="Accepted offers and their live shipment status." />{loading ? <p className="empty-table" role="status">Loading accepted orders…</p> : orders.length ? <OffersTable offers={orders} role="provider" busyId={busyId} onView={(offer) => setViewingOfferId(offer._id)} onEdit={(offer) => { setEditingOffer(offer); setOfferRequest(null); setFormError(''); }} onDelete={deleteCargoOffer} onStatusChange={handleStatusChange} /> : <div className="empty-state"><strong>No accepted orders yet</strong><p>When a customer accepts one of your offers, the order and shipping progress will appear here.</p><button className="small-primary" onClick={() => setSection('opportunities')}>Browse requests</button></div>}</Card>;
     }
 
     if (section === 'messages' && user && !adminMode) {
@@ -1368,6 +1559,7 @@ export default function DashboardWorkspace({ initialRole }) {
                 setSearch('');
                 setSelectedRequestId('');
                 setChatContactId('');
+                setViewingOfferId('');
                 setMobileNavOpen(false);
               }}>
                 <Icon name={icon} size={16} /><span>{label}</span>
@@ -1436,9 +1628,34 @@ export default function DashboardWorkspace({ initialRole }) {
         </main>
       </div>
 
+      {viewingOffer && (
+        <OfferDetailsModal
+          offer={viewingOffer}
+          role={initialRole}
+          busy={busyId === viewingOffer._id}
+          onClose={() => setViewingOfferId('')}
+          onEdit={(offer) => { setViewingOfferId(''); setEditingOffer(offer); setOfferRequest(null); setFormError(''); }}
+          onDelete={deleteCargoOffer}
+          onRespond={handleOfferResponse}
+          onReconsider={reconsiderOffer}
+          onRemove={removeCustomerOffer}
+          onChat={(offer) => { setViewingOfferId(''); openChatWithProvider(offer); }}
+        />
+      )}
       {requestModalOpen && <RequestForm request={editingRequest} saving={saving} error={formError} onSubmit={saveRequest} onClose={() => { setRequestModalOpen(false); setEditingRequest(null); setFormError(''); }} />}
       {(offerRequest || editingOffer) && <OfferForm request={offerRequest || editingOffer?.request} offer={editingOffer} saving={saving} error={formError} onSubmit={saveOffer} onClose={() => { setOfferRequest(null); setEditingOffer(null); setFormError(''); }} />}
       {userModalOpen && <UserForm key={editingUser?.id || 'new'} user={editingUser} saving={saving} error={userFormError} onSubmit={saveUser} onClose={() => { setUserModalOpen(false); setEditingUser(null); setUserFormError(null); }} />}
+      {confirmState && (
+        <ConfirmDialog
+          title={confirmState.title}
+          message={confirmState.message}
+          confirmLabel={confirmState.confirmLabel}
+          tone={confirmState.tone}
+          busy={confirmState.busy}
+          onConfirm={runConfirmed}
+          onCancel={() => setConfirmState(null)}
+        />
+      )}
     </div>
   );
 }
