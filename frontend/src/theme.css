@@ -3038,3 +3038,114 @@ input[type="radio"] {
     width: 100%;
   }
 }
+
+/* ========================================================================
+   24. Admin cargo companies: summary tiles and contact line on cards
+   ======================================================================== */
+.app-shell .company-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.app-shell .company-summary-tile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 0;
+  padding: 14px 16px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--ink);
+  background: #ffffff;
+  box-shadow: none;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.app-shell .company-summary-tile:hover {
+  border-color: var(--blue-300);
+  background: var(--blue-50);
+}
+
+.app-shell .company-summary-tile.active {
+  border-color: var(--navy-900);
+  background: var(--surface-sunken);
+}
+
+.app-shell .company-summary-tile:focus-visible {
+  outline: 2px solid var(--blue-500);
+  outline-offset: 2px;
+}
+
+.app-shell .company-summary-tile > span:last-child {
+  display: grid;
+}
+
+.app-shell .company-summary-tile strong {
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 22px;
+  line-height: 1.1;
+}
+
+.app-shell .company-summary-tile small {
+  color: var(--ink-muted);
+  font-size: 13px;
+}
+
+.app-shell .company-summary-icon {
+  display: grid;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border-radius: 10px;
+  color: var(--navy-900);
+  background: var(--surface-sunken);
+}
+
+.app-shell .company-summary-tile.tone-approved .company-summary-icon {
+  color: var(--emerald-700);
+  background: var(--emerald-100);
+}
+
+.app-shell .company-summary-tile.tone-pending .company-summary-icon {
+  color: var(--amber-700);
+  background: var(--amber-100);
+}
+
+.app-shell .company-summary-tile.tone-unverified .company-summary-icon {
+  color: var(--red-700);
+  background: var(--red-100);
+}
+
+.app-shell .company-directory-contact {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  margin: -4px 0 0;
+  color: var(--ink-muted);
+  font-size: 12.5px;
+}
+
+.app-shell .company-directory-contact span {
+  overflow-wrap: anywhere;
+}
+
+.app-shell .company-directory-contact span + svg {
+  margin-left: 6px;
+}
+
+.app-shell .company-directory-head .verification-chip {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+@media (max-width: 1024px) {
+  .app-shell .company-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
