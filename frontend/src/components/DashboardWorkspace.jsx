@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import logo from '../assets/tayonx-logo.png';
 import Icon from './Icon.jsx';
@@ -174,45 +174,62 @@ function RequestTargetChip({ request, role }) {
   return <span className="request-target-chip" title="Cargo company this request was sent to"><Icon name="building" size={11} />To {target.name || 'cargo company'}</span>;
 }
 
-function RequestTable({ requests, role, search, busyId, onEdit, onDelete, onSelectOffers, onStatusChange, onCreateOffer, onDeclineRequest }) {
+/** When the request last changed status ("since Nov 9"), from the recorded stage history. */
+function statusSince(request) {
+  const at = request.statusHistory?.at?.(-1)?.at;
+  return at ? new Date(at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '';
+}
+
+function RequestTable({ requests, role, search, busyId, onView, onEdit, onDelete, onSelectOffers, onStatusChange, onCreateOffer, onDeclineRequest }) {
   const visibleRequests = requests.filter((request) =>
-    `${request.product} ${request.sourceCountry} ${request.destination} ${request.status} ${request.customer?.name || ''}`
+    `${request.product} ${request.sourceCountry} ${request.destination} ${statusLabel(request.status)} ${displayStatus(request.status)} ${request.targetProvider?.name || ''} ${request.customer?.name || ''}`
       .toLowerCase().includes(search.toLowerCase()),
   );
+  const customer = role === 'customer';
 
   return (
     <div className="table-scroll">
-      <table className="data-table">
-        <thead><tr><th>Shipping request</th><th>Route</th><th>Posted</th><th>Offers</th><th>Status</th><th>Actions</th></tr></thead>
+      <table className={`data-table${customer ? ' customer-requests-table' : ''}`}>
+        <thead><tr><th>Shipping request</th><th>Route</th><th>Posted</th><th>Offers</th><th>Status</th><th className={customer ? 'offer-actions-col' : undefined} scope="col">Actions</th></tr></thead>
         <tbody>
           {visibleRequests.map((request) => {
-            const canCancel = role === 'customer' && ['open', 'offers_received', 'in_progress'].includes(request.status);
-            const canComplete = role === 'customer' && request.status === 'shipping';
-            const canEdit = role === 'admin' || role === 'customer';
+            const canEdit = role === 'admin' || customer;
+            if (customer) {
+              // Customers: status is read-only (the assigned cargo provider updates it).
+              const since = statusSince(request);
+              return (
+                <tr key={request._id} className="request-row-clickable" onClick={() => onView?.(request)}>
+                  <td><span className="request-cell"><RequestThumb photoId={request.productPhoto} product={request.product} size="sm" /><span><span className="table-primary">{request.product} · {request.quantity}</span><span className="table-secondary">REQ-{request._id.slice(-6).toUpperCase()}</span><span className="request-chip-row"><DeliveryMethodChip method={request.deliveryMethod} compact /><RequestTargetChip request={request} role={role} /></span></span></span></td>
+                  <td><span className="request-route">{request.sourceCountry}<Icon name="arrow" size={12} />{request.destination}</span></td>
+                  <td className="table-date">{new Date(request.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</td>
+                  <td onClick={(event) => event.stopPropagation()}>{request.offers?.length
+                    ? <button type="button" className="request-offers-link" onClick={() => onSelectOffers(request._id)}>{request.offers.length} offer{request.offers.length === 1 ? '' : 's'}<Icon name="arrow" size={13} /></button>
+                    : <span className="table-secondary">No offers yet</span>}</td>
+                  <td><span className="request-status-cell"><StatusBadge>{request.status}</StatusBadge>{since && <small>since {since}</small>}</span></td>
+                  <td className="offer-actions-col" onClick={(event) => event.stopPropagation()}><div className="table-buttons offer-actions">
+                    <button type="button" className="offer-action-btn view" aria-label={`View details for ${request.product}`} title="View details" onClick={() => onView?.(request)}><Icon name="eye" size={15} /><span>View</span></button>
+                    <button type="button" className="offer-action-btn edit" aria-label={`Edit ${request.product}`} title="Edit request" onClick={() => onEdit(request)}><Icon name="edit" size={15} /><span>Edit</span></button>
+                    <button type="button" className="offer-action-btn delete" aria-label={`Delete ${request.product}`} title="Delete request" disabled={busyId === request._id} onClick={() => onDelete(request)}><Icon name="trash" size={15} /><span>Delete</span></button>
+                  </div></td>
+                </tr>
+              );
+            }
             return (
               <tr key={request._id}>
                 <td><span className="request-cell"><RequestThumb photoId={request.productPhoto} product={request.product} size="sm" /><span><span className="table-primary">{request.product} · {request.quantity}</span><span className="table-secondary">{request._id}</span><DeliveryMethodChip method={request.deliveryMethod} compact /><RequestTargetChip request={request} role={role} /></span></span></td>
                 <td>{request.sourceCountry} → {request.destination}</td>
                 <td>{new Date(request.createdAt).toLocaleDateString()}</td>
-                <td>{role === 'customer' && request.offers?.length
-                  ? <button className="text-button" onClick={() => onSelectOffers(request._id)}>{request.offers.length} offers</button>
-                  : request.offers?.length || '—'}</td>
+                <td>{request.offers?.length || '—'}</td>
                 <td>
-                  {role === 'admin' && <select aria-label={`Update status for ${request.product}`} value={request.status} disabled={busyId === request._id} onChange={(event) => onStatusChange(request._id, event.target.value)}>
-                    {shipmentStatuses.map((status) => <option value={status} key={status}>{displayStatus(status)}</option>)}
-                  </select>}
-                  {role === 'customer' && (canCancel || canComplete) && <select aria-label={`Update status for ${request.product}`} value={request.status} disabled={busyId === request._id} onChange={(event) => onStatusChange(request._id, event.target.value, request.product)}>
-                    <option value={request.status}>{displayStatus(request.status)}</option>
-                    <option value={canComplete ? 'delivered' : 'cancelled'}>{canComplete ? 'Mark delivered' : 'Cancel request'}</option>
-                  </select>}
-                  {role !== 'admin' && role !== 'customer' || (!canCancel && !canComplete && role === 'customer')
-                    ? <StatusBadge>{request.status}</StatusBadge>
-                    : null}
+                  {role === 'admin'
+                    ? <select aria-label={`Update status for ${request.product}`} value={request.status} disabled={busyId === request._id} onChange={(event) => onStatusChange(request._id, event.target.value)}>
+                      {shipmentStatuses.map((status) => <option value={status} key={status}>{displayStatus(status)}</option>)}
+                    </select>
+                    : <StatusBadge>{request.status}</StatusBadge>}
                 </td>
                 <td><div className="table-buttons">
                   {canEdit && <button className="icon-button table-action" aria-label={`Edit ${request.product}`} onClick={() => onEdit(request)}><Icon name="edit" size={16} /></button>}
-                  {(role === 'customer' || role === 'admin') && <button className="icon-button table-action" aria-label={`Delete ${request.product}`} disabled={busyId === request._id} onClick={() => onDelete(request)}><Icon name="trash" size={16} /></button>}
-                  {role === 'customer' && <button className="icon-button table-action" aria-label={`View offers for ${request.product}`} onClick={() => onSelectOffers(request._id)}><Icon name="arrow" size={17} /></button>}
+                  {role === 'admin' && <button className="icon-button table-action" aria-label={`Delete ${request.product}`} disabled={busyId === request._id} onClick={() => onDelete(request)}><Icon name="trash" size={16} /></button>}
                   {role === 'provider' && ['open', 'offers_received'].includes(request.status) && <><button className="customer-outline-button" disabled={busyId === request._id} onClick={() => onDeclineRequest(request._id)}>Decline</button><button className="small-primary" disabled={busyId === request._id} onClick={() => onCreateOffer(request)}>Send offer</button></>}
                 </div></td>
               </tr>
@@ -351,6 +368,107 @@ function VerificationGate({ status = 'unverified', isCompany, country, onVerify 
 
 function formatDateTime(value) {
   return value ? new Date(value).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : '—';
+}
+
+const TIMELINE_STAGES = ['Offer accepted', 'Item purchased', 'In transit', 'Delivered'];
+const TIMELINE_STAGES_SHORT = ['Accepted', 'Purchased', 'In transit', 'Delivered'];
+
+/** Shipment progress (Offer accepted → Item purchased → In transit → Delivered) with stage dates. */
+function ShipmentTimeline({ request, compact = false }) {
+  const stageIndex = Math.max(0, SHIPMENT_STAGES.indexOf(request.status));
+  const delivered = request.status === 'delivered';
+  const reachedAt = (stage) => [...(request.statusHistory || [])].reverse().find((entry) => entry.status === stage)?.at;
+  const shortDate = (value) => new Date(value).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  return (
+    <ol className={`shipment-tracking${compact ? ' compact' : ''}`}>
+      {(compact ? TIMELINE_STAGES_SHORT : TIMELINE_STAGES).map((stage, index) => {
+        const done = delivered || index < stageIndex;
+        const current = !delivered && index === stageIndex;
+        const when = reachedAt(SHIPMENT_STAGES[index]);
+        // Compact (dashboard): just the date under each reached stage; full: "Current status · since …".
+        const note = compact
+          ? (when && (done || current) ? shortDate(when) : current ? 'Now' : '')
+          : current ? `Current status${when ? ` · since ${shortDate(when)}` : ''}` : done && when ? shortDate(when) : '';
+        return <li className={done ? 'complete' : current ? 'current' : ''} key={stage} aria-current={current ? 'step' : undefined}><i /><span><strong>{stage}</strong>{note && <small>{note}</small>}</span></li>;
+      })}
+    </ol>
+  );
+}
+
+/**
+ * Customer "View details" for one shipping request: photo, route, delivery method, chosen
+ * company, offers and live shipment progress. Status is read-only (the cargo provider updates
+ * it); the customer may cancel the request before the item is purchased.
+ */
+function RequestDetailsModal({ request, busy, onClose, onEdit, onDelete, onCancel, onViewOffers }) {
+  const closeRef = useRef(null);
+  useEffect(() => {
+    closeRef.current?.focus();
+    const onKey = (event) => { if (event.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  const shipment = SHIPMENT_STAGES.includes(request.status);
+  const canCancel = ['open', 'offers_received', 'in_progress'].includes(request.status);
+  const offersCount = request.offers?.length || 0;
+  const accepted = request.offers?.find((offer) => offer.status === 'accepted');
+
+  return (
+    <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+      <section className="request-modal offer-details-modal request-details-modal" role="dialog" aria-modal="true" aria-labelledby="request-details-title">
+        <div className="modal-heading offer-modal-heading">
+          <div className="offer-request-summary">
+            <RequestThumb photoId={request.productPhoto} product={request.product} size="lg" />
+            <div>
+              <p className="eyebrow">SHIPPING REQUEST · REQ-{request._id.slice(-6).toUpperCase()}</p>
+              <h2 id="request-details-title">{request.product}</h2>
+              <span className="offer-details-chips"><StatusBadge>{request.status}</StatusBadge><DeliveryMethodChip method={request.deliveryMethod} /></span>
+            </div>
+          </div>
+          <button ref={closeRef} type="button" className="icon-button" aria-label="Close dialog" onClick={onClose}><Icon name="close" /></button>
+        </div>
+
+        <div className="offer-details-grid">
+          <section className="offer-details-section">
+            <h3>Request</h3>
+            <dl>
+              <div><dt>Item</dt><dd>{request.product}</dd></div>
+              <div><dt>Quantity</dt><dd>{request.quantity}</dd></div>
+              <div><dt>Route</dt><dd>{request.sourceCountry} → {request.destination}</dd></div>
+              <div><dt>Shipping</dt><dd>{DELIVERY_METHODS[request.deliveryMethod]?.label || '—'}</dd></div>
+              <div><dt>Posted</dt><dd>{formatDateTime(request.createdAt)}</dd></div>
+            </dl>
+          </section>
+          <section className="offer-details-section">
+            <h3>Cargo company</h3>
+            <dl>
+              <div><dt>Sent to</dt><dd>{request.targetProvider?.name || 'Open to providers in the source country'}</dd></div>
+              <div><dt>Offers</dt><dd>{offersCount ? `${offersCount} offer${offersCount === 1 ? '' : 's'}` : 'No offers yet'}</dd></div>
+              <div><dt>Handling</dt><dd>{accepted?.provider?.name || (shipment ? 'Accepted provider' : '—')}</dd></div>
+              <div><dt>Status</dt><dd>{displayStatus(request.status)}</dd></div>
+            </dl>
+          </section>
+        </div>
+
+        {request.details && <section className="offer-details-section"><h3>Additional details</h3><p className="request-details-note">{request.details}</p></section>}
+
+        <section className="offer-details-section request-progress-section">
+          <h3>Shipment progress</h3>
+          {shipment
+            ? <><ShipmentTimeline request={request} /><p className="offer-details-hint"><Icon name="shield" size={14} />Progress is updated by your cargo provider and shown here in real time.</p></>
+            : <p className="offer-details-hint">{request.status === 'cancelled' ? 'This request was cancelled.' : 'Tracking starts when you accept an offer.'}</p>}
+        </section>
+
+        <footer className="offer-details-footer request-details-footer">
+          {offersCount > 0 && <button type="button" className="customer-outline-button" onClick={() => onViewOffers(request)}><Icon name="mail" size={15} />View offers</button>}
+          <button type="button" className="customer-outline-button" onClick={() => onEdit(request)}><Icon name="edit" size={15} />Edit</button>
+          {canCancel && <button type="button" className="reject-button" disabled={busy} onClick={() => onCancel(request)}><Icon name="close" size={15} />Cancel request</button>}
+          <button type="button" className="reject-button" disabled={busy} onClick={() => onDelete(request)}><Icon name="trash" size={15} />Delete</button>
+        </footer>
+      </section>
+    </div>
+  );
 }
 
 /** Full breakdown of one offer. Admins get a read-only view (no actions). */
@@ -894,6 +1012,10 @@ export default function DashboardWorkspace({ initialRole }) {
   const closeUserDetails = useCallback(() => setViewingUserId(''), []);
   const [confirmState, setConfirmState] = useState(null);
   const viewingOffer = viewingOfferId ? offers.find((offer) => offer._id === viewingOfferId) || null : null;
+  // Customer "View details" for a shipping request (always read from the latest `requests`).
+  const [viewingRequestId, setViewingRequestId] = useState('');
+  const closeRequestDetails = useCallback(() => setViewingRequestId(''), []);
+  const viewingRequest = viewingRequestId ? requests.find((request) => request._id === viewingRequestId) || null : null;
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [userModalOpen, setUserModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
@@ -1320,8 +1442,29 @@ export default function DashboardWorkspace({ initialRole }) {
   }
 
   function deleteShippingRequest(request) {
-    if (!window.confirm(`Delete "${request.product}" and its offers?`)) return;
-    performMutation(request._id, () => deleteRequest(request._id), 'Shipping request deleted.');
+    askToConfirm({
+      title: 'Delete this request?',
+      message: `“${request.product}” and all of its offers will be permanently deleted. This can’t be undone.`,
+      confirmLabel: 'Delete request',
+      tone: 'danger',
+      run: async () => {
+        const ok = await performMutation(request._id, () => deleteRequest(request._id), 'Shipping request deleted.');
+        if (ok) setViewingRequestId((current) => (current === request._id ? '' : current));
+        return ok;
+      },
+    });
+  }
+
+  // Customers can cancel a request until the item is purchased (status is otherwise read-only).
+  function cancelShippingRequest(request) {
+    askToConfirm({
+      title: 'Cancel this request?',
+      message: `“${request.product}” will be cancelled${request.status === 'in_progress' ? ' and the accepted cargo provider will stop working on it' : ''}. This can’t be undone.`,
+      confirmLabel: 'Cancel request',
+      cancelLabel: 'Keep request',
+      tone: 'danger',
+      run: () => performMutation(request._id, () => updateShipmentStatus(request._id, 'cancelled'), `“${request.product}” was cancelled.`),
+    });
   }
 
   // Provider withdraws their own pending offer.
@@ -1435,6 +1578,7 @@ export default function DashboardWorkspace({ initialRole }) {
       role={initialRole}
       search={search}
       busyId={busyId}
+      onView={(request) => setViewingRequestId(request._id)}
       onEdit={(request) => { setEditingRequest(request); setRequestModalOpen(true); setFormError(''); }}
       onDelete={deleteShippingRequest}
       onSelectOffers={(id) => { setSelectedRequestId(id); setSection('offers'); }}
@@ -1584,39 +1728,32 @@ export default function DashboardWorkspace({ initialRole }) {
               <CardHeading title="My recent requests" subtitle="Your latest shipping requests" action={<button className="link-button" onClick={() => setSection('requests')}>View all <Icon name="arrow" size={15} /></button>} />
               <div className="customer-request-header"><span>Request</span><span>Status</span><span>Actions</span></div>
               {loading ? <p className="empty-table" role="status">Loading your requests…</p> : recentRequests.length ? <div className="customer-request-list">
-                {recentRequests.map((request) => {
-                  const tone = request.status === 'delivered' ? 'success' : ['open', 'offers_received'].includes(request.status) ? 'info' : 'warning';
-                  return <div className="customer-request-row" key={request._id}>
+                {recentRequests.map((request) => (
+                  <div className="customer-request-row request-row-clickable" key={request._id} role="button" tabIndex={0} aria-label={`View details for ${request.product}`}
+                    onClick={() => setViewingRequestId(request._id)}
+                    onKeyDown={(event) => { if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); setViewingRequestId(request._id); } }}>
                     <RequestThumb photoId={request.productPhoto} product={request.product} />
                     <span className="customer-row-copy"><strong>{request.product}</strong><small>{request.quantity} · {request.sourceCountry} to {request.destination}</small><small className="request-row-meta">{request.offers?.length || 0} quote{request.offers?.length === 1 ? '' : 's'}<DeliveryMethodChip method={request.deliveryMethod} compact /></small></span>
-                    <span className={`customer-status customer-status-${tone}`}>{displayStatus(request.status)}</span>
-                    <span className="customer-row-actions">
-                      <button className="icon-button table-action" aria-label={`Edit ${request.product}`} onClick={() => { setEditingRequest(request); setRequestModalOpen(true); setFormError(''); }}><Icon name="edit" size={15} /></button>
-                      <button className="icon-button table-action" aria-label={`Delete ${request.product}`} disabled={busyId === request._id} onClick={() => deleteShippingRequest(request)}><Icon name="trash" size={15} /></button>
+                    <StatusBadge>{request.status}</StatusBadge>
+                    <span className="customer-row-actions" onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
+                      <button type="button" className="icon-button table-action" aria-label={`View details for ${request.product}`} title="View details" onClick={() => setViewingRequestId(request._id)}><Icon name="eye" size={15} /></button>
+                      <button type="button" className="icon-button table-action" aria-label={`Edit ${request.product}`} title="Edit request" onClick={() => { setEditingRequest(request); setRequestModalOpen(true); setFormError(''); }}><Icon name="edit" size={15} /></button>
+                      <button type="button" className="icon-button table-action" aria-label={`Delete ${request.product}`} title="Delete request" disabled={busyId === request._id} onClick={() => deleteShippingRequest(request)}><Icon name="trash" size={15} /></button>
                     </span>
-                  </div>;
-                })}
+                  </div>
+                ))}
               </div> : <div className="empty-state"><strong>No shipping requests yet</strong><p>Create a request to receive quotes from cargo providers.</p><button className="small-primary" onClick={openCreateRequest}>Create request</button></div>}
             </Card>
             <Card className="customer-tracking-card">
               <CardHeading title="Shipment tracking" subtitle="Live progress for your shipments" />
               {loading ? <p className="empty-table" role="status">Loading shipment progress…</p> : trackedShipments.length ? <div className="customer-tracking-list">{trackedShipments.slice(0, 3).map((request) => {
-                const stageIndex = Math.max(0, SHIPMENT_STAGES.indexOf(request.status));
                 const delivered = request.status === 'delivered';
-                const stages = ['Offer accepted', 'Item purchased', 'In transit', 'Delivered'];
-                // When each stage was reached (requests accepted before this was recorded have no dates).
-                const reachedAt = (stage) => [...(request.statusHistory || [])].reverse().find((entry) => entry.status === stage)?.at;
-                const shortDate = (value) => new Date(value).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+                const deliveredAt = delivered ? [...(request.statusHistory || [])].reverse().find((entry) => entry.status === 'delivered')?.at : null;
                 return <section className={`customer-tracking-item${delivered ? ' delivered' : ''}`} key={request._id}>
-                  <div className="customer-tracking-heading"><span><strong>{request.product}</strong><small>{request.destination} · {delivered ? <span className="tracking-delivered-label"><Icon name="check" size={12} />Delivered{reachedAt('delivered') ? ` ${shortDate(reachedAt('delivered'))}` : ''}</span> : displayStatus(request.status)}</small></span><span className="customer-row-actions">
-                    {!delivered && <button className="icon-button table-action" aria-label={`Edit ${request.product}`} onClick={() => { setEditingRequest(request); setRequestModalOpen(true); setFormError(''); }}><Icon name="edit" size={15} /></button>}
-                    <button className="icon-button table-action" aria-label={`Delete ${request.product}`} disabled={busyId === request._id} onClick={() => deleteShippingRequest(request)}><Icon name="trash" size={15} /></button>
+                  <div className="customer-tracking-heading"><span><strong>{request.product}</strong><small>{request.destination} · {delivered ? <span className="tracking-delivered-label"><Icon name="check" size={12} />Delivered{deliveredAt ? ` ${new Date(deliveredAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}` : ''}</span> : displayStatus(request.status)}</small></span><span className="customer-row-actions">
+                    <button type="button" className="icon-button table-action" aria-label={`View details for ${request.product}`} title="View details" onClick={() => setViewingRequestId(request._id)}><Icon name="eye" size={15} /></button>
                   </span></div>
-                  <ol className="shipment-tracking">{stages.map((stage, index) => {
-                    const done = delivered || index < stageIndex;
-                    const when = reachedAt(SHIPMENT_STAGES[index]);
-                    return <li className={done ? 'complete' : index === stageIndex ? 'current' : ''} key={stage}><i /><span><strong>{stage}</strong>{!delivered && index === stageIndex ? <small>Current status{when ? ` · since ${shortDate(when)}` : ''}</small> : done && when ? <small>{shortDate(when)}</small> : null}</span></li>;
-                  })}</ol>
+                  <ShipmentTimeline request={request} compact />
                 </section>;
               })}</div> : <div className="empty-state"><strong>No shipments yet</strong><p>Accepted offers will appear here as your shipments progress.</p></div>}
             </Card>
@@ -1762,6 +1899,7 @@ export default function DashboardWorkspace({ initialRole }) {
                 setSelectedRequestId('');
                 setChatContactId('');
                 setViewingOfferId('');
+                setViewingRequestId('');
                 setViewingUserId('');
                 setMobileNavOpen(false);
               }}>
@@ -1845,6 +1983,17 @@ export default function DashboardWorkspace({ initialRole }) {
           onChat={(offer) => { setViewingOfferId(''); openChatWithProvider(offer); }}
         />
       )}
+      {customerMode && viewingRequest && (
+        <RequestDetailsModal
+          request={viewingRequest}
+          busy={busyId === viewingRequest._id}
+          onClose={closeRequestDetails}
+          onEdit={(request) => { setViewingRequestId(''); setEditingRequest(request); setRequestModalOpen(true); setFormError(''); }}
+          onDelete={deleteShippingRequest}
+          onCancel={cancelShippingRequest}
+          onViewOffers={(request) => { setViewingRequestId(''); setSelectedRequestId(request._id); setSection('offers'); }}
+        />
+      )}
       {customerMode && viewingCompany && <CompanyProfileModal provider={viewingCompany} onClose={closeCompanyProfile} onRequest={openCreateRequest} />}
       {requestModalOpen && <RequestForm request={editingRequest} saving={saving} error={formError} onSubmit={saveRequest} companies={{ ...companies, retry: loadCompanies }} initialCompany={editingRequest ? null : requestCompany} onClose={() => { setRequestModalOpen(false); setEditingRequest(null); setRequestCompany(null); setFormError(''); }} />}
       {(offerRequest || editingOffer) && <OfferForm request={offerRequest || editingOffer?.request} offer={editingOffer} saving={saving} error={formError} onSubmit={saveOffer} onClose={() => { setOfferRequest(null); setEditingOffer(null); setFormError(''); }} />}
@@ -1865,6 +2014,7 @@ export default function DashboardWorkspace({ initialRole }) {
           title={confirmState.title}
           message={confirmState.message}
           confirmLabel={confirmState.confirmLabel}
+          cancelLabel={confirmState.cancelLabel}
           tone={confirmState.tone}
           busy={confirmState.busy}
           onConfirm={runConfirmed}
