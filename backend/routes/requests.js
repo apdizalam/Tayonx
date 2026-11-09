@@ -1,8 +1,18 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const ShippingRequest = require('../models/ShippingRequest');
+const UploadedFile = require('../models/UploadedFile');
 const { authenticate, requireRole } = require('../middleware/authenticate');
 const { parseQuantity, readOfferBody, repriceOffer } = require('../lib/offerPricing');
+const {
+  IMAGE_TYPES,
+  acceptUploads,
+  checkFileType,
+  saveUploadedFile,
+  uploadedFile,
+} = require('../lib/uploads');
+
+const DELIVERY_METHODS = ['sea', 'air'];
 
 const router = express.Router();
 const requestStatuses = ['open', 'offers_received', 'in_progress', 'purchased', 'shipping', 'delivered', 'cancelled'];
@@ -29,7 +39,20 @@ function requestFields(body) {
     destination: typeof body.destination === 'string' ? body.destination.trim() : '',
     quantity: typeof body.quantity === 'string' ? body.quantity.trim() : '',
     details: typeof body.details === 'string' ? body.details.trim() : '',
+    deliveryMethod: typeof body.deliveryMethod === 'string' ? body.deliveryMethod.trim().toLowerCase() : '',
   };
+}
+
+/** Validates an optional product photo upload; returns { photo } or { error }. */
+function readProductPhoto(req) {
+  const photo = uploadedFile(req, 'productPhoto');
+  if (!photo) return { photo: null };
+  const typeError = checkFileType(photo, IMAGE_TYPES);
+  return typeError ? { error: `Product photo: ${typeError}` } : { photo };
+}
+
+function wantsPhotoRemoved(body) {
+  return body.removeProductPhoto === true || body.removeProductPhoto === 'true';
 }
 
 function fieldsError(fields) {
@@ -40,6 +63,7 @@ function fieldsError(fields) {
   // Offers are priced per item, so the quantity must contain a whole number.
   if (!parseQuantity(fields.quantity)) return 'Quantity must include a whole number, e.g. "50 laptops".';
   if (fields.details.length > 2000) return 'Details must be 2,000 characters or fewer.';
+  if (!DELIVERY_METHODS.includes(fields.deliveryMethod)) return 'Choose a delivery method: Ship (Maritime) or Aircraft (Air freight).';
   return null;
 }
 
@@ -76,17 +100,23 @@ router.get('/', async (req, res) => {
   }
 });
 
-router.post('/', requireRole('customer'), async (req, res) => {
+// Accepts JSON or multipart/form-data (with an optional `productPhoto` image).
+router.post('/', requireRole('customer'), acceptUploads(['productPhoto']), async (req, res) => {
   if (mongoose.connection.readyState !== 1) return databaseUnavailable(res);
   const fields = requestFields(req.body || {});
   const error = fieldsError(fields);
   if (error) return res.status(400).json({ error });
+  const { photo, error: photoError } = readProductPhoto(req);
+  if (photoError) return res.status(400).json({ error: photoError, field: 'productPhoto' });
 
+  let photoId = null;
   try {
-    const request = await ShippingRequest.create({ ...fields, customer: req.user._id });
+    if (photo) photoId = await saveUploadedFile(photo, { owner: req.user._id, purpose: 'product_photo' });
+    const request = await ShippingRequest.create({ ...fields, productPhoto: photoId, customer: req.user._id });
     await request.populate('customer', 'name');
     return res.status(201).json({ request });
   } catch (createError) {
+    if (photoId) await UploadedFile.deleteOne({ _id: photoId }).catch(() => {});
     return handleServerError(res, createError);
   }
 });
@@ -113,6 +143,8 @@ router.get('/offers', async (req, res) => {
           sourceCountry: request.sourceCountry,
           destination: request.destination,
           quantity: request.quantity,
+          deliveryMethod: request.deliveryMethod,
+          productPhoto: request.productPhoto,
           status: request.status,
           customer: request.customer,
         },
@@ -149,7 +181,9 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-router.put('/:id', async (req, res) => {
+// Accepts JSON or multipart/form-data. A new `productPhoto` replaces the old one;
+// `removeProductPhoto=true` removes it.
+router.put('/:id', acceptUploads(['productPhoto']), async (req, res) => {
   if (!validId(req.params.id)) return res.status(400).json({ error: 'Invalid request id.' });
   if (mongoose.connection.readyState !== 1) return databaseUnavailable(res);
 
@@ -159,10 +193,23 @@ router.put('/:id', async (req, res) => {
     if (req.user.role !== 'admin' && !request.customer.equals(req.user._id)) {
       return res.status(403).json({ error: 'Only the request owner or an admin can edit this request.' });
     }
-    const fields = requestFields(req.body || {});
+    const body = req.body || {};
+    const fields = requestFields(body);
     const error = fieldsError(fields);
     if (error) return res.status(400).json({ error });
+    const { photo, error: photoError } = readProductPhoto(req);
+    if (photoError) return res.status(400).json({ error: photoError, field: 'productPhoto' });
+
     Object.assign(request, fields);
+    const oldPhoto = request.productPhoto;
+    if (photo) {
+      request.productPhoto = await saveUploadedFile(photo, { owner: request.customer, purpose: 'product_photo' });
+    } else if (wantsPhotoRemoved(body)) {
+      request.productPhoto = null;
+    }
+    if (oldPhoto && !oldPhoto.equals?.(request.productPhoto)) {
+      await UploadedFile.deleteOne({ _id: oldPhoto }).catch(() => {});
+    }
     // Keep pending per-item quotes consistent with the new quantity (subtotal and total).
     const newCount = parseQuantity(request.quantity);
     for (const offer of request.offers) {
@@ -187,6 +234,7 @@ router.delete('/:id', async (req, res) => {
       return res.status(403).json({ error: 'Only the request owner or an admin can delete this request.' });
     }
     await request.deleteOne();
+    if (request.productPhoto) await UploadedFile.deleteOne({ _id: request.productPhoto }).catch(() => {});
     return res.status(204).end();
   } catch (error) {
     return handleServerError(res, error);
