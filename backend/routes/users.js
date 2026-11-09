@@ -4,7 +4,9 @@ const mongoose = require('mongoose');
 const User = require('../models/User');
 const UploadedFile = require('../models/UploadedFile');
 const VerificationRequest = require('../models/VerificationRequest');
+const ShippingRequest = require('../models/ShippingRequest');
 const publicUser = require('../lib/publicUser');
+const { requestSummary, documentPopulate } = require('../lib/verificationSummary');
 const { authenticate, requireRole } = require('../middleware/authenticate');
 const {
   ACCOUNT_ROLES,
@@ -60,6 +62,47 @@ router.get('/', async (req, res) => {
       .select('name email role country phone profilePhoto verification createdAt updatedAt')
       .sort({ createdAt: -1 });
     return res.json({ users: users.map(publicUser) });
+  } catch (error) {
+    return handleServerError(res, error);
+  }
+});
+
+// Full details of one account for the admin "View user" modal: profile, verification
+// history with uploaded documents, and a short activity summary.
+router.get('/:id', async (req, res) => {
+  if (!validId(req.params.id)) return res.status(400).json({ error: 'Invalid user id.' });
+  if (mongoose.connection.readyState !== 1) return databaseUnavailable(res);
+  try {
+    const user = await User.findById(req.params.id)
+      .select('name email role country phone profilePhoto verification createdAt updatedAt');
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+
+    const isProvider = ['cargo_provider', 'individual_cargo'].includes(user.role);
+    const [verificationRequests, activity] = await Promise.all([
+      isProvider
+        ? VerificationRequest.find({ user: user._id }).sort({ createdAt: -1 }).limit(10).populate(documentPopulate)
+        : [],
+      user.role === 'customer'
+        ? ShippingRequest.aggregate([
+          { $match: { customer: user._id } },
+          { $group: { _id: null, requests: { $sum: 1 }, active: { $sum: { $cond: [{ $in: ['$status', ['open', 'offers_received', 'in_progress', 'purchased', 'shipping']] }, 1, 0] } } } },
+        ])
+        : isProvider
+          ? ShippingRequest.aggregate([
+            { $unwind: '$offers' },
+            { $match: { 'offers.provider': user._id } },
+            { $group: { _id: null, offers: { $sum: 1 }, accepted: { $sum: { $cond: [{ $eq: ['$offers.status', 'accepted'] }, 1, 0] } } } },
+          ])
+          : [],
+    ]);
+    const stats = activity[0] || {};
+    return res.json({
+      user: publicUser(user),
+      verificationRequests: verificationRequests.map(requestSummary),
+      activity: user.role === 'customer'
+        ? { requests: stats.requests || 0, activeRequests: stats.active || 0 }
+        : isProvider ? { offers: stats.offers || 0, acceptedOffers: stats.accepted || 0 } : {},
+    });
   } catch (error) {
     return handleServerError(res, error);
   }
