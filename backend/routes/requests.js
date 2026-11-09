@@ -2,6 +2,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const ShippingRequest = require('../models/ShippingRequest');
 const UploadedFile = require('../models/UploadedFile');
+const User = require('../models/User');
 const { authenticate, requireRole } = require('../middleware/authenticate');
 const { parseQuantity, readOfferBody, repriceOffer } = require('../lib/offerPricing');
 const {
@@ -35,6 +36,36 @@ function providerCountryFilter(user) {
   const country = typeof user.country === 'string' ? user.country.trim() : '';
   if (!country) return { _id: null }; // no country on the profile → match nothing
   return { sourceCountry: new RegExp(`^\\s*${escapeRegExp(country)}\\s*$`, 'i') };
+}
+
+// Which open requests a (verified) provider may see and act on:
+//  - requests the customer sent directly to this provider (company-first flow), or
+//  - older requests sent to nobody in particular, from the provider's own country.
+// Requests sent to a different provider are never visible.
+function providerRequestScope(user) {
+  return {
+    $or: [
+      { targetProvider: user._id },
+      { targetProvider: null, ...providerCountryFilter(user) },
+    ],
+  };
+}
+
+function canSeeOpenRequest(user, request) {
+  const target = request.targetProvider?._id || request.targetProvider;
+  if (target) return String(target) === String(user._id);
+  return sameCountry(user, request);
+}
+
+const TARGET_POPULATE = { path: 'targetProvider', select: 'name role country' };
+
+/** Validates the chosen cargo company: must be an existing, verified provider. */
+async function readTargetProvider(body) {
+  const id = typeof body.targetProvider === 'string' ? body.targetProvider.trim() : '';
+  if (!id) return { targetProvider: null };
+  if (!mongoose.isValidObjectId(id)) return { error: 'Choose a verified cargo company.' };
+  const provider = await User.findOne({ _id: id, role: { $in: cargoProviderRoles }, 'verification.status': 'approved' }).select('_id');
+  return provider ? { targetProvider: provider._id } : { error: 'This cargo company is not available. Choose a verified cargo company.' };
 }
 
 // Only approved (verified) cargo providers can see or act on incoming requests.
@@ -120,13 +151,13 @@ router.get('/', async (req, res) => {
           status: { $in: ['open', 'offers_received'] },
           declinedBy: { $ne: req.user._id },
           'offers.provider': { $ne: req.user._id },
-          ...providerCountryFilter(req.user),
+          ...providerRequestScope(req.user),
         };
     }
     let query = ShippingRequest.find(filter);
     const hideOffers = isCargoProvider(req.user) && req.query.scope !== 'offers';
     if (hideOffers) query = query.select('-offers');
-    query = query.populate('customer', 'name').sort({ createdAt: -1 });
+    query = query.populate('customer', 'name').populate(TARGET_POPULATE).sort({ createdAt: -1 });
     if (!hideOffers) query = query.populate('offers.provider', 'name');
     const requests = await query;
     return res.json({ requests });
@@ -146,9 +177,12 @@ router.post('/', requireRole('customer'), acceptUploads(['productPhoto']), async
 
   let photoId = null;
   try {
+    // Company-first flow: the customer picks a verified cargo company the request is sent to.
+    const { targetProvider, error: targetError } = await readTargetProvider(req.body || {});
+    if (targetError) return res.status(400).json({ error: targetError, field: 'targetProvider' });
     if (photo) photoId = await saveUploadedFile(photo, { owner: req.user._id, purpose: 'product_photo' });
-    const request = await ShippingRequest.create({ ...fields, productPhoto: photoId, customer: req.user._id });
-    await request.populate('customer', 'name');
+    const request = await ShippingRequest.create({ ...fields, targetProvider, productPhoto: photoId, customer: req.user._id });
+    await request.populate([{ path: 'customer', select: 'name' }, TARGET_POPULATE]);
     return res.status(201).json({ request });
   } catch (createError) {
     if (photoId) await UploadedFile.deleteOne({ _id: photoId }).catch(() => {});
@@ -182,6 +216,7 @@ router.get('/offers', async (req, res) => {
           productPhoto: request.productPhoto,
           status: request.status,
           customer: request.customer,
+          targetProvider: request.targetProvider || null,
         },
       })));
     return res.json({ offers });
@@ -197,15 +232,17 @@ router.get('/:id', async (req, res) => {
   try {
     const request = await ShippingRequest.findById(req.params.id)
       .populate('customer', 'name')
+      .populate(TARGET_POPULATE)
       .populate('offers.provider', 'name');
     if (!request) return res.status(404).json({ error: 'Shipping request not found.' });
     if (req.user.role === 'customer' && (!request.customer || !request.customer._id.equals(req.user._id))) {
       return res.status(403).json({ error: 'You do not have access to this request.' });
     }
-    // Providers can open a request they already quoted on, or (once verified) an open request from their own country.
+    // Providers can open a request they already quoted on, or (once verified) an open request
+    // sent to them directly — or, for requests sent to nobody in particular, from their own country.
     if (isCargoProvider(req.user)
       && !request.offers.some((offer) => offer.provider?._id.equals(req.user._id))
-      && (!isVerifiedProvider(req.user) || !['open', 'offers_received'].includes(request.status) || !sameCountry(req.user, request))) {
+      && (!isVerifiedProvider(req.user) || !['open', 'offers_received'].includes(request.status) || !canSeeOpenRequest(req.user, request))) {
       return res.status(404).json({ error: 'Shipping request not found.' });
     }
     if (isCargoProvider(req.user)) {
@@ -252,7 +289,7 @@ router.put('/:id', acceptUploads(['productPhoto']), async (req, res) => {
       if (offer.status === 'pending') repriceOffer(offer, newCount);
     }
     await request.save();
-    await request.populate('customer', 'name');
+    await request.populate([{ path: 'customer', select: 'name' }, TARGET_POPULATE]);
     return res.json({ request });
   } catch (error) {
     return handleServerError(res, error);
@@ -288,7 +325,7 @@ router.post('/:id/decline', requireRole(...cargoProviderRoles), async (req, res)
         _id: req.params.id,
         status: { $in: ['open', 'offers_received'] },
         'offers.provider': { $ne: req.user._id },
-        ...providerCountryFilter(req.user),
+        ...providerRequestScope(req.user),
       },
       { $addToSet: { declinedBy: req.user._id } },
       { returnDocument: 'after' },
@@ -313,7 +350,7 @@ router.post('/:id/offers', requireRole(...cargoProviderRoles), async (req, res) 
       status: { $in: ['open', 'offers_received'] },
       declinedBy: { $ne: req.user._id },
       'offers.provider': { $ne: req.user._id },
-      ...providerCountryFilter(req.user),
+      ...providerRequestScope(req.user),
     });
     if (!request) return res.status(404).json({ error: 'This request is unavailable or you have already responded.' });
     const { fields, error, field } = readOfferBody(body, request.quantity);
