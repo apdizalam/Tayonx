@@ -37,6 +37,17 @@ function providerCountryFilter(user) {
   return { sourceCountry: new RegExp(`^\\s*${escapeRegExp(country)}\\s*$`, 'i') };
 }
 
+// Only approved (verified) cargo providers can see or act on incoming requests.
+function isVerifiedProvider(user) {
+  return isCargoProvider(user) && user.verification?.status === 'approved';
+}
+
+const VERIFICATION_REQUIRED = 'Verify your account to see and respond to shipping requests.';
+
+function verificationRequired(res) {
+  return res.status(403).json({ error: VERIFICATION_REQUIRED, code: 'verification_required' });
+}
+
 function sameCountry(user, request) {
   const a = typeof user.country === 'string' ? user.country.trim().toLowerCase() : '';
   const b = typeof request.sourceCountry === 'string' ? request.sourceCountry.trim().toLowerCase() : '';
@@ -99,6 +110,10 @@ router.get('/', async (req, res) => {
     if (req.user.role === 'customer') {
       filter = { customer: req.user._id };
     } else if (isCargoProvider(req.user)) {
+      // Unverified providers get no incoming requests (their own offers stay visible).
+      if (req.query.scope !== 'offers' && !isVerifiedProvider(req.user)) {
+        return res.json({ requests: [], verificationRequired: true, message: VERIFICATION_REQUIRED });
+      }
       filter = req.query.scope === 'offers'
         ? { 'offers.provider': req.user._id }
         : {
@@ -187,10 +202,10 @@ router.get('/:id', async (req, res) => {
     if (req.user.role === 'customer' && (!request.customer || !request.customer._id.equals(req.user._id))) {
       return res.status(403).json({ error: 'You do not have access to this request.' });
     }
-    // Providers can open a request they already quoted on, or an open request from their own country.
+    // Providers can open a request they already quoted on, or (once verified) an open request from their own country.
     if (isCargoProvider(req.user)
       && !request.offers.some((offer) => offer.provider?._id.equals(req.user._id))
-      && (!['open', 'offers_received'].includes(request.status) || !sameCountry(req.user, request))) {
+      && (!isVerifiedProvider(req.user) || !['open', 'offers_received'].includes(request.status) || !sameCountry(req.user, request))) {
       return res.status(404).json({ error: 'Shipping request not found.' });
     }
     if (isCargoProvider(req.user)) {
@@ -265,6 +280,7 @@ router.delete('/:id', async (req, res) => {
 router.post('/:id/decline', requireRole(...cargoProviderRoles), async (req, res) => {
   if (!validId(req.params.id)) return res.status(400).json({ error: 'Invalid request id.' });
   if (mongoose.connection.readyState !== 1) return databaseUnavailable(res);
+  if (!isVerifiedProvider(req.user)) return verificationRequired(res);
 
   try {
     const request = await ShippingRequest.findOneAndUpdate(
@@ -287,6 +303,7 @@ router.post('/:id/decline', requireRole(...cargoProviderRoles), async (req, res)
 router.post('/:id/offers', requireRole(...cargoProviderRoles), async (req, res) => {
   if (!validId(req.params.id)) return res.status(400).json({ error: 'Invalid request id.' });
   if (mongoose.connection.readyState !== 1) return databaseUnavailable(res);
+  if (!isVerifiedProvider(req.user)) return verificationRequired(res);
 
   const body = req.body && typeof req.body === 'object' ? req.body : {};
 
