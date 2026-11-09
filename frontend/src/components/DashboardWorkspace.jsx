@@ -221,32 +221,59 @@ function offerPermissions(offer, role) {
     canRespond: role === 'customer' && offer.status === 'pending',
     canReconsider: role === 'customer' && offer.status === 'declined' && requestOpen,
     canRemove: role === 'customer' && ['pending', 'declined'].includes(offer.status) && offer.request?.status !== 'cancelled',
-    canChat: role === 'customer' && offer.status === 'accepted' && Boolean(offer.provider),
+    canChat: offer.status === 'accepted' && (
+      (role === 'customer' && Boolean(offer.provider))
+      || (role === 'provider' && Boolean(offer.request?.customer))
+    ),
     canEdit: role === 'provider' && offer.status === 'pending',
     canWithdraw: role === 'provider' && offer.status === 'pending',
   };
 }
 
-/** Action buttons for one offer; used in the table row and in the details modal. */
+/** Why Edit/Delete is unavailable for this offer (shown as the disabled button's tooltip). */
+function lockedReason(offer, action) {
+  if (offer.status === 'accepted') return action === 'edit' ? 'Accepted offers can’t be edited' : 'Accepted offers can’t be deleted while the shipment is in progress';
+  if (offer.status === 'declined') return action === 'edit' ? 'Declined offers can’t be edited' : 'This offer can’t be deleted';
+  return action === 'edit' ? 'This offer can’t be edited' : 'This offer can’t be deleted';
+}
+
+/**
+ * Action buttons for one offer, in the same order in every dashboard:
+ * View → Edit → Delete → decision (Accept / Decline / Reconsider) → Chat.
+ * In tables, Edit/Delete stay in place (disabled, with a reason) so columns line up.
+ * Used in the table rows and in the details modal (inModal).
+ */
 function OfferActions({ offer, role, busy, onView, onEdit, onDelete, onRespond, onReconsider, onRemove, onChat, inModal = false }) {
   const can = offerPermissions(offer, role);
-  const providerName = offer.provider?.name || 'the cargo provider';
+  const otherParty = role === 'provider' ? offer.request?.customer?.name || 'the customer' : offer.provider?.name || 'the cargo provider';
   const stop = (handler) => (event) => { event.stopPropagation(); handler(offer); };
+  const product = offer.request?.product || 'this request';
+
+  // Delete means "withdraw" for the provider who sent the offer and "remove" for the customer who received it.
+  const deleteHandler = role === 'provider' ? onDelete : role === 'customer' ? onRemove : null;
+  const canDelete = role === 'provider' ? can.canWithdraw : can.canRemove;
+  const deleteLabel = role === 'provider' ? 'Withdraw offer' : 'Remove offer';
+  const showEdit = role === 'provider' && onEdit && (!inModal || can.canEdit);
+  const showDelete = Boolean(deleteHandler) && (!inModal || canDelete);
+
   return (
     <div className={`table-buttons offer-actions${inModal ? ' offer-actions-modal' : ''}`}>
       {!inModal && onView && (
-        <button type="button" className="icon-button table-action" aria-label={`View offer details for ${offer.request.product}`} title="View details" onClick={stop(onView)}><Icon name="eye" size={16} /></button>
+        <button type="button" className="offer-action-btn view" aria-label={`View offer details for ${product}`} title="View details" onClick={stop(onView)}><Icon name="eye" size={15} /><span>View</span></button>
       )}
-      {can.canEdit && onEdit && <button type="button" className={inModal ? 'customer-outline-button' : 'icon-button table-action'} aria-label="Edit offer" title="Edit offer" onClick={stop(onEdit)}><Icon name="edit" size={16} />{inModal && 'Edit offer'}</button>}
-      {can.canWithdraw && onDelete && <button type="button" className={inModal ? 'reject-button' : 'icon-button table-action'} aria-label="Withdraw offer" title="Withdraw offer" disabled={busy} onClick={stop(onDelete)}><Icon name="trash" size={16} />{inModal && 'Withdraw'}</button>}
-      {can.canRespond && <>
+      {showEdit && (
+        <button type="button" className={inModal ? 'customer-outline-button' : 'offer-action-btn edit'} aria-label={`Edit offer for ${product}`} title={can.canEdit ? 'Edit offer' : lockedReason(offer, 'edit')} disabled={!can.canEdit || busy} onClick={stop(onEdit)}><Icon name="edit" size={15} /><span>{inModal ? 'Edit offer' : 'Edit'}</span></button>
+      )}
+      {showDelete && (
+        <button type="button" className={inModal ? 'reject-button' : 'offer-action-btn delete'} aria-label={`${deleteLabel}${role === 'customer' ? ` from ${otherParty}` : ` for ${product}`}`} title={canDelete ? deleteLabel : lockedReason(offer, 'delete')} disabled={!canDelete || busy} onClick={stop(deleteHandler)}><Icon name="trash" size={15} /><span>{inModal ? deleteLabel : 'Delete'}</span></button>
+      )}
+      {can.canRespond && onRespond && <>
         <button type="button" className="reject-button" disabled={busy} onClick={stop((item) => onRespond(item, 'declined'))}>Decline</button>
         <button type="button" className="approve-button" disabled={busy} onClick={stop((item) => onRespond(item, 'accepted'))}>Accept</button>
       </>}
       {can.canReconsider && onReconsider && <button type="button" className="customer-outline-button" disabled={busy} title="Move this offer back to pending" onClick={stop(onReconsider)}><Icon name="refresh" size={15} />Reconsider</button>}
-      {can.canRemove && onRemove && <button type="button" className={inModal ? 'reject-button' : 'icon-button table-action'} aria-label={`Remove offer from ${providerName}`} title="Remove offer" disabled={busy} onClick={stop(onRemove)}><Icon name="trash" size={16} />{inModal && 'Remove offer'}</button>}
       {can.canChat && onChat && (
-        <button type="button" className="offer-chat-button" onClick={stop(onChat)} aria-label={`Chat with ${providerName} about ${offer.request.product}`} title={`Chat with ${providerName}`}>
+        <button type="button" className="offer-chat-button" onClick={stop(onChat)} aria-label={`Chat with ${otherParty} about ${product}`} title={`Chat with ${otherParty}`}>
           <Icon name="chat" size={15} />Chat
         </button>
       )}
@@ -262,7 +289,7 @@ function OffersTable({ offers, role, busyId, onView, onEdit, onDelete, onRespond
   return (
     <div className="table-scroll">
       <table className="data-table offers-table">
-        <thead><tr><th>Request</th><th>{role === 'customer' || role === 'admin' ? 'Cargo provider' : 'Customer'}</th><th>Quote</th><th>Delivery</th><th>Status / shipment</th><th>Actions</th></tr></thead>
+        <thead><tr><th>Request</th><th>{role === 'customer' || role === 'admin' ? 'Cargo provider' : 'Customer'}</th><th>Quote</th><th>Delivery</th><th>Status / shipment</th><th className="offer-actions-col" scope="col">Actions</th></tr></thead>
         <tbody>{offers.map((offer) => {
           const nextStatus = { in_progress: 'purchased', purchased: 'shipping', shipping: 'delivered' }[offer.request.status];
           return (
@@ -276,11 +303,29 @@ function OffersTable({ offers, role, busyId, onView, onEdit, onDelete, onRespond
                   <option value={offer.request.status}>{displayStatus(offer.request.status)}</option><option value={nextStatus}>{displayStatus(nextStatus)}</option>
                 </select>
                 : <StatusBadge>{role === 'provider' && offer.status === 'accepted' ? offer.request.status : offer.status}</StatusBadge>}</td>
-              <td><OfferActions offer={offer} role={role} busy={busyId === offer._id} onView={onView} onEdit={onEdit} onDelete={onDelete} onRespond={onRespond} onReconsider={onReconsider} onRemove={onRemove} onChat={onChat} /></td>
+              <td className="offer-actions-col"><OfferActions offer={offer} role={role} busy={busyId === offer._id} onView={onView} onEdit={onEdit} onDelete={onDelete} onRespond={onRespond} onReconsider={onReconsider} onRemove={onRemove} onChat={onChat} /></td>
             </tr>
           );
         })}</tbody>
       </table>
+    </div>
+  );
+}
+
+/** Shown to cargo providers instead of incoming requests until an admin approves their account. */
+function VerificationGate({ status = 'unverified', isCompany, country, onVerify }) {
+  const pending = status === 'pending';
+  const rejected = status === 'rejected';
+  return (
+    <div className={`verification-gate${pending ? ' pending' : ''}${rejected ? ' rejected' : ''}`} role="status">
+      <span className="verification-gate-icon" aria-hidden="true"><Icon name={pending ? 'clock' : 'shield'} size={26} /></span>
+      <strong>{pending ? 'Your verification is being reviewed' : rejected ? 'Your verification needs changes' : `Verify your ${isCompany ? 'company' : 'account'} to see requests`}</strong>
+      <p>
+        {pending
+          ? 'An administrator is checking your documents. Shipping requests will appear here as soon as your account is approved.'
+          : `Only verified cargo providers can see and quote on shipping requests${country ? ` from ${country}` : ''}. ${rejected ? 'Update your documents in Settings and resubmit.' : 'Upload your documents in Settings to get approved.'}`}
+      </p>
+      <button type="button" className="small-primary" onClick={onVerify}>{pending ? 'View status' : rejected ? 'Fix in Settings' : 'Verify now'}<Icon name="arrow" size={14} /></button>
     </div>
   );
 }
@@ -806,6 +851,11 @@ export default function DashboardWorkspace({ initialRole }) {
   // The server only sends providers requests shipped from their profile country;
   // the dashboard tabs then narrow that list by delivery method.
   const providerCountry = user?.country || '';
+  // Requests are only shown to approved providers (the server enforces this too).
+  const providerVerified = user?.verification?.status === 'approved';
+  const providerGate = providerMode && user && !providerVerified
+    ? <VerificationGate status={user.verification?.status} isCompany={user.role === 'cargo_provider'} country={providerCountry} onVerify={() => setSection('settings')} />
+    : null;
   const visibleProviderRequests = providerMethodFilter === 'all'
     ? requests
     : requests.filter((request) => request.deliveryMethod === providerMethodFilter);
@@ -1192,11 +1242,13 @@ export default function DashboardWorkspace({ initialRole }) {
     performMutation(id, () => updateShipmentStatus(id, status), `Shipment status changed to ${statusLabel(status)}.`);
   }
 
-  // Accepted offer → open the direct chat with the cargo provider who sent it.
+  // Accepted offer → open the direct chat with the other party
+  // (customers chat with the cargo provider, providers with the customer).
   function openChatWithProvider(offer) {
-    const providerId = String(offer.provider?._id || offer.provider?.id || '');
-    if (!providerId) return;
-    setChatContactId(providerId);
+    const other = providerMode ? offer.request?.customer : offer.provider;
+    const contactId = String(other?._id || other?.id || '');
+    if (!contactId) return;
+    setChatContactId(contactId);
     setSection('messages');
     setMobileNavOpen(false);
   }
@@ -1283,12 +1335,12 @@ export default function DashboardWorkspace({ initialRole }) {
     }
 
     if (section === 'opportunities') {
-      return <Card><CardHeading title={title} subtitle={`Requests shipped from ${providerCountry || 'your profile country'}. Send a real quote or decline requests you cannot fulfil.`} action={providerCountry ? <span className="provider-country-scope" title="Based on the country in your profile"><Icon name="globe" size={13} />{providerCountry}</span> : null} />{loading ? <p className="empty-table" role="status">Loading matching requests…</p> : renderRequests(requests)}</Card>;
+      return <Card><CardHeading title={title} subtitle={`Requests shipped from ${providerCountry || 'your profile country'}. Send a real quote or decline requests you cannot fulfil.`} action={providerCountry ? <span className="provider-country-scope" title="Based on the country in your profile"><Icon name="globe" size={13} />{providerCountry}</span> : null} />{providerGate || (loading ? <p className="empty-table" role="status">Loading matching requests…</p> : renderRequests(requests))}</Card>;
     }
 
     if (providerMode && section === 'orders') {
       const orders = offers.filter((offer) => offer.status === 'accepted');
-      return <Card><CardHeading title="Orders & shipping" subtitle="Accepted offers and their live shipment status." />{loading ? <p className="empty-table" role="status">Loading accepted orders…</p> : orders.length ? <OffersTable offers={orders} role="provider" busyId={busyId} onView={(offer) => setViewingOfferId(offer._id)} onEdit={(offer) => { setEditingOffer(offer); setOfferRequest(null); setFormError(''); }} onDelete={deleteCargoOffer} onStatusChange={handleStatusChange} /> : <div className="empty-state"><strong>No accepted orders yet</strong><p>When a customer accepts one of your offers, the order and shipping progress will appear here.</p><button className="small-primary" onClick={() => setSection('opportunities')}>Browse requests</button></div>}</Card>;
+      return <Card><CardHeading title="Orders & shipping" subtitle="Accepted offers and their live shipment status." />{loading ? <p className="empty-table" role="status">Loading accepted orders…</p> : orders.length ? <OffersTable offers={orders} role="provider" busyId={busyId} onView={(offer) => setViewingOfferId(offer._id)} onEdit={(offer) => { setEditingOffer(offer); setOfferRequest(null); setFormError(''); }} onDelete={deleteCargoOffer} onStatusChange={handleStatusChange} onChat={openChatWithProvider} /> : <div className="empty-state"><strong>No accepted orders yet</strong><p>When a customer accepts one of your offers, the order and shipping progress will appear here.</p><button className="small-primary" onClick={() => setSection('opportunities')}>Browse requests</button></div>}</Card>;
     }
 
     if (section === 'messages' && user && !adminMode) {
@@ -1453,8 +1505,8 @@ export default function DashboardWorkspace({ initialRole }) {
           </div>
           <div className="provider-dashboard-grid">
             <Card className="provider-requests-card">
-              <CardHeading title="New requests for you" subtitle={providerCountry ? <span className="provider-country-scope" title="Based on the country in your profile"><Icon name="globe" size={13} />Shipping from {providerCountry}</span> : null} action={<div className="provider-request-filters" role="group" aria-label="Filter by delivery method">{[['all', 'All'], ...Object.entries(DELIVERY_METHODS).map(([value, info]) => [value, info.short])].map(([value, label]) => <button type="button" className={providerMethodFilter === value ? 'active' : ''} aria-pressed={providerMethodFilter === value} key={value} onClick={() => setProviderMethodFilter(value)}>{label}</button>)}</div>} />
-              {loading ? <p className="empty-table" role="status">Loading opportunities…</p> : visibleProviderRequests.length ? <div className="provider-request-list">{visibleProviderRequests.slice(0, 8).map((request) => {
+              <CardHeading title="New requests for you" subtitle={providerCountry ? <span className="provider-country-scope" title="Based on the country in your profile"><Icon name="globe" size={13} />Shipping from {providerCountry}</span> : null} action={providerGate ? null : <div className="provider-request-filters" role="group" aria-label="Filter by delivery method">{[['all', 'All'], ...Object.entries(DELIVERY_METHODS).map(([value, info]) => [value, info.short])].map(([value, label]) => <button type="button" className={providerMethodFilter === value ? 'active' : ''} aria-pressed={providerMethodFilter === value} key={value} onClick={() => setProviderMethodFilter(value)}>{label}</button>)}</div>} />
+              {providerGate ? providerGate : loading ? <p className="empty-table" role="status">Loading opportunities…</p> : visibleProviderRequests.length ? <div className="provider-request-list">{visibleProviderRequests.slice(0, 8).map((request) => {
                 const age = Math.max(0, dashboardLoadedAt - new Date(request.createdAt || 0).getTime());
                 const timeLabel = age < 60 * 60 * 1000 ? `${Math.max(1, Math.floor(age / 60000))} min ago` : age < 24 * 60 * 60 * 1000 ? `${Math.floor(age / (60 * 60 * 1000))} hr ago` : new Date(request.createdAt).toLocaleDateString();
                 return <div className="provider-request-row" key={request._id}>
