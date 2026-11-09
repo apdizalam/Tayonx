@@ -217,6 +217,7 @@ router.get('/offers', async (req, res) => {
           status: request.status,
           customer: request.customer,
           targetProvider: request.targetProvider || null,
+          statusHistory: (request.statusHistory || []).map(({ status: stage, at }) => ({ status: stage, at })),
         },
       })));
     return res.json({ offers });
@@ -463,6 +464,7 @@ router.patch('/offers/:offerId/status', requireRole('customer'), async (req, res
         item.status = item.id === offer.id ? 'accepted' : 'declined';
       });
       request.status = 'in_progress';
+      request.statusHistory.push({ status: 'in_progress', at: new Date(), by: req.user._id });
     } else {
       offer.status = 'declined';
       request.status = request.offers.some((item) => item.status === 'pending') ? 'offers_received' : 'open';
@@ -488,19 +490,29 @@ router.patch('/:id/status', async (req, res) => {
     if (req.user.role === 'customer' && !isOwner) return res.status(403).json({ error: 'Only the request owner can update this shipment.' });
     if (isCargoProvider(req.user) && !assignedProvider) return res.status(403).json({ error: 'Only the selected cargo provider can update this shipment.' });
 
+    // Shipment lifecycle: In progress → Purchased → In transit ("shipping") → Delivered.
+    // A shipment can move forward to any later stage (e.g. straight to Delivered) but never
+    // back. Delivered and cancelled are final. Admins can still set any status.
     const transitions = {
       open: ['cancelled'],
       offers_received: ['cancelled'],
-      in_progress: ['purchased', 'cancelled'],
-      purchased: ['shipping'],
+      in_progress: ['purchased', 'shipping', 'delivered', 'cancelled'],
+      purchased: ['shipping', 'delivered'],
       shipping: ['delivered'],
       delivered: [],
       cancelled: [],
     };
+    if (status === request.status) return res.json({ request });
     if (req.user.role !== 'admin' && !transitions[request.status].includes(status)) {
-      return res.status(409).json({ error: `Cannot change shipment from ${request.status} to ${status}.` });
+      const final = ['delivered', 'cancelled'].includes(request.status);
+      return res.status(409).json({
+        error: final
+          ? `This shipment is already ${request.status} and can no longer change.`
+          : `Cannot change shipment from ${request.status} to ${status}.`,
+      });
     }
     request.status = status;
+    request.statusHistory.push({ status, at: new Date(), by: req.user._id });
     await request.save();
     return res.json({ request });
   } catch (error) {
