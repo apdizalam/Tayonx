@@ -9,8 +9,10 @@ import AccountFields from './AccountFields.jsx';
 import AdminVerifications from './AdminVerifications.jsx';
 import VerificationCenter from './VerificationCenter.jsx';
 import { ProtectedAvatar } from './ProtectedFile.jsx';
+import FilePicker from './FilePicker.jsx';
 import { createChatSocket } from '../socket.js';
-import { ACCOUNT_TYPES, ROLE_LABELS, VERIFICATION_LABELS, cleanText, normalizePhone, validateAccount } from '../lib/accountFields.js';
+import { useFileUrl } from '../lib/useFileUrl.js';
+import { ACCOUNT_TYPES, IMAGE_TYPES, ROLE_LABELS, VERIFICATION_LABELS, cleanText, normalizePhone, validateAccount, validateFile } from '../lib/accountFields.js';
 import { calculateOfferPrice, formatUsd, offerBreakdown, parseQuantity, quantityUnitLabel, roundMoney } from '../lib/offerPricing.js';
 import {
   apiRequest,
@@ -100,6 +102,28 @@ function StatusBadge({ children }) {
   return <span className={`status-badge status-${statusLabel(children).toLowerCase().replaceAll(' ', '-')}`}>{statusLabel(children)}</span>;
 }
 
+const DELIVERY_METHODS = {
+  sea: { label: 'Ship (Maritime)', short: 'Sea', icon: 'ship' },
+  air: { label: 'Aircraft (Air freight)', short: 'Air', icon: 'plane' },
+};
+
+/** "Ship (Maritime)" / "Aircraft (Air freight)" chip; nothing for older requests without a method. */
+function DeliveryMethodChip({ method, compact = false }) {
+  const info = DELIVERY_METHODS[method];
+  if (!info) return null;
+  return <span className={`delivery-method-chip delivery-${method}`} title={info.label}><Icon name={info.icon} size={13} />{compact ? info.short : info.label}</span>;
+}
+
+/** Product photo of a request (protected upload), or a box icon when there is none. */
+function RequestThumb({ photoId, product = '', size = 'md', icon = 'box' }) {
+  const { url } = useFileUrl(photoId);
+  return (
+    <span className={`request-thumb request-thumb-${size}${url ? ' has-photo' : ''}`}>
+      {url ? <img src={url} alt={product ? `Photo of ${product}` : 'Product photo'} /> : <Icon name={icon} size={size === 'sm' ? 15 : 18} />}
+    </span>
+  );
+}
+
 function userRoleLabel(role) {
   return ROLE_LABELS[role] || role;
 }
@@ -143,7 +167,7 @@ function RequestTable({ requests, role, search, busyId, onEdit, onDelete, onSele
             const canEdit = role === 'admin' || role === 'customer';
             return (
               <tr key={request._id}>
-                <td><span className="table-primary">{request.product} · {request.quantity}</span><span className="table-secondary">{request._id}</span></td>
+                <td><span className="request-cell"><RequestThumb photoId={request.productPhoto} product={request.product} size="sm" /><span><span className="table-primary">{request.product} · {request.quantity}</span><span className="table-secondary">{request._id}</span><DeliveryMethodChip method={request.deliveryMethod} compact /></span></span></td>
                 <td>{request.sourceCountry} → {request.destination}</td>
                 <td>{new Date(request.createdAt).toLocaleDateString()}</td>
                 <td>{role === 'customer' && request.offers?.length
@@ -177,7 +201,7 @@ function RequestTable({ requests, role, search, busyId, onEdit, onDelete, onSele
   );
 }
 
-function OffersTable({ offers, role, busyId, onEdit, onDelete, onRespond, onStatusChange }) {
+function OffersTable({ offers, role, busyId, onEdit, onDelete, onRespond, onStatusChange, onChat }) {
   if (!offers.length) {
     return <p className="empty-table">{role === 'customer' ? 'No offers have been submitted for your requests.' : 'You have not sent any offers yet.'}</p>;
   }
@@ -190,7 +214,7 @@ function OffersTable({ offers, role, busyId, onEdit, onDelete, onRespond, onStat
           const nextStatus = { in_progress: 'purchased', purchased: 'shipping', shipping: 'delivered' }[offer.request.status];
           return (
             <tr key={offer._id}>
-              <td><span className="table-primary">{offer.request.product}</span><span className="table-secondary">{offer.request.id}</span></td>
+              <td><span className="request-cell"><RequestThumb photoId={offer.request.productPhoto} product={offer.request.product} size="sm" /><span><span className="table-primary">{offer.request.product}</span><span className="table-secondary">{offer.request.quantity}</span><DeliveryMethodChip method={offer.request.deliveryMethod} compact /></span></span></td>
               <td>{role === 'customer' || role === 'admin' ? offer.provider?.name || 'Cargo provider' : offer.request.customer?.name || 'Customer'}</td>
               <td><OfferPriceBreakdown offer={offer} /></td>
               <td>{offer.deliveryDays} days</td>
@@ -208,11 +232,28 @@ function OffersTable({ offers, role, busyId, onEdit, onDelete, onRespond, onStat
                   <button className="reject-button" disabled={busyId === offer._id} onClick={() => onRespond(offer, 'declined')}>Decline</button>
                   <button className="approve-button" disabled={busyId === offer._id} onClick={() => onRespond(offer, 'accepted')}>Accept</button>
                 </>}
+                {role === 'customer' && offer.status === 'accepted' && onChat && offer.provider && (
+                  <button type="button" className="offer-chat-button" onClick={() => onChat(offer)} aria-label={`Chat with ${offer.provider.name || 'the cargo provider'} about ${offer.request.product}`} title={`Chat with ${offer.provider.name || 'the cargo provider'}`}>
+                    <Icon name="chat" size={15} />Chat
+                  </button>
+                )}
               </div></td>
             </tr>
           );
         })}</tbody>
       </table>
+    </div>
+  );
+}
+
+/** The request's current product photo in the edit form, with a remove/undo toggle. */
+function CurrentProductPhoto({ photoId, product, removed, onToggle }) {
+  const { url } = useFileUrl(removed ? null : photoId);
+  return (
+    <div className={`current-product-photo${removed ? ' removed' : ''}`}>
+      <span className="request-thumb request-thumb-lg">{url ? <img src={url} alt={`Current photo of ${product}`} /> : <Icon name="image" size={20} />}</span>
+      <span><strong>{removed ? 'Photo will be removed' : 'Current photo'}</strong><small>{removed ? 'Save to remove it, or undo.' : 'Upload a new photo below to replace it.'}</small></span>
+      <button type="button" className="text-button" onClick={onToggle}>{removed ? 'Undo' : 'Remove'}</button>
     </div>
   );
 }
@@ -223,35 +264,80 @@ function RequestForm({ request, saving, error, onSubmit, onClose }) {
     sourceCountry: request?.sourceCountry || 'China',
     destination: request?.destination || '',
     quantity: request?.quantity || '',
+    deliveryMethod: request?.deliveryMethod || '',
     details: request?.details || '',
   });
-  const [quantityError, setQuantityError] = useState('');
+  const [photo, setPhoto] = useState(null);
+  const [removePhoto, setRemovePhoto] = useState(false);
+  const [errors, setErrors] = useState({});
+
   function change(event) {
-    setValues((current) => ({ ...current, [event.target.name]: event.target.value }));
-    if (event.target.name === 'quantity') setQuantityError('');
+    const { name, value } = event.target;
+    setValues((current) => ({ ...current, [name]: value }));
+    setErrors((current) => ({ ...current, [name]: '' }));
   }
 
   function handleSubmit(event) {
     event.preventDefault();
+    const next = {};
     // Providers price offers per item, so the quantity needs a whole number.
-    if (!parseQuantity(values.quantity)) {
-      setQuantityError('Include a whole number, e.g. “50 laptops”.');
-      document.getElementById('request-quantity')?.focus();
+    if (!parseQuantity(values.quantity)) next.quantity = 'Include a whole number, e.g. “50 laptops”.';
+    if (!DELIVERY_METHODS[values.deliveryMethod]) next.deliveryMethod = 'Choose how the item should be shipped.';
+    const photoError = validateFile(photo, IMAGE_TYPES);
+    if (photoError) next.productPhoto = photoError;
+    setErrors(next);
+    const firstInvalid = Object.keys(next)[0];
+    if (firstInvalid) {
+      document.getElementById(`request-${firstInvalid}`)?.focus();
       return;
     }
-    onSubmit(values);
+
+    // Multipart so the optional product photo can be uploaded with the request.
+    const body = new FormData();
+    for (const [key, value] of Object.entries(values)) body.append(key, value.trim());
+    if (photo) body.append('productPhoto', photo);
+    else if (removePhoto) body.append('removeProductPhoto', 'true');
+    onSubmit(body);
   }
+
+  const fieldError = (name) => errors[name] && <span className="offer-field-error" id={`request-${name}-error`} role="alert">{errors[name]}</span>;
 
   return (
     <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-      <form className="request-modal" onSubmit={handleSubmit}>
+      <form className="request-modal shipping-request-modal" onSubmit={handleSubmit} noValidate>
         <div className="modal-heading"><div><p className="eyebrow">{request ? 'EDIT SHIPPING REQUEST' : 'NEW SHIPPING REQUEST'}</p><h2>{request ? 'Update your request' : 'What are you looking for?'}</h2></div><button type="button" className="icon-button" aria-label="Close dialog" onClick={onClose}><Icon name="close" /></button></div>
         <label>Product or item<input name="product" value={values.product} onChange={change} maxLength="160" required placeholder="e.g. 50 business laptops" /></label>
         <div className="form-row"><label>Source country<select name="sourceCountry" value={values.sourceCountry} onChange={change}><option>China</option><option>Turkey</option><option>Other</option></select></label><label>Delivery to<input name="destination" value={values.destination} onChange={change} maxLength="160" required placeholder="City, country" /></label></div>
-        <label>Quantity<input id="request-quantity" name="quantity" value={values.quantity} onChange={change} maxLength="100" required placeholder="e.g. 50 laptops" aria-invalid={Boolean(quantityError)} aria-describedby="request-quantity-help" />
-          <small id="request-quantity-help" className="offer-field-help">Number of items, e.g. “50 laptops” — cargo providers quote a price per item.</small>
-          {quantityError && <span className="offer-field-error" role="alert">{quantityError}</span>}
-        </label>
+        <div className="form-row">
+          <label>Quantity<input id="request-quantity" name="quantity" value={values.quantity} onChange={change} maxLength="100" required placeholder="e.g. 50 laptops" aria-invalid={Boolean(errors.quantity)} aria-describedby="request-quantity-help" />
+            <small id="request-quantity-help" className="offer-field-help">Number of items — providers quote a price per item.</small>
+            {fieldError('quantity')}
+          </label>
+          <label>Delivery method
+            <select id="request-deliveryMethod" name="deliveryMethod" value={values.deliveryMethod} onChange={change} required aria-invalid={Boolean(errors.deliveryMethod)} aria-describedby={errors.deliveryMethod ? 'request-deliveryMethod-error' : 'request-deliveryMethod-help'}>
+              <option value="" disabled>Choose a method</option>
+              {Object.entries(DELIVERY_METHODS).map(([value, info]) => <option key={value} value={value}>{info.label}</option>)}
+            </select>
+            <small id="request-deliveryMethod-help" className="offer-field-help">{values.deliveryMethod === 'air' ? 'Faster, usually more expensive.' : values.deliveryMethod === 'sea' ? 'Slower, best for large or heavy orders.' : 'How the cargo should travel.'}</small>
+            {fieldError('deliveryMethod')}
+          </label>
+        </div>
+
+        <div className="request-photo-field">
+          {request?.productPhoto && !photo && (
+            <CurrentProductPhoto photoId={request.productPhoto} product={request.product} removed={removePhoto} onToggle={() => setRemovePhoto((current) => !current)} />
+          )}
+          <FilePicker
+            id="request-productPhoto"
+            label={request?.productPhoto ? 'Replace product photo' : 'Product photo (optional)'}
+            hint="JPG, PNG or WebP · max 5 MB"
+            accept="image/jpeg,image/png,image/webp"
+            file={photo}
+            error={errors.productPhoto}
+            onChange={(file) => { setPhoto(file); setErrors((current) => ({ ...current, productPhoto: '' })); }}
+          />
+        </div>
+
         <label>Additional details<textarea name="details" value={values.details} onChange={change} maxLength="2000" rows="3" /></label>
         {error && <p className="signin-message" role="alert">{error}</p>}
         <button className="primary-button full-button" disabled={saving} type="submit">{saving ? 'Saving…' : request ? 'Save changes' : 'Post request'}</button>
@@ -349,7 +435,13 @@ function OfferForm({ request, offer, saving, error, onSubmit, onClose }) {
   return (
     <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
       <form className="request-modal offer-modal" onSubmit={handleSubmit} noValidate>
-        <div className="modal-heading"><div><p className="eyebrow">{offer ? 'UPDATE OFFER' : 'SEND OFFER'}</p><h2>{request?.product || offer?.request?.product}</h2></div><button type="button" className="icon-button" aria-label="Close dialog" onClick={onClose}><Icon name="close" /></button></div>
+        <div className="modal-heading offer-modal-heading">
+          <div className="offer-request-summary">
+            <RequestThumb photoId={(request || offer?.request)?.productPhoto} product={request?.product || offer?.request?.product} size="lg" />
+            <div><p className="eyebrow">{offer ? 'UPDATE OFFER' : 'SEND OFFER'}</p><h2>{request?.product || offer?.request?.product}</h2><DeliveryMethodChip method={(request || offer?.request)?.deliveryMethod} /></div>
+          </div>
+          <button type="button" className="icon-button" aria-label="Close dialog" onClick={onClose}><Icon name="close" /></button>
+        </div>
 
         {!count ? (
           <div className="offer-blocked" role="alert">
@@ -535,6 +627,8 @@ export default function DashboardWorkspace({ initialRole }) {
   const [editingOffer, setEditingOffer] = useState(null);
   const [formError, setFormError] = useState('');
   const [selectedRequestId, setSelectedRequestId] = useState('');
+  // Conversation to open when going to Chat from an accepted offer.
+  const [chatContactId, setChatContactId] = useState('');
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [userModalOpen, setUserModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
@@ -916,6 +1010,15 @@ export default function DashboardWorkspace({ initialRole }) {
     performMutation(id, () => updateShipmentStatus(id, status), `Shipment status changed to ${statusLabel(status)}.`);
   }
 
+  // Accepted offer → open the direct chat with the cargo provider who sent it.
+  function openChatWithProvider(offer) {
+    const providerId = String(offer.provider?._id || offer.provider?.id || '');
+    if (!providerId) return;
+    setChatContactId(providerId);
+    setSection('messages');
+    setMobileNavOpen(false);
+  }
+
   function handleOfferResponse(offer, status) {
     performMutation(offer._id, () => respondToOffer(offer._id, status), status === 'accepted'
       ? 'Offer accepted. The shipment is now in progress.'
@@ -976,6 +1079,7 @@ export default function DashboardWorkspace({ initialRole }) {
         onDelete={deleteCargoOffer}
         onRespond={handleOfferResponse}
         onStatusChange={handleStatusChange}
+        onChat={openChatWithProvider}
       />}</Card>;
     }
 
@@ -989,7 +1093,7 @@ export default function DashboardWorkspace({ initialRole }) {
     }
 
     if (section === 'messages' && user && !adminMode) {
-      return <Card className="messages-card live-chat-card"><Chat user={user} /></Card>;
+      return <Card className="messages-card live-chat-card"><Chat key={chatContactId || 'chat'} user={user} initialContactId={chatContactId} /></Card>;
     }
 
     if (providerMode && section === 'settings') {
@@ -1092,8 +1196,8 @@ export default function DashboardWorkspace({ initialRole }) {
                 {recentRequests.map((request) => {
                   const tone = request.status === 'delivered' ? 'success' : ['open', 'offers_received'].includes(request.status) ? 'info' : 'warning';
                   return <div className="customer-request-row" key={request._id}>
-                    <span className="customer-request-icon"><Icon name="box" size={18} /></span>
-                    <span className="customer-row-copy"><strong>{request.product}</strong><small>{request.quantity} · {request.sourceCountry} to {request.destination}</small><small>{request.offers?.length || 0} quote{request.offers?.length === 1 ? '' : 's'}</small></span>
+                    <RequestThumb photoId={request.productPhoto} product={request.product} />
+                    <span className="customer-row-copy"><strong>{request.product}</strong><small>{request.quantity} · {request.sourceCountry} to {request.destination}</small><small className="request-row-meta">{request.offers?.length || 0} quote{request.offers?.length === 1 ? '' : 's'}<DeliveryMethodChip method={request.deliveryMethod} compact /></small></span>
                     <span className={`customer-status customer-status-${tone}`}>{statusLabel(request.status)}</span>
                     <span className="customer-row-actions">
                       <button className="icon-button table-action" aria-label={`Edit ${request.product}`} onClick={() => { setEditingRequest(request); setRequestModalOpen(true); setFormError(''); }}><Icon name="edit" size={15} /></button>
@@ -1155,11 +1259,11 @@ export default function DashboardWorkspace({ initialRole }) {
                 const age = Math.max(0, dashboardLoadedAt - new Date(request.createdAt || 0).getTime());
                 const timeLabel = age < 60 * 60 * 1000 ? `${Math.max(1, Math.floor(age / 60000))} min ago` : age < 24 * 60 * 60 * 1000 ? `${Math.floor(age / (60 * 60 * 1000))} hr ago` : new Date(request.createdAt).toLocaleDateString();
                 return <div className="provider-request-row" key={request._id}>
-                  <span className="provider-request-icon"><Icon name="laptop" size={18} /></span>
+                  <RequestThumb photoId={request.productPhoto} product={request.product} icon="laptop" />
                   <div className="provider-request-info">
                     <span className="provider-request-title"><strong>{request.product} · {request.quantity}</strong>{age < 24 * 60 * 60 * 1000 && <span>New</span>}</span>
                     <small>{request.details || `${request.sourceCountry} to ${request.destination}`}</small>
-                    <span className="provider-request-meta"><span><b>{request.sourceCountry.slice(0, 2).toUpperCase()}</b>{request.destination}</span><small>{timeLabel}</small></span>
+                    <span className="provider-request-meta"><span><b>{request.sourceCountry.slice(0, 2).toUpperCase()}</b>{request.destination}</span><DeliveryMethodChip method={request.deliveryMethod} /><small>{timeLabel}</small></span>
                   </div>
                   <div className="provider-request-actions"><button className="customer-outline-button" disabled={busyId === request._id} onClick={() => handleDeclineRequest(request._id)}>Decline</button><button className="small-primary" disabled={busyId === request._id} onClick={() => { setOfferRequest(request); setEditingOffer(null); setFormError(''); }}>Send offer</button></div>
                 </div>;
@@ -1257,6 +1361,7 @@ export default function DashboardWorkspace({ initialRole }) {
                 setSection(sectionId);
                 setSearch('');
                 setSelectedRequestId('');
+                setChatContactId('');
                 setMobileNavOpen(false);
               }}>
                 <Icon name={icon} size={16} /><span>{label}</span>
