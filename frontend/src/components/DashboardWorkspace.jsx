@@ -86,6 +86,12 @@ function statusLabel(status) {
   return status.replaceAll('_', ' ');
 }
 
+/** Visible status text, e.g. "offers_received" -> "Offers received" (presentation only). */
+function displayStatus(status) {
+  const label = statusLabel(String(status || ''));
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
+
 function formatRelativeTime(value, referenceTime) {
   const timestamp = new Date(value || 0).getTime();
   if (!Number.isFinite(timestamp) || timestamp <= 0) return 'Date unavailable';
@@ -99,7 +105,7 @@ function formatRelativeTime(value, referenceTime) {
 }
 
 function StatusBadge({ children }) {
-  return <span className={`status-badge status-${statusLabel(children).toLowerCase().replaceAll(' ', '-')}`}>{statusLabel(children)}</span>;
+  return <span className={`status-badge status-${statusLabel(children).toLowerCase().replaceAll(' ', '-')}`}>{displayStatus(children)}</span>;
 }
 
 const DELIVERY_METHODS = {
@@ -175,10 +181,10 @@ function RequestTable({ requests, role, search, busyId, onEdit, onDelete, onSele
                   : request.offers?.length || '—'}</td>
                 <td>
                   {role === 'admin' && <select aria-label={`Update status for ${request.product}`} value={request.status} disabled={busyId === request._id} onChange={(event) => onStatusChange(request._id, event.target.value)}>
-                    {shipmentStatuses.map((status) => <option value={status} key={status}>{statusLabel(status)}</option>)}
+                    {shipmentStatuses.map((status) => <option value={status} key={status}>{displayStatus(status)}</option>)}
                   </select>}
                   {role === 'customer' && (canCancel || canComplete) && <select aria-label={`Update status for ${request.product}`} value={request.status} disabled={busyId === request._id} onChange={(event) => onStatusChange(request._id, event.target.value)}>
-                    <option value={request.status}>{statusLabel(request.status)}</option>
+                    <option value={request.status}>{displayStatus(request.status)}</option>
                     <option value={canComplete ? 'delivered' : 'cancelled'}>{canComplete ? 'Mark delivered' : 'Cancel request'}</option>
                   </select>}
                   {role !== 'admin' && role !== 'customer' || (!canCancel && !canComplete && role === 'customer')
@@ -220,7 +226,7 @@ function OffersTable({ offers, role, busyId, onEdit, onDelete, onRespond, onStat
               <td>{offer.deliveryDays} days</td>
               <td>{role === 'provider' && offer.status === 'accepted' && nextStatus
                 ? <select aria-label="Update shipment progress" value={offer.request.status} disabled={busyId === offer.request.id} onChange={(event) => onStatusChange(offer.request.id, event.target.value)}>
-                  <option value={offer.request.status}>{statusLabel(offer.request.status)}</option><option value={nextStatus}>{statusLabel(nextStatus)}</option>
+                  <option value={offer.request.status}>{displayStatus(offer.request.status)}</option><option value={nextStatus}>{displayStatus(nextStatus)}</option>
                 </select>
                 : <StatusBadge>{role === 'provider' && offer.status === 'accepted' ? offer.request.status : offer.status}</StatusBadge>}</td>
               <td><div className="table-buttons">
@@ -1148,7 +1154,7 @@ export default function DashboardWorkspace({ initialRole }) {
         <article className="admin-kpi admin-kpi-blue"><span className="admin-kpi-icon"><Icon name="mail" size={16} /></span><span className="admin-kpi-content"><strong>{loading ? '—' : adminOffers.length}</strong><span>Offers submitted</span><small>Selected period</small></span></article>
         <article className="admin-kpi admin-kpi-amber"><span className="admin-kpi-icon"><Icon name="clock" size={16} /></span><span className="admin-kpi-content"><strong>{loading ? '—' : adminPendingOffers.length}</strong><span>Awaiting response</span><small>Live database total</small></span></article>
       </div><div className="admin-insights-grid">
-        <Card className="admin-insight-card"><CardHeading title="Requests by status" /><div className="admin-source-content">{adminRequestStatusCounts.filter((item) => item.count > 0).map((item) => <div className="admin-source-item" key={item.status}><span>{statusLabel(item.status)}</span><strong>{item.count}</strong><i><b style={{ width: `${adminRequests.length ? (item.count / adminRequests.length) * 100 : 0}%` }} /></i></div>)}{!adminRequests.length && <p>No request activity recorded in this period.</p>}</div></Card>
+        <Card className="admin-insight-card"><CardHeading title="Requests by status" /><div className="admin-source-content">{adminRequestStatusCounts.filter((item) => item.count > 0).map((item) => <div className="admin-source-item" key={item.status}><span>{displayStatus(item.status)}</span><strong>{item.count}</strong><i><b style={{ width: `${adminRequests.length ? (item.count / adminRequests.length) * 100 : 0}%` }} /></i></div>)}{!adminRequests.length && <p>No request activity recorded in this period.</p>}</div></Card>
         <Card className="admin-insight-card"><CardHeading title="Requests by source" /><div className="admin-source-content">{adminSourceCountries.map((country) => { const count = adminRequests.filter((request) => request.sourceCountry === country).length; return <div className="admin-source-item" key={country}><span>{country}</span><strong>{adminRequests.length ? `${Math.round((count / adminRequests.length) * 100)}%` : '0%'}</strong><i><b style={{ width: `${adminRequests.length ? (count / adminRequests.length) * 100 : 0}%` }} /></i></div>; })}{!adminSourceCountries.length && <p>No source country data in this period.</p>}</div></Card>
         <Card className="admin-insight-card"><CardHeading title="Offer funnel" /><div className="admin-source-content"><div className="admin-source-item"><span>Requests with offers</span><strong>{adminRequests.filter((request) => request.offers?.length).length}</strong><i><b style={{ width: `${adminRequests.length ? (adminRequests.filter((request) => request.offers?.length).length / adminRequests.length) * 100 : 0}%` }} /></i></div><div className="admin-source-item"><span>Offers accepted</span><strong>{adminOffers.filter((offer) => offer.status === 'accepted').length}</strong><i><b style={{ width: `${adminOffers.length ? (adminOffers.filter((offer) => offer.status === 'accepted').length / adminOffers.length) * 100 : 0}%` }} /></i></div><div className="admin-source-item"><span>Delivered</span><strong>{adminRequestStatusCounts.find((item) => item.status === 'delivered')?.count || 0}</strong></div></div></Card>
       </div></div>;
@@ -1198,7 +1204,7 @@ export default function DashboardWorkspace({ initialRole }) {
                   return <div className="customer-request-row" key={request._id}>
                     <RequestThumb photoId={request.productPhoto} product={request.product} />
                     <span className="customer-row-copy"><strong>{request.product}</strong><small>{request.quantity} · {request.sourceCountry} to {request.destination}</small><small className="request-row-meta">{request.offers?.length || 0} quote{request.offers?.length === 1 ? '' : 's'}<DeliveryMethodChip method={request.deliveryMethod} compact /></small></span>
-                    <span className={`customer-status customer-status-${tone}`}>{statusLabel(request.status)}</span>
+                    <span className={`customer-status customer-status-${tone}`}>{displayStatus(request.status)}</span>
                     <span className="customer-row-actions">
                       <button className="icon-button table-action" aria-label={`Edit ${request.product}`} onClick={() => { setEditingRequest(request); setRequestModalOpen(true); setFormError(''); }}><Icon name="edit" size={15} /></button>
                       <button className="icon-button table-action" aria-label={`Delete ${request.product}`} disabled={busyId === request._id} onClick={() => deleteShippingRequest(request)}><Icon name="trash" size={15} /></button>
@@ -1213,7 +1219,7 @@ export default function DashboardWorkspace({ initialRole }) {
                 const stageIndex = { in_progress: 0, purchased: 1, shipping: 2, delivered: 3 }[request.status] ?? 0;
                 const stages = ['Offer accepted', 'Item purchased', 'In transit', 'Delivered'];
                 return <section className="customer-tracking-item" key={request._id}>
-                  <div className="customer-tracking-heading"><span><strong>{request.product}</strong><small>{request.destination} · {statusLabel(request.status)}</small></span><span className="customer-row-actions">
+                  <div className="customer-tracking-heading"><span><strong>{request.product}</strong><small>{request.destination} · {displayStatus(request.status)}</small></span><span className="customer-row-actions">
                     <button className="icon-button table-action" aria-label={`Edit ${request.product}`} onClick={() => { setEditingRequest(request); setRequestModalOpen(true); setFormError(''); }}><Icon name="edit" size={15} /></button>
                     <button className="icon-button table-action" aria-label={`Delete ${request.product}`} disabled={busyId === request._id} onClick={() => deleteShippingRequest(request)}><Icon name="trash" size={15} /></button>
                   </span></div>

@@ -1,0 +1,1860 @@
+/*
+ * Tayonx design system theme
+ * --------------------------------------------------------------------------
+ * Visual layer only, based on the Tayonx UI design (Tayonx-UI-Design).
+ * Loaded last (see main.jsx) so it restyles App.css, dashboard-sizing.css and
+ * account-forms.css without touching any component logic.
+ *
+ * Fonts:   Manrope (body), Space Grotesk (headings & numbers), JetBrains Mono (labels)
+ * Palette: navy / blue / emerald / amber / red scales from the design tokens
+ */
+
+/* ========================================================================
+   1. Design tokens
+   ======================================================================== */
+
+:root {
+  --navy-50: #f2f5fa;
+  --navy-100: #e3e9f4;
+  --navy-200: #c5d1e5;
+  --navy-300: #9dafcc;
+  --navy-400: #6f86ab;
+  --navy-500: #4a6390;
+  --navy-600: #304a75;
+  --navy-700: #1b3358;
+  --navy-800: #11264a;
+  --navy-900: #0a1a33;
+
+  --blue-50: #f0f5ff;
+  --blue-100: #e5eeff;
+  --blue-200: #c7d9ff;
+  --blue-300: #9cbeff;
+  --blue-500: #1f6bff;
+  --blue-600: #1559e0;
+  --blue-700: #1047b5;
+
+  --neutral-0: #ffffff;
+  --neutral-50: #f4f7fc;
+  --neutral-100: #e9eef7;
+  --neutral-200: #d5ddea;
+  --neutral-300: #b8c3d6;
+  --neutral-400: #7d8ba5;
+  --neutral-500: #5f6e89;
+  --neutral-600: #4a5a75;
+  --neutral-700: #36445c;
+
+  --emerald-100: #ddf7ec;
+  --emerald-400: #34d399;
+  --emerald-500: #10b981;
+  --emerald-700: #047857;
+  --emerald-800: #065f46;
+  --amber-50: #fffaeb;
+  --amber-100: #fef3dc;
+  --amber-700: #a15c07;
+  --amber-800: #7a450a;
+  --red-50: #fff3f1;
+  --red-100: #fde8e6;
+  --red-600: #da2a1f;
+  --red-700: #b42318;
+  --red-800: #912018;
+
+  --surface: var(--neutral-50);
+  --surface-raised: #ffffff;
+  --surface-sunken: var(--neutral-100);
+  --border: var(--neutral-200);
+  --border-strong: var(--neutral-400);
+  --ink: var(--navy-900);
+  --ink-muted: var(--neutral-600);
+  --accent: var(--blue-500);
+  --accent-hover: var(--blue-600);
+  --accent-active: var(--blue-700);
+  --accent-soft: var(--blue-100);
+  --accent-text: var(--blue-600);
+  --focus-ring: var(--blue-500);
+
+  --radius-xs: 2px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+  --radius-xl: 16px;
+  --radius-pill: 999px;
+
+  --shadow-sm: 0 1px 2px rgba(10, 26, 51, 0.08);
+  --shadow-md: 0 4px 12px rgba(10, 26, 51, 0.08), 0 1px 3px rgba(10, 26, 51, 0.06);
+  --shadow-lg: 0 16px 40px rgba(10, 26, 51, 0.14);
+
+  --font-sans: "Manrope", "Segoe UI", system-ui, sans-serif;
+  --font-display: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  --ease-out: cubic-bezier(0.2, 0, 0, 1);
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+
+  font-family: var(--font-sans);
+  color: var(--ink);
+  background: var(--surface);
+}
+
+/* The app shell re-declares a few legacy variables; point them at the tokens. */
+.app-shell {
+  --navy: var(--navy-900);
+  --navy-raised: var(--navy-800);
+  --ink: var(--navy-900);
+  --muted: var(--ink-muted);
+  --surface: var(--neutral-50);
+  --white: #ffffff;
+  --border: var(--neutral-200);
+  --accent: var(--blue-500);
+  --accent-dark: var(--blue-600);
+  --topbar-height: 68px;
+
+  background: var(--surface);
+  font-family: var(--font-sans);
+}
+
+/* ========================================================================
+   2. Base
+   ======================================================================== */
+
+body {
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: var(--font-sans);
+}
+
+:where(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: var(--blue-200);
+}
+
+/* ========================================================================
+   3. Sidebar
+   ======================================================================== */
+
+.app-shell .sidebar {
+  background: var(--navy-900);
+  color: var(--navy-200);
+  box-shadow: none;
+}
+
+@media (min-width: 681px) {
+  .app-shell .sidebar {
+    padding: 0 14px 20px;
+  }
+
+  .app-shell .sidebar-brand {
+    height: var(--topbar-height);
+    margin: 0 -14px 14px;
+    padding: 0 22px;
+    border-bottom: 0;
+  }
+}
+
+.app-shell .sidebar-brand img {
+  height: 26px;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  background: #ffffff;
+}
+
+.app-shell .workspace-role-picker .customer-role-label {
+  display: inline-flex;
+  height: 24px;
+  align-items: center;
+  margin: 0 12px 12px;
+  padding: 0 10px;
+  border-radius: var(--radius-sm);
+  color: var(--navy-200);
+  background: rgba(255, 255, 255, 0.08);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+}
+
+.app-shell .side-nav {
+  gap: 4px;
+}
+
+.app-shell .sidebar .nav-item {
+  min-height: 42px;
+  gap: 12px;
+  padding: 0 12px;
+  border-radius: var(--radius-md);
+  color: var(--navy-200);
+  font-size: 14px;
+  font-weight: 600;
+  transition: background var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out);
+}
+
+.app-shell .sidebar .nav-item:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.app-shell .sidebar .nav-item.active {
+  color: #ffffff;
+  background: var(--blue-500);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  font-weight: 700;
+}
+
+.app-shell .sidebar .nav-item .icon {
+  width: 20px;
+  height: 20px;
+}
+
+.app-shell .sidebar .nav-count {
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: var(--radius-pill);
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.12);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.app-shell .sidebar .nav-item.active .nav-count {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.app-shell .sidebar .nav-count.nav-count-alert {
+  background: var(--red-600);
+}
+
+.app-shell .sidebar .sidebar-section-label {
+  margin: 18px 0 6px;
+  padding-left: 12px;
+  color: var(--navy-400);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+}
+
+.app-shell .sidebar .sidebar-bottom {
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.app-shell .sidebar .customer-signout {
+  min-height: 42px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--radius-md);
+  color: var(--navy-200);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.app-shell .sidebar .customer-signout:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.app-shell .mobile-backdrop {
+  background: rgba(10, 26, 51, 0.55);
+}
+
+/* ========================================================================
+   4. Top bar
+   ======================================================================== */
+
+.app-shell .topbar {
+  height: var(--topbar-height);
+  padding: 0 28px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: saturate(160%) blur(10px);
+}
+
+.app-shell .dashboard-main {
+  min-height: calc(100vh - var(--topbar-height));
+}
+
+.app-shell .customer-topbar-title strong {
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 28px;
+}
+
+.app-shell .customer-topbar-title span {
+  color: var(--ink-muted);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.app-shell .topbar .topbar-avatar,
+.app-shell .topbar .provider-topbar-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  color: #ffffff;
+  background: var(--navy-900);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.app-shell .customer-shell .topbar .topbar-avatar,
+.app-shell.customer-shell .topbar .topbar-avatar {
+  color: var(--navy-800);
+  background: var(--navy-100);
+}
+
+.app-shell .topbar .notification-button {
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  color: var(--ink);
+  background: #ffffff;
+}
+
+.app-shell .topbar .notification-button:hover {
+  background: var(--surface-sunken);
+}
+
+.app-shell .topbar .provider-country-chip {
+  height: 34px;
+  padding: 0 12px 0 6px;
+  border-radius: var(--radius-md);
+  color: var(--ink);
+  background: var(--surface-sunken);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.app-shell .topbar .provider-country-chip b {
+  border-radius: var(--radius-xs);
+  color: #ffffff;
+  background: var(--navy-900);
+  font-family: var(--font-mono);
+}
+
+.app-shell .topbar .search-box {
+  height: 40px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: #ffffff;
+}
+
+.app-shell .topbar .search-box:focus-within {
+  border-color: var(--accent);
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+.app-shell .topbar .search-box input {
+  color: var(--ink);
+  font-size: 15px;
+}
+
+.app-shell .topbar-verified-badge {
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--emerald-800);
+  background: var(--emerald-100);
+}
+
+/* Segmented control (admin period switch) */
+.app-shell .topbar .admin-period-switch {
+  gap: 2px;
+  padding: 4px;
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+}
+
+.app-shell .topbar .admin-period-switch button {
+  min-height: 34px;
+  padding: 0 16px;
+  border-radius: var(--radius-sm);
+  color: var(--ink-muted);
+  background: transparent;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.app-shell .topbar .admin-period-switch button.active {
+  color: var(--ink);
+  background: #ffffff;
+  box-shadow: var(--shadow-sm);
+}
+
+/* ========================================================================
+   5. Content area & cards
+   ======================================================================== */
+
+.app-shell .dashboard-main {
+  padding: 28px;
+}
+
+.app-shell .dashboard-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  box-shadow: none;
+}
+
+.app-shell .dashboard-card .card-heading {
+  min-height: 56px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.app-shell .dashboard-content > .dashboard-card:not(.messages-card) > .card-heading {
+  margin: -24px -24px 20px;
+  padding: 16px 24px;
+}
+
+.app-shell .dashboard-card .card-heading h2 {
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  line-height: 24px;
+}
+
+.app-shell .dashboard-card .card-heading p {
+  color: var(--ink-muted);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.app-shell .dashboard-card .card-heading .link-button,
+.app-shell .link-button {
+  color: var(--accent-text);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.app-shell .link-button:hover {
+  color: var(--accent-active);
+}
+
+.app-shell .admin-caption {
+  color: var(--ink-muted);
+  font-size: 13px;
+}
+
+.app-shell .dashboard-footer {
+  border-top: 1px solid var(--border);
+  color: var(--neutral-500);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+/* ========================================================================
+   6. KPI / stat tiles
+   ======================================================================== */
+
+.app-shell .admin-kpi,
+.app-shell .customer-stat-card,
+.app-shell .provider-stat-card {
+  min-height: 0;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 22px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  box-shadow: none;
+  transition: box-shadow var(--duration-base) var(--ease-out), border-color var(--duration-base) var(--ease-out);
+}
+
+.app-shell .admin-kpi:hover,
+.app-shell .customer-stat-card:hover,
+.app-shell .provider-stat-card:hover {
+  border-color: var(--neutral-300);
+  box-shadow: var(--shadow-md);
+}
+
+.app-shell .admin-kpi-icon,
+.app-shell .customer-stat-icon,
+.app-shell .provider-stat-icon,
+.app-shell .admin-kpi-blue .admin-kpi-icon,
+.app-shell .admin-kpi-green .admin-kpi-icon,
+.app-shell .admin-kpi-amber .admin-kpi-icon,
+.app-shell .provider-stat-icon.amber {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  color: var(--navy-800);
+  background: var(--surface-sunken);
+}
+
+.app-shell .admin-kpi-icon svg,
+.app-shell .customer-stat-icon svg,
+.app-shell .provider-stat-icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.app-shell .admin-kpi-content > strong,
+.app-shell .customer-stat-card strong,
+.app-shell .provider-stat-card strong {
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 34px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 40px;
+}
+
+.app-shell .admin-kpi-content > span,
+.app-shell .customer-stat-card > div > span,
+.app-shell .provider-stat-card > div > span {
+  color: var(--ink-muted);
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.app-shell .admin-kpi-content > small {
+  color: var(--emerald-700);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.app-shell .admin-kpi-amber .admin-kpi-content > small {
+  color: var(--accent-text);
+}
+
+/* Highlight banner ("3 offers ready to review") */
+.app-shell .offers-notice {
+  border: 0;
+  border-radius: var(--radius-lg);
+  color: var(--ink);
+  background: var(--blue-100);
+}
+
+.app-shell .offers-notice > .icon {
+  color: var(--accent);
+}
+
+.app-shell .offers-notice span {
+  color: var(--neutral-700);
+}
+
+/* ========================================================================
+   7. Status badges & chips
+   ======================================================================== */
+
+.app-shell .status-badge,
+.app-shell .customer-status,
+.app-shell .verification-chip,
+.app-shell .admin-user-role,
+.app-shell .admin-report-status,
+.app-shell .admin-attention-count {
+  display: inline-flex;
+  height: 24px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 16px;
+  text-transform: none;
+  white-space: nowrap;
+}
+
+.app-shell .status-badge::before,
+.app-shell .customer-status::before {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 50%;
+  background: currentColor;
+  content: "";
+}
+
+/* Info (blue): open, offers received, pending */
+.app-shell .status-badge,
+.app-shell .status-open,
+.app-shell .status-offers-received,
+.app-shell .status-pending,
+.app-shell .status-info,
+.app-shell .customer-status-info {
+  color: var(--blue-700);
+  background: var(--accent-soft);
+}
+
+/* Warning (amber): in progress, purchased, shipping, under review */
+.app-shell .status-in-progress,
+.app-shell .status-purchased,
+.app-shell .status-shipping,
+.app-shell .status-under-review,
+.app-shell .status-reviewed,
+.app-shell .status-warning,
+.app-shell .customer-status-warning {
+  color: var(--amber-800);
+  background: var(--amber-100);
+}
+
+/* Success (emerald): delivered, accepted, verified, resolved */
+.app-shell .status-delivered,
+.app-shell .status-accepted,
+.app-shell .status-verified,
+.app-shell .status-resolved,
+.app-shell .status-success,
+.app-shell .customer-status-success {
+  color: var(--emerald-800);
+  background: var(--emerald-100);
+}
+
+/* Danger (red): cancelled, declined */
+.app-shell .status-cancelled,
+.app-shell .status-declined {
+  color: var(--red-800);
+  background: var(--red-100);
+}
+
+.app-shell .status-dismissed {
+  color: var(--neutral-600);
+  background: var(--neutral-100);
+}
+
+/* Verification chips */
+.verification-chip.verification-unverified { color: var(--neutral-600); background: var(--neutral-100); }
+.verification-chip.verification-pending { color: var(--amber-800); background: var(--amber-100); }
+.verification-chip.verification-approved { color: var(--emerald-800); background: var(--emerald-100); }
+.verification-chip.verification-rejected { color: var(--red-800); background: var(--red-100); }
+
+.app-shell .admin-attention-count {
+  color: var(--red-800);
+  background: var(--red-100);
+}
+
+/* Role labels in the users table */
+.app-shell .admin-user-role { color: var(--navy-800); background: var(--navy-100); }
+.app-shell .admin-user-role-customer { color: var(--blue-700); background: var(--blue-100); }
+.app-shell .admin-user-role-cargo_provider,
+.app-shell .admin-user-role-individual_cargo { color: var(--emerald-800); background: var(--emerald-100); }
+.app-shell .admin-user-role-admin { color: #ffffff; background: var(--navy-900); }
+
+/* Delivery method chips */
+.app-shell .delivery-method-chip {
+  border-radius: var(--radius-sm);
+}
+
+.app-shell .delivery-method-chip.delivery-sea { color: var(--navy-800); background: var(--navy-100); }
+.app-shell .delivery-method-chip.delivery-air { color: var(--blue-700); background: var(--blue-100); }
+
+/* Country chips ("CN China") */
+.app-shell .admin-source-item > span,
+.app-shell .provider-request-meta > span {
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  background: var(--surface-sunken);
+}
+
+.app-shell .admin-source-item > span > b,
+.app-shell .provider-request-meta > span b {
+  border-radius: var(--radius-xs);
+  color: #ffffff;
+  background: var(--navy-900);
+  font-family: var(--font-mono);
+  font-weight: 500;
+}
+
+/* ========================================================================
+   8. Buttons
+   ======================================================================== */
+
+.app-shell .primary-button,
+.app-shell .small-primary,
+.app-shell .offer-chat-button,
+.signin-card .primary-button,
+.signup-form .signup-submit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  color: #ffffff;
+  background: var(--accent);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-weight: 700;
+  transition: background var(--duration-fast) var(--ease-out), transform var(--duration-fast) var(--ease-out);
+}
+
+.app-shell .primary-button,
+.signin-card .primary-button,
+.signup-form .signup-submit {
+  min-height: 44px;
+  padding: 0 20px;
+  font-size: 15px;
+}
+
+.app-shell .small-primary,
+.app-shell .offer-chat-button {
+  min-height: 36px;
+  padding: 0 14px;
+  font-size: 14px;
+}
+
+.app-shell .primary-button:hover,
+.app-shell .small-primary:hover,
+.app-shell .offer-chat-button:hover,
+.signin-card .primary-button:hover,
+.signup-form .signup-submit:hover {
+  border-color: transparent;
+  background: var(--accent-hover);
+}
+
+.app-shell .primary-button:active,
+.app-shell .small-primary:active,
+.signin-card .primary-button:active,
+.signup-form .signup-submit:active {
+  background: var(--accent-active);
+  transform: translateY(1px);
+}
+
+.app-shell .primary-button:disabled,
+.app-shell .small-primary:disabled,
+.signin-card .primary-button:disabled,
+.signup-form .signup-submit:disabled {
+  color: var(--neutral-400);
+  background: var(--neutral-100);
+  box-shadow: none;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Secondary / outline buttons */
+.app-shell .customer-outline-button,
+.app-shell .secondary-button,
+.app-shell .admin-export-button,
+.app-shell .file-picker-button,
+.app-shell .document-open,
+.signin-card .secondary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  color: var(--ink);
+  background: #ffffff;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-weight: 700;
+  text-decoration: none;
+  transition: background var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out);
+}
+
+.app-shell .customer-outline-button,
+.app-shell .file-picker-button,
+.app-shell .document-open {
+  min-height: 36px;
+  height: auto;
+  padding: 0 14px;
+  font-size: 14px;
+}
+
+.app-shell .topbar .admin-export-button,
+.signin-card .secondary-button {
+  min-height: 40px;
+  padding: 0 16px;
+  font-size: 14px;
+}
+
+.signin-card .secondary-button {
+  min-height: 44px;
+  font-size: 15px;
+}
+
+.app-shell .customer-outline-button:hover,
+.app-shell .secondary-button:hover,
+.app-shell .admin-export-button:hover,
+.app-shell .file-picker-button:hover,
+.app-shell .document-open:hover,
+.signin-card .secondary-button:hover {
+  border-color: var(--navy-600);
+  background: var(--surface-sunken);
+}
+
+.app-shell .customer-outline-button:disabled {
+  color: var(--neutral-400);
+  border-color: var(--border);
+  background: var(--neutral-50);
+  cursor: not-allowed;
+}
+
+/* Accept / decline offer buttons */
+.app-shell .approve-button,
+.app-shell .reject-button {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 14px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.app-shell .approve-button {
+  border: 1px solid transparent;
+  color: var(--navy-900);
+  background: var(--emerald-500);
+}
+
+.app-shell .approve-button:hover {
+  background: var(--emerald-400);
+}
+
+.app-shell .reject-button,
+.app-shell .verification-reject {
+  border: 1px solid var(--border-strong);
+  color: var(--red-700);
+  background: #ffffff;
+}
+
+.app-shell .reject-button:hover,
+.app-shell .verification-reject:hover {
+  border-color: var(--red-700);
+  background: var(--red-50);
+}
+
+/* "Approve & verify account" is the success action in the review dialog */
+.app-shell .verification-review-actions .primary-button {
+  color: var(--navy-900);
+  background: var(--emerald-500);
+}
+
+.app-shell .verification-review-actions .primary-button:hover {
+  background: var(--emerald-400);
+}
+
+/* Icon-only buttons */
+.app-shell .icon-button {
+  border-radius: var(--radius-md);
+  color: var(--neutral-600);
+}
+
+.app-shell .icon-button:hover {
+  color: var(--ink);
+  background: var(--surface-sunken);
+}
+
+.app-shell .icon-button.table-action:hover {
+  color: var(--accent-text);
+  background: var(--accent-soft);
+}
+
+.app-shell .icon-button.table-action[aria-label^="Delete"]:hover {
+  color: var(--red-700);
+  background: var(--red-50);
+}
+
+.app-shell .text-button {
+  color: var(--accent-text);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.app-shell .text-button:hover {
+  color: var(--accent-active);
+}
+
+/* ========================================================================
+   9. Form controls
+   ======================================================================== */
+
+.app-shell .request-modal input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.app-shell .request-modal select,
+.app-shell .request-modal textarea,
+.app-shell .account-form .account-input input,
+.app-shell .account-form .account-input select,
+.app-shell .verification-note-field textarea,
+.app-shell .admin-settings-form input:not([type="checkbox"]),
+.app-shell .admin-settings-form select,
+.signin-card input,
+.signup-form .account-input input,
+.signup-form .account-input select {
+  min-height: 44px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  color: var(--ink);
+  background: #ffffff;
+  font-family: var(--font-sans);
+  font-size: 15px;
+  transition: border-color var(--duration-fast) var(--ease-out);
+}
+
+.app-shell .request-modal textarea,
+.app-shell .verification-note-field textarea {
+  padding-top: 11px;
+  padding-bottom: 11px;
+}
+
+.app-shell .request-modal input:not([type="checkbox"]):hover,
+.app-shell .request-modal select:hover,
+.app-shell .request-modal textarea:hover,
+.app-shell .account-form .account-input input:hover,
+.app-shell .account-form .account-input select:hover,
+.signin-card input:hover,
+.signup-form .account-input input:hover,
+.signup-form .account-input select:hover {
+  border-color: var(--navy-600);
+}
+
+.app-shell .request-modal input:not([type="checkbox"]):focus,
+.app-shell .request-modal select:focus,
+.app-shell .request-modal textarea:focus,
+.app-shell .account-form .account-input input:focus,
+.app-shell .account-form .account-input select:focus,
+.app-shell .verification-note-field textarea:focus,
+.app-shell .admin-settings-form input:focus,
+.signin-card input:focus,
+.signup-form .account-input input:focus,
+.signup-form .account-input select:focus {
+  border-color: var(--accent);
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+  box-shadow: none;
+}
+
+.app-shell .request-modal input::placeholder,
+.app-shell .request-modal textarea::placeholder,
+.app-shell .account-form .account-input input::placeholder,
+.signin-card input::placeholder,
+.signup-form .account-input input::placeholder {
+  color: var(--neutral-500);
+}
+
+.app-shell .request-modal label,
+.app-shell .account-field-label,
+.signin-card label,
+.signup-form .account-field-label,
+.signup-role-picker legend {
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.app-shell .request-modal input[aria-invalid="true"],
+.app-shell .account-field.has-error .account-input input,
+.app-shell .account-field.has-error .account-input select,
+.signup-form .account-field.has-error .account-input input,
+.signup-form .account-field.has-error .account-input select {
+  border-color: var(--red-700);
+  box-shadow: none;
+}
+
+.app-shell .offer-field-error,
+.app-shell .account-field-error,
+.signup-form .account-field-error {
+  color: var(--red-700);
+}
+
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: var(--accent);
+}
+
+/* ========================================================================
+   10. Tables & lists
+   ======================================================================== */
+
+.app-shell .data-table th {
+  padding: 12px 16px;
+  border-top: 0;
+  border-bottom: 1px solid var(--border);
+  color: var(--ink-muted);
+  background: var(--surface-sunken);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.app-shell .data-table td {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  color: var(--ink);
+  font-size: 15px;
+}
+
+.app-shell .data-table tbody tr {
+  transition: background var(--duration-fast) var(--ease-out);
+}
+
+/* The overview's latest-requests table shares its row with a side card: keep it compact. */
+.app-shell .admin-latest-table th,
+.app-shell .admin-latest-table td {
+  padding-right: 10px;
+  padding-left: 10px;
+}
+
+.app-shell .admin-latest-table th:first-child,
+.app-shell .admin-latest-table td:first-child {
+  padding-left: 16px;
+}
+
+.app-shell .admin-latest-table td {
+  font-size: 14px;
+}
+
+/* Long customer / product names wrap instead of pushing the table wider than its card. */
+.app-shell .admin-latest-table td:nth-child(2),
+.app-shell .admin-latest-table td:nth-child(3) {
+  min-width: 110px;
+  white-space: normal;
+}
+
+.app-shell .data-table tbody tr:hover {
+  background: var(--navy-50);
+}
+
+.app-shell .data-table td.admin-request-id,
+.app-shell .table-secondary[class] {
+  color: var(--ink-muted);
+}
+
+.app-shell .data-table td.admin-request-id {
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 14px;
+}
+
+.app-shell .table-primary {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.app-shell .table-scroll {
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+}
+
+/* Row lists (recent requests, providers, offers, provider requests) */
+.app-shell .customer-request-row,
+.app-shell .customer-company-row,
+.app-shell .customer-chat-row,
+.app-shell .customer-offer-row,
+.app-shell .provider-request-row,
+.app-shell .admin-attention-item {
+  border-bottom: 1px solid var(--border);
+  background: #ffffff;
+  transition: background var(--duration-fast) var(--ease-out);
+}
+
+.app-shell .customer-request-row:hover,
+.app-shell .customer-company-row:hover,
+.app-shell .customer-offer-row:hover,
+.app-shell .provider-request-row:hover {
+  background: var(--navy-50);
+}
+
+.app-shell .customer-request-header {
+  color: var(--ink-muted);
+  background: var(--surface-sunken);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.app-shell .customer-row-copy strong,
+.app-shell .provider-request-title strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.app-shell .customer-row-copy small,
+.app-shell .provider-request-info > small,
+.app-shell .provider-request-meta > small {
+  color: var(--ink-muted);
+}
+
+/* Product thumbnails & icon tiles */
+.app-shell .request-thumb,
+.app-shell .customer-request-icon,
+.app-shell .provider-request-icon {
+  border-radius: var(--radius-md);
+  color: var(--ink-muted);
+  background: var(--surface-sunken);
+}
+
+/* Initial avatars (companies, chat, users) */
+.app-shell .avatar,
+.app-shell .customer-company-avatar,
+.app-shell .provider-chat-avatar,
+.app-shell .protected-avatar {
+  border-radius: var(--radius-md);
+  color: #ffffff;
+  background: var(--navy-900);
+  font-family: var(--font-sans);
+  font-weight: 700;
+}
+
+.app-shell .customer-company-avatar.blue {
+  color: #ffffff;
+  background: var(--blue-700);
+}
+
+.app-shell .protected-avatar {
+  border-radius: 50%;
+}
+
+/* Empty states */
+.app-shell .empty-state strong {
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-weight: 600;
+}
+
+.app-shell .empty-state p,
+.app-shell .empty-table,
+.app-shell .admin-empty-note {
+  color: var(--ink-muted);
+}
+
+/* ========================================================================
+   11. Charts, timelines & feeds
+   ======================================================================== */
+
+.app-shell .admin-donut > span {
+  color: var(--ink);
+  font-family: var(--font-display);
+}
+
+.app-shell .admin-legend > div {
+  color: var(--ink);
+}
+
+.app-shell .admin-legend > div > i {
+  border-radius: var(--radius-xs);
+}
+
+.app-shell .admin-source-item > i {
+  border-radius: var(--radius-pill);
+  background: var(--neutral-200);
+}
+
+.app-shell .admin-source-item > i > b,
+.app-shell .provider-performance > div > i > b {
+  border-radius: var(--radius-pill);
+  background: var(--navy-900);
+}
+
+.app-shell .admin-source-item:nth-child(even) > i > b {
+  background: var(--accent);
+}
+
+.app-shell .admin-activity-list > li > i,
+.app-shell .shipment-tracking li > i {
+  border-radius: var(--radius-xs);
+}
+
+.app-shell .admin-activity-list > li.current > i,
+.app-shell .shipment-tracking li.current > i {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.app-shell .admin-activity-list > li.success > i,
+.app-shell .shipment-tracking li.complete > i {
+  border-color: var(--emerald-500);
+  background: var(--emerald-500);
+}
+
+.app-shell .admin-activity-list strong,
+.app-shell .shipment-tracking strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.app-shell .admin-activity-list small,
+.app-shell .shipment-tracking small {
+  color: var(--ink-muted);
+}
+
+/* ========================================================================
+   12. Tabs / filter chips
+   ======================================================================== */
+
+.app-shell .provider-request-filters {
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.app-shell .provider-request-filters button {
+  min-height: 34px;
+  padding: 0 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  color: var(--ink);
+  background: #ffffff;
+  box-shadow: none;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.app-shell .provider-request-filters button:hover {
+  background: var(--surface-sunken);
+}
+
+.app-shell .provider-request-filters button.active,
+.app-shell .provider-request-filters button[aria-pressed="true"] {
+  border-color: var(--navy-900);
+  color: #ffffff;
+  background: var(--navy-900);
+}
+
+.app-shell .admin-chat-tabs {
+  gap: 24px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* ========================================================================
+   13. Modals
+   ======================================================================== */
+
+.modal-backdrop {
+  background: rgba(10, 26, 51, 0.5);
+  backdrop-filter: blur(4px);
+}
+
+.app-shell .request-modal,
+.request-modal {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background: #ffffff;
+  box-shadow: var(--shadow-lg);
+}
+
+.app-shell .request-modal {
+  padding: 28px;
+}
+
+.app-shell .modal-heading .eyebrow,
+.app-shell .eyebrow {
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+}
+
+.app-shell .modal-heading h2 {
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.app-shell .offer-section,
+.app-shell .verification-section,
+.app-shell .verification-review-section {
+  border-color: var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.app-shell .offer-section legend,
+.app-shell .verification-section legend,
+.app-shell .verification-review-section h3 {
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.app-shell .offer-summary {
+  border-color: var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-sunken);
+}
+
+.app-shell .offer-summary > div + div {
+  border-color: var(--neutral-200);
+}
+
+.app-shell .offer-summary .offer-summary-total {
+  background: var(--navy-900);
+}
+
+.app-shell .offer-readonly input {
+  border-style: solid;
+  background: var(--surface-sunken);
+}
+
+/* ========================================================================
+   14. Alerts & toasts
+   ======================================================================== */
+
+.app-shell .toast-message {
+  border: 1px solid #a7f0d0;
+  border-radius: var(--radius-lg);
+  color: var(--emerald-800);
+  background: var(--emerald-100);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.app-shell .toast-message.toast-error {
+  border-color: #f7c6c1;
+  color: var(--red-800);
+  background: var(--red-100);
+}
+
+.app-shell .verification-alert,
+.app-shell .verification-prompt,
+.app-shell .offer-blocked {
+  border-radius: var(--radius-lg);
+}
+
+.app-shell .verification-prompt {
+  border: 0;
+  background: var(--blue-100);
+}
+
+.app-shell .verification-prompt.rejected {
+  background: var(--red-100);
+}
+
+.app-shell .verification-prompt-icon {
+  border-radius: var(--radius-md);
+}
+
+.app-shell .verification-alert.info,
+.app-shell .offer-blocked {
+  border-color: transparent;
+  color: var(--amber-800);
+  background: var(--amber-100);
+}
+
+.app-shell .verification-alert.success {
+  border-color: transparent;
+  color: var(--emerald-800);
+  background: var(--emerald-100);
+}
+
+.app-shell .verification-alert.warning,
+.app-shell .verification-alert.error {
+  border-color: transparent;
+  color: var(--red-800);
+  background: var(--red-100);
+}
+
+/* Upload drop zones & document cards */
+.app-shell .document-dropzone,
+.signup-form .photo-picker-preview {
+  border-color: var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: repeating-linear-gradient(135deg, var(--neutral-100) 0 12px, var(--neutral-50) 12px 24px);
+}
+
+.app-shell .document-dropzone:hover,
+.app-shell .document-dropzone.dragging {
+  border-color: var(--accent);
+  background: var(--blue-50);
+}
+
+.app-shell .document-dropzone.has-file {
+  border-color: var(--emerald-500);
+  background: var(--emerald-100);
+}
+
+.app-shell .document-preview,
+.app-shell .current-product-photo {
+  border-color: var(--border);
+  border-radius: var(--radius-lg);
+}
+
+/* ========================================================================
+   15. Chat
+   ======================================================================== */
+
+.app-shell .messages-card {
+  overflow: hidden;
+}
+
+.app-shell .conversation-heading h2 {
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.app-shell .conversation-row {
+  border-bottom: 1px solid var(--border);
+  transition: background var(--duration-fast) var(--ease-out);
+}
+
+.app-shell .conversation-row:hover {
+  background: var(--navy-50);
+}
+
+.app-shell .conversation-row.selected {
+  background: var(--blue-100);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.app-shell .conversation-copy b {
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.app-shell .conversation-copy small,
+.app-shell .conversation-meta time {
+  color: var(--ink-muted);
+}
+
+.app-shell .chat-heading {
+  border-bottom: 1px solid var(--border);
+}
+
+.app-shell .chat-heading b {
+  color: var(--ink);
+  font-size: 17px;
+}
+
+.app-shell .chat-history {
+  background: var(--neutral-50);
+}
+
+.app-shell .chat-message {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  color: var(--ink);
+  background: #ffffff;
+  font-size: 15px;
+  line-height: 22px;
+}
+
+.app-shell .chat-message.sent {
+  border-color: var(--navy-900);
+  color: #ffffff;
+  background: var(--navy-900);
+}
+
+.app-shell .chat-message time {
+  color: var(--ink-muted);
+}
+
+.app-shell .chat-message.sent time {
+  color: var(--navy-200);
+}
+
+.app-shell .chat-composer {
+  border-top: 1px solid var(--border);
+  background: #ffffff;
+}
+
+.app-shell .chat-composer textarea,
+.app-shell .chat-composer input {
+  min-height: 44px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 15px;
+}
+
+.app-shell .chat-composer textarea:focus,
+.app-shell .chat-composer input:focus {
+  border-color: var(--accent);
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+.app-shell .chat-composer button[type="submit"] {
+  border-radius: var(--radius-md);
+  background: var(--accent);
+}
+
+/* ========================================================================
+   16. Sign in & sign up
+   ======================================================================== */
+
+.signin-page {
+  background: var(--surface);
+}
+
+.signin-brand {
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-sm);
+}
+
+.signin-card {
+  gap: 18px;
+  padding: 36px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-md);
+}
+
+.signin-card h1 {
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 32px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.signin-card .eyebrow {
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+}
+
+.signin-card .page-description {
+  color: var(--ink-muted);
+  font-size: 15px;
+}
+
+.signin-card label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.signin-card input {
+  padding: 0 14px;
+}
+
+.signup-page {
+  background: var(--surface);
+}
+
+.signup-welcome {
+  background: var(--navy-900);
+}
+
+.signup-welcome-copy h1 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.signup-welcome-copy > p,
+.signup-welcome-copy ul {
+  color: var(--navy-200);
+  font-size: 17px;
+  line-height: 1.6;
+}
+
+.signup-welcome-copy li .icon {
+  color: var(--emerald-400);
+}
+
+.signup-brand {
+  border-radius: var(--radius-sm);
+}
+
+/* Heading with "Already have one? Sign in" underneath, as in the design */
+.signup-heading {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.signup-heading h2 {
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 34px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.signup-heading p,
+.signup-legal {
+  color: var(--ink-muted);
+  font-size: 15px;
+}
+
+.signup-heading a,
+.signup-legal a {
+  color: var(--accent-text);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* Role choices stacked as full-width rows, like the design */
+.signup-role-picker.role-picker-3 {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+}
+
+.role-picker-3 .signup-role-option {
+  min-height: 0;
+  flex-direction: row;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: #ffffff;
+  transition: border-color var(--duration-fast) var(--ease-out), background var(--duration-fast) var(--ease-out);
+}
+
+.role-picker-3 .signup-role-option:hover {
+  border-color: var(--navy-600);
+}
+
+.role-picker-3 .signup-role-option.selected {
+  border-color: var(--accent);
+  background: var(--blue-50);
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.signup-role-option .signup-role-icon,
+.signup-role-option .signup-role-icon.provider {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  color: var(--navy-800);
+  background: var(--surface-sunken);
+}
+
+.role-picker-3 .signup-role-option b {
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.role-picker-3 .signup-role-option small {
+  color: var(--ink-muted);
+  font-size: 14px;
+}
+
+.signup-form .signup-submit {
+  min-height: 52px;
+  font-size: 16px;
+}
+
+.signup-verification-note {
+  border: 0;
+  border-radius: var(--radius-lg);
+  color: var(--navy-800);
+  background: var(--blue-100);
+}
+
+.signup-verification-note p {
+  color: var(--neutral-700);
+}
+
+.signin-success {
+  border: 0;
+  border-radius: var(--radius-md);
+  color: var(--emerald-800);
+  background: var(--emerald-100);
+}
+
+/* ========================================================================
+   17. Responsive refinements
+   ======================================================================== */
+
+/* Laptops: four stat tiles side by side get too narrow next to the sidebar. */
+@media (min-width: 901px) and (max-width: 1199px) {
+  .app-shell .admin-kpi-grid,
+  .app-shell .customer-stats-grid,
+  .app-shell .provider-stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* Cargo providers + Latest offers (with price breakdowns) need the full width here */
+  .app-shell .customer-dashboard-grid-secondary {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 900px) {
+  .app-shell {
+    --topbar-height: 64px;
+  }
+
+  .app-shell .dashboard-main {
+    padding: 20px 18px;
+  }
+
+  .app-shell .topbar {
+    padding: 0 18px;
+  }
+}
+
+@media (max-width: 680px) {
+  .app-shell {
+    --topbar-height: 60px;
+  }
+
+  .app-shell .dashboard-main {
+    padding: 16px 14px;
+  }
+
+  .app-shell .topbar {
+    padding: 0 14px;
+  }
+
+  .app-shell .customer-topbar-title strong {
+    font-size: 18px;
+    line-height: 24px;
+  }
+
+  .app-shell .customer-topbar-title span {
+    font-size: 13px;
+  }
+
+  /* Compact top-bar controls on phones */
+  .app-shell .topbar .topbar-actions {
+    gap: 6px;
+  }
+
+  .app-shell .topbar .admin-period-switch {
+    padding: 3px;
+  }
+
+  .app-shell .topbar .admin-period-switch button {
+    min-height: 30px;
+    padding: 0 8px;
+    font-size: 12px;
+  }
+
+  /* Icon-only Export (the text stays for screen readers) */
+  .app-shell .topbar .admin-export-button {
+    min-height: 36px;
+    gap: 0;
+    padding: 0 10px;
+    font-size: 0;
+  }
+
+  .app-shell .topbar .admin-export-button .icon {
+    width: 16px;
+    height: 16px;
+  }
+
+  .app-shell .topbar .topbar-avatar,
+  .app-shell .topbar .provider-topbar-avatar {
+    width: 34px;
+    height: 34px;
+    font-size: 12px;
+  }
+
+  .app-shell .admin-kpi,
+  .app-shell .customer-stat-card,
+  .app-shell .provider-stat-card {
+    gap: 10px;
+    padding: 16px;
+  }
+
+  .app-shell .admin-kpi-icon,
+  .app-shell .customer-stat-icon,
+  .app-shell .provider-stat-icon {
+    width: 38px;
+    height: 38px;
+  }
+
+  .app-shell .admin-kpi-content > strong,
+  .app-shell .customer-stat-card strong,
+  .app-shell .provider-stat-card strong {
+    font-size: 26px;
+    line-height: 32px;
+  }
+
+  .app-shell .request-modal {
+    padding: 20px 18px;
+  }
+
+  .app-shell .dashboard-content > .dashboard-card:not(.messages-card) > .card-heading {
+    margin: -18px -16px 16px;
+    padding: 14px 16px;
+  }
+
+  .signin-card {
+    padding: 26px 20px;
+  }
+
+  .app-shell .conversation-heading h2 {
+    font-size: 20px;
+  }
+
+  /* Chat on phones: conversation list on top (scrollable), messages below */
+  .app-shell .messages-card {
+    height: auto;
+    min-height: 0;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(420px, 1fr);
+  }
+
+  .app-shell .messages-card .conversation-list {
+    max-height: 240px;
+    overflow-y: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .app-shell .messages-card .chat-pane {
+    min-height: 420px;
+  }
+}
+
+/* Provider request rows: let the location / method / time chips wrap */
+.app-shell .provider-request-meta {
+  flex-wrap: wrap;
+  row-gap: 6px;
+}
+
+@media (max-width: 900px) {
+  .app-shell .provider-request-row {
+    flex-wrap: wrap;
+  }
+
+  .app-shell .provider-request-info {
+    flex: 1 1 calc(100% - 64px);
+  }
+
+  .app-shell .provider-request-actions {
+    width: 100%;
+    justify-content: flex-end;
+    margin-left: 0;
+  }
+}
+
+@media (max-width: 680px) {
+
+  .signup-heading h2 {
+    font-size: 28px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-shell *,
+  .signin-page *,
+  .signup-page * {
+    transition: none !important;
+  }
+}
