@@ -963,22 +963,6 @@ export default function DashboardWorkspace({ initialRole }) {
   const adminProviderIds = [...new Set(adminOffers.map((offer) => offer.provider?._id || offer.provider?.id).filter(Boolean).map(String))];
   const adminCustomers = new Set(adminCustomerIds);
   const adminProviders = new Set(adminProviderIds);
-  const adminCompanyRows = [...adminOffers.reduce((companies, offer) => {
-    const providerId = String(offer.provider?._id || offer.provider?.id || '');
-    if (!providerId) return companies;
-    const company = companies.get(providerId) || {
-      id: providerId,
-      name: offer.provider?.name || 'Cargo company',
-      offers: 0,
-      pending: 0,
-      accepted: 0,
-    };
-    company.offers += 1;
-    if (offer.status === 'pending') company.pending += 1;
-    if (offer.status === 'accepted') company.accepted += 1;
-    companies.set(providerId, company);
-    return companies;
-  }, new Map()).values()].sort((first, second) => second.offers - first.offers);
   const adminPendingOffers = adminOffers.filter((offer) => offer.status === 'pending');
   const adminRecentRequests = [...adminRequests]
     .sort((first, second) => new Date(second.createdAt || 0) - new Date(first.createdAt || 0))
@@ -1027,6 +1011,30 @@ export default function DashboardWorkspace({ initialRole }) {
   useEffect(() => {
     if (customerMode && localStorage.getItem('token')) loadCompanies();
   }, [customerMode, loadCompanies]);
+
+  // Admins: (re)load every cargo provider when the Cargo companies page opens, and after
+  // users are edited or deleted (`users` changes) so the cards stay current.
+  useEffect(() => {
+    if (adminMode && section === 'companies' && localStorage.getItem('token')) loadCompanies();
+  }, [adminMode, section, users, loadCompanies]);
+
+  // The admin user-details modal can be opened from the Users table or a Cargo company card.
+  const viewingUserAccount = viewingUserId
+    ? users.find((account) => account.id === viewingUserId) || (() => {
+      const provider = companies.list.find((item) => item.id === viewingUserId);
+      return provider && {
+        id: provider.id,
+        name: provider.name,
+        email: provider.email,
+        phone: provider.phone,
+        role: provider.role,
+        country: provider.country,
+        profilePhoto: null,
+        verification: { status: provider.verificationStatus || 'unverified' },
+        createdAt: provider.memberSince,
+      };
+    })()
+    : null;
 
   useEffect(() => {
     document.title = `Tayonx | ${config.label} dashboard`;
@@ -1466,7 +1474,9 @@ export default function DashboardWorkspace({ initialRole }) {
     }
 
     if (adminMode && section === 'companies') {
-      return <Card><CardHeading title="Cargo companies" subtitle="Providers with quotes in the selected dashboard period." />{loading ? <p className="empty-table" role="status">Loading cargo companies…</p> : <div className="table-scroll"><table className="data-table"><thead><tr><th>Company</th><th>Quotes</th><th>Pending</th><th>Accepted</th></tr></thead><tbody>{adminCompanyRows.map((company) => <tr key={company.id}><td><span className="table-primary">{company.name}</span><span className="table-secondary">Verified status is not available in this system.</span></td><td>{company.offers}</td><td>{company.pending}</td><td>{company.accepted}</td></tr>)}{!adminCompanyRows.length && <tr><td className="empty-table" colSpan="4">No cargo companies have submitted quotes in this period.</td></tr>}</tbody></table></div>}</Card>;
+      return <Card className="company-directory-card-wrap"><CardHeading title="Cargo companies" subtitle="Every cargo company and individual provider, with verification status and activity. Open a card for full details and documents." />
+        <CompanyDirectory admin providers={companies.list} loading={companies.loading && !companies.list.length} error={companies.error} onRetry={loadCompanies} onView={(provider) => setViewingUserId(provider.id)} onReview={() => setSection('verifications')} />
+      </Card>;
     }
 
     if (adminMode && section === 'users') {
@@ -1802,9 +1812,9 @@ export default function DashboardWorkspace({ initialRole }) {
       {customerMode && viewingCompany && <CompanyProfileModal provider={viewingCompany} onClose={closeCompanyProfile} onRequest={openCreateRequest} />}
       {requestModalOpen && <RequestForm request={editingRequest} saving={saving} error={formError} onSubmit={saveRequest} companies={{ ...companies, retry: loadCompanies }} initialCompany={editingRequest ? null : requestCompany} onClose={() => { setRequestModalOpen(false); setEditingRequest(null); setRequestCompany(null); setFormError(''); }} />}
       {(offerRequest || editingOffer) && <OfferForm request={offerRequest || editingOffer?.request} offer={editingOffer} saving={saving} error={formError} onSubmit={saveOffer} onClose={() => { setOfferRequest(null); setEditingOffer(null); setFormError(''); }} />}
-      {adminMode && viewingUserId && users.some((account) => account.id === viewingUserId) && (
+      {adminMode && viewingUserAccount && (
         <AdminUserDetails
-          account={users.find((account) => account.id === viewingUserId)}
+          account={viewingUserAccount}
           isSelf={viewingUserId === user?.id}
           busy={busyId === viewingUserId}
           onClose={closeUserDetails}
