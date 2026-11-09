@@ -1029,7 +1029,15 @@ export default function DashboardWorkspace({ initialRole }) {
   const [currentTime, setCurrentTime] = useState(dashboardLoadedAt);
   const [providerMethodFilter, setProviderMethodFilter] = useState('all');
   const config = roleConfig[initialRole];
-  const displayName = user?.name || config.label;
+  // Cargo providers see their exact account type: "Cargo Company" or "Individual".
+  const isIndividualProvider = initialRole === 'provider' && user?.role === 'individual_cargo';
+  const roleTitle = initialRole !== 'provider' || !user
+    ? config.label
+    : user.role === 'individual_cargo' ? 'Individual' : user.role === 'cargo_provider' ? 'Cargo Company' : config.label;
+  const displayName = user?.name || roleTitle;
+  useEffect(() => {
+    if (user) document.title = `Tayonx | ${roleTitle} dashboard`;
+  }, [roleTitle, user]);
   const customerMode = initialRole === 'customer';
   const providerMode = initialRole === 'provider';
   const adminMode = initialRole === 'admin';
@@ -1634,7 +1642,7 @@ export default function DashboardWorkspace({ initialRole }) {
 
     if (providerMode && section === 'company') {
       const isCompany = user?.role === 'cargo_provider';
-      return <Card><CardHeading title={isCompany ? 'Company profile' : 'Provider profile'} subtitle="Your account details as customers and administrators see them." action={user && <VerificationChip status={user.verification?.status} />} />{user ? <div className="customer-profile-grid"><div><span>{isCompany ? 'Company name' : 'Full name'}</span><strong>{user.name}</strong></div><div><span>Account type</span><strong>{userRoleLabel(user.role)}</strong></div><div><span>Phone number</span><strong>{user.phone || 'Not provided'}</strong></div><div><span>Email address</span><strong>{user.email}</strong></div><div><span>Country</span><strong>{user.country}</strong></div><div><span>Verification</span><strong>{VERIFICATION_LABELS[user.verification?.status || 'unverified']}{user.verification?.status !== 'approved' && <button type="button" className="link-button profile-verify-link" onClick={() => setSection('settings')}>{user.verification?.status === 'pending' ? 'View status' : 'Get verified'} <Icon name="arrow" size={13} /></button>}</strong></div></div> : <p className="empty-table" role="status">Loading company account…</p>}</Card>;
+      return <Card><CardHeading title={isCompany ? 'Company profile' : 'My profile'} subtitle="Your account details as customers and administrators see them." action={user && <VerificationChip status={user.verification?.status} />} />{user ? <div className="customer-profile-grid"><div><span>{isCompany ? 'Company name' : 'Full name'}</span><strong>{user.name}</strong></div><div><span>Account type</span><strong>{roleTitle}</strong></div><div><span>Phone number</span><strong>{user.phone || 'Not provided'}</strong></div><div><span>Email address</span><strong>{user.email}</strong></div><div><span>Country</span><strong>{user.country}</strong></div><div><span>Verification</span><strong>{VERIFICATION_LABELS[user.verification?.status || 'unverified']}{user.verification?.status !== 'approved' && <button type="button" className="link-button profile-verify-link" onClick={() => setSection('settings')}>{user.verification?.status === 'pending' ? 'View status' : 'Get verified'} <Icon name="arrow" size={13} /></button>}</strong></div></div> : <p className="empty-table" role="status">Loading company account…</p>}</Card>;
     }
 
     if (adminMode && section === 'verifications') {
@@ -1878,12 +1886,15 @@ export default function DashboardWorkspace({ initialRole }) {
     <div className={`app-shell${customerMode ? ' customer-shell' : ''}${providerMode ? ' provider-shell' : ''}${adminMode ? ' admin-shell' : ''}`}>
       <aside className={`sidebar${mobileNavOpen ? ' sidebar-open' : ''}`}>
         <a className="sidebar-brand" href="#dashboard" aria-label="Tayonx dashboard home" onClick={(event) => { event.preventDefault(); setSection('overview'); }}><img src={logo} alt="Tayonx" /></a>
-        <div className="workspace-role-picker"><span className="customer-role-label">{config.label.toUpperCase()}</span></div>
-        <nav className="side-nav" aria-label={`${config.label} navigation`}>
-          {config.sections.map(([sectionId, label, icon]) => (
+        <div className="workspace-role-picker"><span className="customer-role-label">{roleTitle.toUpperCase()}</span></div>
+        <nav className="side-nav" aria-label={`${roleTitle} navigation`}>
+          {config.sections.map(([sectionId, sectionLabel, icon]) => {
+            // Individual providers have a personal profile, not a company one.
+            const label = providerMode && sectionId === 'company' && isIndividualProvider ? 'My profile' : sectionLabel;
+            return (
             <Fragment key={sectionId}>
               {adminMode && sectionId === 'settings' && <span className="sidebar-section-label">SYSTEM</span>}
-          {providerMode && sectionId === 'company' && <span className="sidebar-section-label">COMPANY</span>}
+          {providerMode && sectionId === 'company' && <span className="sidebar-section-label">{isIndividualProvider ? 'ACCOUNT' : 'COMPANY'}</span>}
           <button className={`nav-item${section === sectionId ? ' active' : ''}`} onClick={() => {
                 if (sectionId === 'new-request') {
                   openCreateRequest();
@@ -1910,7 +1921,8 @@ export default function DashboardWorkspace({ initialRole }) {
                 {providerMode && sectionId === 'settings' && ['unverified', 'rejected'].includes(user?.verification?.status) && <span className="nav-dot" aria-label="Verification needed" />}
               </button>
             </Fragment>
-          ))}
+            );
+          })}
         </nav>
         <div className="sidebar-bottom">
           <button className="customer-signout" onClick={signOut}><Icon name="arrow" size={15} />Log out</button>
@@ -1921,7 +1933,7 @@ export default function DashboardWorkspace({ initialRole }) {
       <div className="app-main">
         <header className="topbar">
           <button className="mobile-menu icon-button" aria-label="Open navigation" onClick={() => setMobileNavOpen(true)}><Icon name="menu" /></button>
-          <div className="customer-topbar-title"><strong>{title}</strong><span className="topbar-welcome">Welcome back, {displayName}{providerMode && user?.verification?.status === 'approved' && <span className="topbar-verified-badge" title={`Verified ${user.role === 'cargo_provider' ? 'cargo company' : 'cargo provider'}`}><Icon name="shield" size={13} />Verified</span>}</span></div>
+          <div className="customer-topbar-title"><strong>{title}</strong><span className="topbar-welcome">Welcome back, {displayName}{providerMode && user && <span className={`topbar-role-badge${isIndividualProvider ? ' individual' : ''}`} title={`Account type: ${roleTitle}`}><Icon name={isIndividualProvider ? 'user' : 'building'} size={13} />{roleTitle}</span>}{providerMode && user?.verification?.status === 'approved' && <span className="topbar-verified-badge" title={`Verified ${isIndividualProvider ? 'individual provider' : 'cargo company'}`}><Icon name="shield" size={13} />Verified</span>}</span></div>
           <div className="topbar-actions">
             {providerMode && <span className="provider-country-chip"><b>{user?.country?.slice(0, 2).toUpperCase() || '—'}</b>{user?.country || 'Country not set'}</span>}
             {adminMode && section === 'overview' && <div className="admin-period-switch" role="group" aria-label="Filter dashboard period">

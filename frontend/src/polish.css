@@ -1219,7 +1219,208 @@ body {
 }
 
 /* ========================================================================
-   17. Motion
+   17. Cargo provider dashboard: compact overview
+   ======================================================================== */
+.app-shell .provider-dashboard-main {
+  padding-top: 22px;
+  padding-bottom: 22px;
+}
+
+.app-shell .provider-dashboard {
+  gap: 18px;
+}
+
+.app-shell .provider-dashboard .provider-dashboard-grid,
+.app-shell .provider-dashboard .provider-dashboard-aside {
+  gap: 18px;
+}
+
+.app-shell .provider-dashboard .provider-stats-grid {
+  gap: 14px;
+}
+
+.app-shell .provider-dashboard .provider-stat-card {
+  min-height: 0;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  border-radius: var(--radius-lg);
+}
+
+.app-shell .provider-dashboard .provider-stat-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+}
+
+.app-shell .provider-dashboard .provider-stat-icon svg {
+  width: 19px;
+  height: 19px;
+}
+
+.app-shell .provider-dashboard .provider-stat-card > div {
+  gap: 0;
+}
+
+.app-shell .provider-dashboard .provider-stat-card strong {
+  font-size: 26px;
+  line-height: 30px;
+}
+
+.app-shell .provider-dashboard .provider-stat-card > div > span {
+  color: var(--neutral-500);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 18px;
+}
+
+.app-shell .provider-dashboard .dashboard-card .card-heading {
+  min-height: 0;
+  padding: 14px 18px;
+}
+
+.app-shell .provider-dashboard .dashboard-card .card-heading h2 {
+  font-size: 16px;
+  line-height: 22px;
+}
+
+/* New requests list */
+.app-shell .provider-dashboard .provider-request-row {
+  min-height: 0;
+  gap: 12px;
+  padding: 12px 18px;
+}
+
+.app-shell .provider-dashboard .provider-request-row .request-thumb {
+  width: 44px;
+  height: 44px;
+}
+
+.app-shell .provider-dashboard .provider-request-info {
+  gap: 2px;
+}
+
+.app-shell .provider-dashboard .provider-request-title strong {
+  font-size: 14.5px;
+}
+
+.app-shell .provider-dashboard .provider-request-info > small {
+  font-size: 12.5px;
+}
+
+.app-shell .provider-dashboard .provider-request-meta {
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.app-shell .provider-dashboard .provider-request-actions button {
+  min-height: 34px;
+}
+
+/* Recent customer activity + This month */
+.app-shell .provider-dashboard .customer-chat-row {
+  min-height: 0;
+  padding: 10px 18px;
+}
+
+.app-shell .provider-dashboard .provider-performance {
+  gap: 14px;
+  padding: 16px 18px;
+}
+
+.app-shell .provider-dashboard .verification-gate {
+  margin: 4px 0;
+  padding: 26px 20px;
+}
+
+/* Side column: the two cards share the column height instead of each taking 100%
+   (which pushed "This month" below the grid). The last card fills any leftover space. */
+.app-shell .provider-dashboard-aside > .dashboard-card {
+  height: auto;
+  min-height: 0;
+  flex: 0 0 auto;
+}
+
+.app-shell .provider-dashboard-aside > .dashboard-card:last-child {
+  flex: 1 0 auto;
+}
+
+/* Account type badge next to "Welcome back, …" */
+.app-shell .topbar-role-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 22px;
+  margin-left: 8px;
+  padding: 0 9px;
+  border-radius: var(--radius-pill);
+  color: var(--navy-800);
+  background: var(--navy-100);
+  box-shadow: inset 0 0 0 1px rgba(15, 30, 60, 0.08);
+  font-size: 12px;
+  font-weight: 700;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.app-shell .topbar-role-badge.individual {
+  color: var(--blue-700);
+  background: var(--blue-100);
+}
+
+.app-shell .topbar-role-badge + .topbar-verified-badge {
+  margin-left: 6px;
+}
+
+/* Chat: close button in the conversation header */
+.app-shell .chat-heading-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.app-shell .chat-heading-actions .chat-report-button {
+  margin-left: 0;
+}
+
+.app-shell .chat-close-button {
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: #ffffff;
+  box-shadow: var(--shadow-xs);
+}
+
+.app-shell .chat-close-button:hover {
+  border-color: var(--red-600);
+  color: var(--red-700);
+  background: var(--red-50);
+}
+
+@media (max-width: 680px) {
+  .app-shell .provider-dashboard-main {
+    padding-top: 16px;
+    padding-bottom: 16px;
+  }
+
+  .app-shell .provider-dashboard .provider-stat-card {
+    padding: 14px;
+  }
+
+  .app-shell .provider-dashboard .provider-stat-card strong {
+    font-size: 22px;
+    line-height: 26px;
+  }
+
+  .app-shell .topbar-role-badge {
+    display: none;
+  }
+}
+
+/* ========================================================================
+   18. Motion
    ======================================================================== */
 
 @keyframes tayonx-fade-in {
@@ -1263,7 +1464,7 @@ body {
 }
 
 /* ========================================================================
-   18. Small screens
+   19. Small screens
    ======================================================================== */
 
 @media (max-width: 680px) {
