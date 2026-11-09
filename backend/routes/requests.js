@@ -503,6 +503,11 @@ router.patch('/:id/status', async (req, res) => {
       cancelled: [],
     };
     if (status === request.status) return res.json({ request });
+    // Shipment progress is updated only by the assigned cargo provider. Customers see it
+    // read-only; the one change they can make is cancelling their request before purchase.
+    if (req.user.role === 'customer' && status !== 'cancelled') {
+      return res.status(403).json({ error: 'Shipment progress is updated by your cargo provider. You can only cancel the request.' });
+    }
     if (req.user.role !== 'admin' && !transitions[request.status].includes(status)) {
       const final = ['delivered', 'cancelled'].includes(request.status);
       return res.status(409).json({
