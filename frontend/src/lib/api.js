@@ -29,6 +29,15 @@ export function getRequests(scope, options) {
   return apiRequest(`/api/requests${query}`, options);
 }
 
+// Verified cargo companies / providers (public profile fields only — no verification documents).
+export function getProviders(options) {
+  return apiRequest('/api/providers', options);
+}
+
+export function getProvider(id, options) {
+  return apiRequest(`/api/providers/${encodeURIComponent(id)}`, options);
+}
+
 export function createRequest(values) {
   return apiRequest('/api/requests', { method: 'POST', body: values });
 }

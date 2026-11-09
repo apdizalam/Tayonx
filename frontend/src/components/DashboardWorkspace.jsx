@@ -7,6 +7,7 @@ import AdminSettings from './AdminSettings.jsx';
 import Chat from './Chat.jsx';
 import ConfirmDialog from './ConfirmDialog.jsx';
 import AdminUserDetails from './AdminUserDetails.jsx';
+import { CompanyDirectory, CompanyPicker, CompanyProfileModal } from './CargoCompanies.jsx';
 import AccountFields from './AccountFields.jsx';
 import AdminVerifications from './AdminVerifications.jsx';
 import VerificationCenter from './VerificationCenter.jsx';
@@ -26,6 +27,7 @@ import {
   deleteRequest,
   deleteUser,
   getOffers,
+  getProviders,
   getRequests,
   getUsers,
   getVerificationRequests,
@@ -158,6 +160,14 @@ function Avatar({ name, className = '' }) {
   return <span className={`avatar ${className}`}>{initials}</span>;
 }
 
+/** Which cargo company a request was sent to ("Sent to you" for that provider). */
+function RequestTargetChip({ request, role }) {
+  const target = request.targetProvider;
+  if (!target) return null;
+  if (role === 'provider') return <span className="request-target-chip mine" title="The customer chose your company for this request"><Icon name="check" size={11} />Sent to you</span>;
+  return <span className="request-target-chip" title="Cargo company this request was sent to"><Icon name="building" size={11} />To {target.name || 'cargo company'}</span>;
+}
+
 function RequestTable({ requests, role, search, busyId, onEdit, onDelete, onSelectOffers, onStatusChange, onCreateOffer, onDeclineRequest }) {
   const visibleRequests = requests.filter((request) =>
     `${request.product} ${request.sourceCountry} ${request.destination} ${request.status} ${request.customer?.name || ''}`
@@ -175,7 +185,7 @@ function RequestTable({ requests, role, search, busyId, onEdit, onDelete, onSele
             const canEdit = role === 'admin' || role === 'customer';
             return (
               <tr key={request._id}>
-                <td><span className="request-cell"><RequestThumb photoId={request.productPhoto} product={request.product} size="sm" /><span><span className="table-primary">{request.product} · {request.quantity}</span><span className="table-secondary">{request._id}</span><DeliveryMethodChip method={request.deliveryMethod} compact /></span></span></td>
+                <td><span className="request-cell"><RequestThumb photoId={request.productPhoto} product={request.product} size="sm" /><span><span className="table-primary">{request.product} · {request.quantity}</span><span className="table-secondary">{request._id}</span><DeliveryMethodChip method={request.deliveryMethod} compact /><RequestTargetChip request={request} role={role} /></span></span></td>
                 <td>{request.sourceCountry} → {request.destination}</td>
                 <td>{new Date(request.createdAt).toLocaleDateString()}</td>
                 <td>{role === 'customer' && request.offers?.length
@@ -435,10 +445,17 @@ function CurrentProductPhoto({ photoId, product, removed, onToggle }) {
   );
 }
 
-function RequestForm({ request, saving, error, onSubmit, onClose }) {
+/**
+ * New requests are company-first: step 1 picks a verified cargo company, step 2 collects the
+ * shipping details for that company. Editing an existing request skips straight to the details.
+ */
+function RequestForm({ request, saving, error, onSubmit, onClose, companies = {}, initialCompany = null }) {
+  const isNew = !request;
+  const [company, setCompany] = useState(initialCompany);
+  const [step, setStep] = useState(isNew && !initialCompany ? 'company' : 'details');
   const [values, setValues] = useState({
     product: request?.product || '',
-    sourceCountry: request?.sourceCountry || 'China',
+    sourceCountry: request?.sourceCountry || initialCompany?.country || 'China',
     destination: request?.destination || '',
     quantity: request?.quantity || '',
     deliveryMethod: request?.deliveryMethod || '',
@@ -469,9 +486,15 @@ function RequestForm({ request, saving, error, onSubmit, onClose }) {
       return;
     }
 
+    if (isNew && !company) {
+      setStep('company');
+      return;
+    }
+
     // Multipart so the optional product photo can be uploaded with the request.
     const body = new FormData();
     for (const [key, value] of Object.entries(values)) body.append(key, value.trim());
+    if (isNew) body.append('targetProvider', company.id);
     if (photo) body.append('productPhoto', photo);
     else if (removePhoto) body.append('removeProductPhoto', 'true');
     onSubmit(body);
@@ -479,10 +502,50 @@ function RequestForm({ request, saving, error, onSubmit, onClose }) {
 
   const fieldError = (name) => errors[name] && <span className="offer-field-error" id={`request-${name}-error`} role="alert">{errors[name]}</span>;
 
+  function chooseCompany(next) {
+    setCompany(next);
+    // Default the source country to where the chosen company operates (still editable).
+    if (!values.product && !values.quantity) setValues((current) => ({ ...current, sourceCountry: next.country || current.sourceCountry }));
+  }
+
+  const stepper = isNew && (
+    <ol className="request-steps" aria-label="New request steps">
+      <li className={step === 'company' ? 'current' : 'done'}><span>{step === 'company' ? '1' : <Icon name="check" size={12} />}</span>Choose a cargo company</li>
+      <li className={step === 'details' ? 'current' : ''}><span>2</span>Shipping details</li>
+    </ol>
+  );
+
+  if (isNew && step === 'company') {
+    return (
+      <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+        <section className="request-modal shipping-request-modal company-step-modal" role="dialog" aria-modal="true" aria-labelledby="request-company-title">
+          <div className="modal-heading"><div><p className="eyebrow">NEW SHIPPING REQUEST</p><h2 id="request-company-title">Which cargo company should handle it?</h2></div><button type="button" className="icon-button" aria-label="Close dialog" onClick={onClose}><Icon name="close" /></button></div>
+          {stepper}
+          <p className="company-step-hint">Only verified companies are listed. Your request is sent to the company you choose.</p>
+          <CompanyPicker providers={companies.list || []} loading={companies.loading} error={companies.error} selectedId={company?.id} onSelect={chooseCompany} onRetry={companies.retry} />
+          <div className="company-step-footer">
+            <button type="button" className="customer-outline-button" onClick={onClose}>Cancel</button>
+            <button type="button" className="primary-button" disabled={!company} onClick={() => setStep('details')}>Continue<Icon name="arrow" size={15} /></button>
+          </div>
+        </section>
+      </div>
+    );
+  }
+
+  const target = isNew ? company : request?.targetProvider;
+
   return (
     <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
       <form className="request-modal shipping-request-modal" onSubmit={handleSubmit} noValidate>
         <div className="modal-heading"><div><p className="eyebrow">{request ? 'EDIT SHIPPING REQUEST' : 'NEW SHIPPING REQUEST'}</p><h2>{request ? 'Update your request' : 'What are you looking for?'}</h2></div><button type="button" className="icon-button" aria-label="Close dialog" onClick={onClose}><Icon name="close" /></button></div>
+        {stepper}
+        {target?.name && (
+          <div className="request-target-banner">
+            <span className="company-avatar" aria-hidden="true">{target.name.split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase()}</span>
+            <span><small>{isNew ? 'Sending this request to' : 'Sent to'}</small><strong>{target.name}</strong><small>{target.role === 'cargo_provider' ? 'Cargo company' : 'Individual cargo'}{target.country ? ` · ${target.country}` : ''}</small></span>
+            {isNew && <button type="button" className="link-button" onClick={() => setStep('company')}>Change</button>}
+          </div>
+        )}
         <label>Product or item<input name="product" value={values.product} onChange={change} maxLength="160" required placeholder="e.g. 50 business laptops" /></label>
         <div className="form-row"><label>Source country<select name="sourceCountry" value={values.sourceCountry} onChange={change}>{[...new Set([...COUNTRIES, values.sourceCountry, 'Other'])].filter(Boolean).map((country) => <option key={country} value={country}>{country}</option>)}</select></label><label>Delivery to<input name="destination" value={values.destination} onChange={change} maxLength="160" required placeholder="City, country" /></label></div>
         <div className="form-row">
@@ -517,7 +580,7 @@ function RequestForm({ request, saving, error, onSubmit, onClose }) {
 
         <label>Additional details<textarea name="details" value={values.details} onChange={change} maxLength="2000" rows="3" /></label>
         {error && <p className="signin-message" role="alert">{error}</p>}
-        <button className="primary-button full-button" disabled={saving} type="submit">{saving ? 'Saving…' : request ? 'Save changes' : 'Post request'}</button>
+        <button className="primary-button full-button" disabled={saving} type="submit">{saving ? 'Saving…' : request ? 'Save changes' : `Send request${company ? ` to ${company.name}` : ''}`}</button>
       </form>
     </div>
   );
@@ -799,6 +862,17 @@ export default function DashboardWorkspace({ initialRole }) {
   const [message, setMessage] = useState('');
   const [search, setSearch] = useState('');
   const [requestModalOpen, setRequestModalOpen] = useState(false);
+  // Verified cargo companies for the customer's directory and the company-first request flow.
+  const [companies, setCompanies] = useState({ list: [], loading: false, error: '' });
+  const [requestCompany, setRequestCompany] = useState(null);
+  const [viewingCompany, setViewingCompany] = useState(null);
+  const closeCompanyProfile = useCallback(() => setViewingCompany(null), []);
+  const loadCompanies = useCallback(() => {
+    setCompanies((current) => ({ ...current, loading: true, error: '' }));
+    return getProviders()
+      .then((data) => setCompanies({ list: data.providers || [], loading: false, error: '' }))
+      .catch((loadError) => setCompanies((current) => ({ ...current, loading: false, error: loadError.message })));
+  }, []);
   const [editingRequest, setEditingRequest] = useState(null);
   const [offerRequest, setOfferRequest] = useState(null);
   const [editingOffer, setEditingOffer] = useState(null);
@@ -948,6 +1022,11 @@ export default function DashboardWorkspace({ initialRole }) {
     providers.set(key, existing);
     return providers;
   }, new Map()).values()];
+
+  // Customers: load verified cargo companies for the directory and the New Request flow.
+  useEffect(() => {
+    if (customerMode && localStorage.getItem('token')) loadCompanies();
+  }, [customerMode, loadCompanies]);
 
   useEffect(() => {
     document.title = `Tayonx | ${config.label} dashboard`;
@@ -1117,10 +1196,15 @@ export default function DashboardWorkspace({ initialRole }) {
     setConfirmState(ok ? null : (current) => current && { ...current, busy: false });
   }
 
-  function openCreateRequest() {
+  // Opens the company-first New Request flow. Passing a company (from the directory or a
+  // company profile) skips the "choose a company" step. Click events are ignored.
+  function openCreateRequest(company) {
+    setRequestCompany(company && typeof company === 'object' && 'stats' in company ? company : null);
+    setViewingCompany(null);
     setEditingRequest(null);
     setFormError('');
     setRequestModalOpen(true);
+    if (!companies.list.length && !companies.loading) loadCompanies();
   }
 
   async function saveRequest(values) {
@@ -1132,7 +1216,7 @@ export default function DashboardWorkspace({ initialRole }) {
       await refreshData();
       setRequestModalOpen(false);
       setEditingRequest(null);
-      setMessage(editingRequest ? 'Shipping request updated.' : 'Shipping request posted.');
+      setMessage(editingRequest ? 'Shipping request updated.' : 'Shipping request sent to the cargo company.');
     } catch (requestError) {
       setFormError(requestError.message);
     } finally {
@@ -1430,7 +1514,9 @@ export default function DashboardWorkspace({ initialRole }) {
     }
 
     if (customerMode && section === 'companies') {
-      return <Card><CardHeading title="Cargo companies" subtitle="Providers who have sent quotes for your requests." />{loading ? <p className="empty-table" role="status">Loading cargo providers…</p> : quotedProviders.length ? <div className="customer-directory-list">{quotedProviders.map((provider) => <div className="customer-company-row" key={provider.id}><Avatar name={provider.name} className="customer-company-avatar navy" /><span className="customer-row-copy"><strong>{provider.name}</strong><small>{provider.offers} quote{provider.offers === 1 ? '' : 's'} on your requests</small></span><button className="customer-outline-button" disabled={!provider.requestId} onClick={() => { setSelectedRequestId(provider.requestId); setSection('offers'); }}>View quotes</button></div>)}</div> : <div className="empty-state"><strong>No cargo companies yet</strong><p>Companies appear here after they send a quote on one of your requests.</p><button className="small-primary" onClick={() => setSection('requests')}>View requests</button></div>}</Card>;
+      return <Card className="company-directory-card-wrap"><CardHeading title="Cargo companies" subtitle="Verified cargo companies and providers from every country. Open a profile or send a request directly." action={<span className="company-verified-badge large"><Icon name="shield" size={13} />Verified only</span>} />
+        <CompanyDirectory providers={companies.list} loading={companies.loading && !companies.list.length} error={companies.error} onRetry={loadCompanies} onView={setViewingCompany} onRequest={openCreateRequest} />
+      </Card>;
     }
 
     if (customerMode && section === 'notifications') {
@@ -1528,7 +1614,7 @@ export default function DashboardWorkspace({ initialRole }) {
                 return <div className="provider-request-row" key={request._id}>
                   <RequestThumb photoId={request.productPhoto} product={request.product} icon="laptop" />
                   <div className="provider-request-info">
-                    <span className="provider-request-title"><strong>{request.product} · {request.quantity}</strong>{age < 24 * 60 * 60 * 1000 && <span>New</span>}</span>
+                    <span className="provider-request-title"><strong>{request.product} · {request.quantity}</strong>{age < 24 * 60 * 60 * 1000 && <span>New</span>}<RequestTargetChip request={request} role="provider" /></span>
                     <small>{request.details || `${request.sourceCountry} to ${request.destination}`}</small>
                     <span className="provider-request-meta"><span><b>{request.sourceCountry.slice(0, 2).toUpperCase()}</b>{request.destination}</span><DeliveryMethodChip method={request.deliveryMethod} /><small>{timeLabel}</small></span>
                   </div>
@@ -1713,7 +1799,8 @@ export default function DashboardWorkspace({ initialRole }) {
           onChat={(offer) => { setViewingOfferId(''); openChatWithProvider(offer); }}
         />
       )}
-      {requestModalOpen && <RequestForm request={editingRequest} saving={saving} error={formError} onSubmit={saveRequest} onClose={() => { setRequestModalOpen(false); setEditingRequest(null); setFormError(''); }} />}
+      {customerMode && viewingCompany && <CompanyProfileModal provider={viewingCompany} onClose={closeCompanyProfile} onRequest={openCreateRequest} />}
+      {requestModalOpen && <RequestForm request={editingRequest} saving={saving} error={formError} onSubmit={saveRequest} companies={{ ...companies, retry: loadCompanies }} initialCompany={editingRequest ? null : requestCompany} onClose={() => { setRequestModalOpen(false); setEditingRequest(null); setRequestCompany(null); setFormError(''); }} />}
       {(offerRequest || editingOffer) && <OfferForm request={offerRequest || editingOffer?.request} offer={editingOffer} saving={saving} error={formError} onSubmit={saveOffer} onClose={() => { setOfferRequest(null); setEditingOffer(null); setFormError(''); }} />}
       {adminMode && viewingUserId && users.some((account) => account.id === viewingUserId) && (
         <AdminUserDetails
