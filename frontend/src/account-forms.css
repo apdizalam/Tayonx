@@ -1024,26 +1024,18 @@ input.file-picker-input {
   background: #f5f8ff;
 }
 
-/* ---------- Send offer: unit price × quantity ---------- */
+/* ---------- Send offer: itemised pricing ---------- */
 
 .request-modal.offer-modal {
-  width: min(100%, 560px);
+  width: min(100%, 600px);
+  max-height: calc(100vh - 44px);
+  gap: 18px;
+  overflow-y: auto;
 }
 
-.offer-quantity {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  margin: -4px 0 0;
-  padding: 10px 12px;
-  border-radius: 8px;
-  color: #4b5a70;
-  background: #f4f7fc;
-  font-size: 13px;
-}
-
-.offer-quantity strong {
-  color: #132541;
+/* The dialog scrolls instead; its sections must never shrink (the summary would be clipped). */
+.request-modal.offer-modal > * {
+  flex-shrink: 0;
 }
 
 .offer-modal label {
@@ -1055,28 +1047,83 @@ input.file-picker-input {
   font-size: 14px;
 }
 
-.offer-modal .form-row {
-  align-items: flex-start;
+.offer-section {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 16px 16px 14px;
+  border: 1px solid #e3e8f0;
+  border-radius: 10px;
 }
 
-.offer-total {
-  display: flex;
-  height: 39px;
-  align-items: center;
-  padding: 0 12px;
-  border: 1px solid #a6dcc0;
-  border-radius: 5px;
-  color: #0f6b43;
-  background: #effaf4;
+.offer-section legend {
+  padding: 0 6px;
+  color: #132541;
   font-family: var(--font-display);
-  font-size: 18px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.offer-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.offer-grid label {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Read-only quantity */
+.offer-readonly {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.offer-readonly > .icon {
+  position: absolute;
+  left: 11px;
+  color: #8490a2;
+}
+
+.request-modal.offer-modal .offer-readonly input {
+  padding-left: 34px;
+  border-style: dashed;
+  color: #132541;
+  background: #f4f7fc;
+  cursor: default;
   font-weight: 700;
 }
 
-.offer-total.empty {
-  border-color: #dfe5ee;
-  color: #98a3b4;
-  background: #f7f9fc;
+.request-modal.offer-modal .offer-readonly input:focus {
+  border-color: #cbd4e1;
+  box-shadow: none;
+}
+
+/* "$" prefix on money inputs */
+.offer-money {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.offer-money > span {
+  position: absolute;
+  left: 12px;
+  color: #64728a;
+  font-size: 14px;
+  font-weight: 700;
+  pointer-events: none;
+}
+
+.request-modal.offer-modal .offer-money input {
+  padding-left: 26px;
 }
 
 .offer-field-help {
@@ -1091,43 +1138,119 @@ input.file-picker-input {
   font-weight: 600;
 }
 
-.offer-modal input[aria-invalid="true"] {
+.request-modal input[aria-invalid="true"] {
   border-color: #d92d20;
   box-shadow: 0 0 0 3px #fee4e2;
 }
 
-.offer-calculation {
+/* Live pricing summary */
+.offer-summary {
   display: flex;
-  align-items: center;
-  gap: 9px;
-  padding: 12px 14px;
+  flex-direction: column;
+  overflow: hidden;
   border: 1px solid #c8d8ff;
-  border-radius: 9px;
-  color: #1f3a6b;
-  background: #f2f6ff;
+  border-radius: 10px;
+  background: #f7f9ff;
+}
+
+.offer-summary > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 16px;
+  color: #4b5a70;
   font-size: 14px;
 }
 
-.offer-calculation b {
+.offer-summary > div + div {
+  border-top: 1px solid #e3eaf8;
+}
+
+.offer-summary > div > span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.offer-summary small {
+  color: #8490a2;
+  font-size: 12px;
+}
+
+.offer-summary strong {
   color: #132541;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
-.offer-calculation.pending {
-  border-style: dashed;
+.offer-summary .offer-summary-total {
+  color: #fff;
+  background: #142744;
+}
+
+.offer-summary .offer-summary-total span {
+  font-weight: 700;
+}
+
+.offer-summary .offer-summary-total strong {
+  color: #fff;
+  font-family: var(--font-display);
+  font-size: 20px;
+}
+
+/* Request without a numeric quantity */
+.offer-blocked {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid #f5d48a;
+  border-radius: 10px;
+  color: #7a4a00;
+  background: #fff8e6;
+}
+
+.offer-blocked > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.offer-blocked strong {
+  font-size: 14px;
+}
+
+/* Stored offer breakdown in tables and lists */
+.offer-breakdown {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
   color: #64728a;
-  background: #f9fbfe;
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: nowrap;
 }
 
-.customer-offer-amount small {
-  display: block;
-  color: #718099;
-  font-size: 11px;
-  font-weight: 500;
+.offer-breakdown .offer-breakdown-total {
+  color: #132541;
+  font-size: 14px;
+}
+
+.customer-offer-amount .offer-breakdown {
+  align-items: flex-end;
+  text-align: right;
 }
 
 @media (max-width: 560px) {
-  .offer-modal .form-row {
-    flex-direction: column;
-    align-items: stretch;
+  .offer-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .offer-section {
+    padding: 14px 12px 12px;
   }
 }
