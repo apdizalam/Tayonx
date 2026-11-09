@@ -2,7 +2,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const ShippingRequest = require('../models/ShippingRequest');
 const { authenticate, requireRole } = require('../middleware/authenticate');
-const { parseQuantity, readOfferBody, roundMoney } = require('../lib/offerPricing');
+const { parseQuantity, readOfferBody, repriceOffer } = require('../lib/offerPricing');
 
 const router = express.Router();
 const requestStatuses = ['open', 'offers_received', 'in_progress', 'purchased', 'shipping', 'delivered', 'cancelled'];
@@ -37,6 +37,8 @@ function fieldsError(fields) {
   if (!fields.sourceCountry || fields.sourceCountry.length > 80) return 'A source country is required.';
   if (!fields.destination || fields.destination.length > 160) return 'A destination is required.';
   if (!fields.quantity || fields.quantity.length > 100) return 'A quantity is required.';
+  // Offers are priced per item, so the quantity must contain a whole number.
+  if (!parseQuantity(fields.quantity)) return 'Quantity must include a whole number, e.g. "50 laptops".';
   if (fields.details.length > 2000) return 'Details must be 2,000 characters or fewer.';
   return null;
 }
@@ -161,18 +163,10 @@ router.put('/:id', async (req, res) => {
     const error = fieldsError(fields);
     if (error) return res.status(400).json({ error });
     Object.assign(request, fields);
-    // Keep unit-price quotes consistent with the new quantity.
+    // Keep pending per-item quotes consistent with the new quantity (subtotal and total).
     const newCount = parseQuantity(request.quantity);
     for (const offer of request.offers) {
-      if (offer.status !== 'pending' || !offer.unitPrice) continue;
-      if (newCount) {
-        offer.quantityCount = newCount;
-        offer.price = roundMoney(offer.unitPrice * newCount);
-      } else {
-        // The quantity is no longer a number: keep the last total, drop the per-unit breakdown.
-        offer.unitPrice = null;
-        offer.quantityCount = null;
-      }
+      if (offer.status === 'pending') repriceOffer(offer, newCount);
     }
     await request.save();
     await request.populate('customer', 'name');
