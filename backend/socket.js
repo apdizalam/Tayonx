@@ -73,7 +73,7 @@ function registerChatSocket(io) {
           return;
         }
         if (!await canChatBetween(currentSender, recipient)) {
-          reply({ error: 'You can only message shipment counterparties or an administrator.' });
+          reply({ error: 'You can only message customers or cargo providers you are currently doing business with, or an administrator.' });
           return;
         }
 
