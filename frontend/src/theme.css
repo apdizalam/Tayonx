@@ -2603,3 +2603,438 @@ input[type="radio"] {
   padding-right: 12px;
   padding-left: 12px;
 }
+
+/* ========================================================================
+   23. Cargo companies: company-first request flow, verified directory, profile
+   ======================================================================== */
+.app-shell .company-avatar {
+  display: grid;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border-radius: 12px;
+  color: #ffffff;
+  background: linear-gradient(135deg, var(--navy-900), var(--blue-600));
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.app-shell .company-avatar.large {
+  width: 48px;
+  height: 48px;
+  font-size: 16px;
+}
+
+.app-shell .company-verified-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 22px;
+  padding: 0 8px;
+  border-radius: var(--radius-pill);
+  color: var(--emerald-800);
+  background: var(--emerald-100);
+  font-size: 11.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.app-shell .company-verified-badge.large {
+  min-height: 28px;
+  padding: 0 12px;
+  font-size: 12.5px;
+}
+
+/* Filters */
+.app-shell .company-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.app-shell .company-filters .company-search {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.app-shell .company-filters .company-search input {
+  width: 100%;
+}
+
+.app-shell .company-country-filter {
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: #ffffff;
+  font-size: 14px;
+}
+
+/* Request steps */
+.app-shell .request-steps {
+  display: flex;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.app-shell .request-steps li {
+  display: inline-flex;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  color: var(--ink-muted);
+  background: var(--surface-sunken);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.app-shell .request-steps li span {
+  display: grid;
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--ink-muted);
+  background: #ffffff;
+  font-size: 12px;
+}
+
+.app-shell .request-steps li.current {
+  color: var(--navy-900);
+  background: var(--blue-100);
+}
+
+.app-shell .request-steps li.current span {
+  color: #ffffff;
+  background: var(--blue-500);
+}
+
+.app-shell .request-steps li.done span {
+  color: #ffffff;
+  background: var(--emerald-500);
+}
+
+/* Step 1: company picker */
+.app-shell .company-step-modal {
+  width: min(100%, 720px);
+  max-height: calc(100vh - 44px);
+  overflow-y: auto;
+}
+
+.app-shell .company-step-modal > * {
+  flex-shrink: 0;
+}
+
+.app-shell .company-step-hint {
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: 14px;
+}
+
+.app-shell .company-pick-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  max-height: 360px;
+  padding: 2px;
+  overflow-y: auto;
+}
+
+.app-shell .company-pick-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 0;
+  padding: 12px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--ink);
+  background: #ffffff;
+  box-shadow: none;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.app-shell .company-pick-card:hover {
+  border-color: var(--blue-300);
+  background: var(--blue-50);
+}
+
+.app-shell .company-pick-card.selected {
+  border-color: var(--blue-500);
+  background: var(--blue-50);
+  box-shadow: 0 0 0 3px rgba(31, 107, 255, 0.14);
+}
+
+.app-shell .company-pick-card:focus-visible {
+  outline: 2px solid var(--blue-500);
+  outline-offset: 2px;
+}
+
+.app-shell .company-pick-copy {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  gap: 3px;
+}
+
+.app-shell .company-pick-copy strong {
+  overflow: hidden;
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-shell .company-pick-copy small {
+  color: var(--ink-muted);
+  font-size: 12.5px;
+}
+
+.app-shell .company-pick-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.app-shell .company-pick-check {
+  display: grid;
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 50%;
+  color: #ffffff;
+}
+
+.app-shell .company-pick-card.selected .company-pick-check {
+  border-color: var(--blue-500);
+  background: var(--blue-500);
+}
+
+.app-shell .company-step-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.app-shell .company-step-footer .primary-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Step 2: chosen company banner */
+.app-shell .request-target-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--blue-200);
+  border-radius: var(--radius-md);
+  background: var(--blue-50);
+}
+
+.app-shell .request-target-banner > span:nth-child(2) {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+
+.app-shell .request-target-banner small {
+  color: var(--ink-muted);
+  font-size: 12px;
+}
+
+.app-shell .request-target-banner strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* "To <company>" / "Sent to you" labels on requests */
+.app-shell .request-target-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  width: fit-content;
+  margin-top: 4px;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  color: var(--navy-900);
+  background: var(--surface-sunken);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.app-shell .request-target-chip.mine {
+  margin: 0 0 0 6px;
+  color: var(--emerald-800);
+  background: var(--emerald-100);
+}
+
+/* Directory */
+.app-shell .company-directory-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 14px;
+}
+
+.app-shell .company-directory-card {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg, 16px);
+  background: #ffffff;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.app-shell .company-directory-card:hover {
+  border-color: var(--blue-300);
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.08);
+  transform: translateY(-1px);
+}
+
+.app-shell .company-directory-card:focus-visible {
+  outline: 2px solid var(--blue-500);
+  outline-offset: 2px;
+}
+
+.app-shell .company-directory-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.app-shell .company-directory-head > div {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+
+.app-shell .company-directory-head strong {
+  overflow: hidden;
+  font-size: 15px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-shell .company-directory-head small {
+  color: var(--ink-muted);
+  font-size: 12.5px;
+}
+
+.app-shell .company-directory-facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.app-shell .company-directory-facts > div {
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+}
+
+.app-shell .company-directory-facts dt {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--ink-muted);
+  font-size: 11.5px;
+}
+
+.app-shell .company-directory-facts dd {
+  margin: 0;
+  overflow: hidden;
+  font-size: 13.5px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-shell .company-directory-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.app-shell .company-directory-actions button {
+  display: inline-flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+/* Profile modal */
+.app-shell .company-profile-stats {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.app-shell .company-privacy-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  color: var(--emerald-800);
+  background: var(--emerald-100);
+  font-size: 13px;
+}
+
+.app-shell .company-profile-modal .offer-details-footer {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+@media (max-width: 680px) {
+  .app-shell .company-pick-list {
+    grid-template-columns: 1fr;
+    max-height: none;
+  }
+
+  .app-shell .company-step-footer button,
+  .app-shell .company-profile-modal .offer-details-footer button {
+    flex: 1 1 100%;
+    justify-content: center;
+  }
+
+  .app-shell .request-steps li {
+    font-size: 12px;
+  }
+}
+
+/* The company search stays a full search field on phones (the top-bar search collapses to an icon). */
+.app-shell .company-filters .search-box.company-search {
+  position: static;
+  width: auto;
+  height: 38px;
+}
+
+.app-shell .company-filters .search-box.company-search input {
+  display: block;
+}
+
+@media (max-width: 680px) {
+  .app-shell .company-filters .search-box.company-search {
+    flex: 1 1 100%;
+    width: 100%;
+  }
+}
