@@ -11,6 +11,7 @@ const chatRoutes = require('./routes/chats');
 const adminRoutes = require('./routes/admin');
 const fileRoutes = require('./routes/files');
 const verificationRoutes = require('./routes/verification');
+const providerRoutes = require('./routes/providers');
 const registerChatSocket = require('./socket');
 
 const app = express();
@@ -35,6 +36,7 @@ app.use('/api/chats', chatRoutes.router);
 app.use('/api/admin', adminRoutes);
 app.use('/api/files', fileRoutes);
 app.use('/api/verification', verificationRoutes);
+app.use('/api/providers', providerRoutes);
 
 // Socket.io Setup (Real-Time)
 const io = new Server(server, {

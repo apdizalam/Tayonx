@@ -32,6 +32,9 @@ const shippingRequestSchema = new mongoose.Schema({
     default: 'open',
     index: true,
   },
+  // The verified cargo company/provider the customer chose for this request.
+  // Requests without one (older requests) are open to verified providers in the source country.
+  targetProvider: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null, index: true },
   declinedBy: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   offers: [offerSchema],
 }, { timestamps: true });
