@@ -1254,3 +1254,203 @@ input.file-picker-input {
     padding: 14px 12px 12px;
   }
 }
+
+/* ---------- Shipping requests: delivery method & product photo ---------- */
+
+.delivery-method-chip {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 9px 2px 7px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 18px;
+  white-space: nowrap;
+}
+
+.delivery-method-chip.delivery-sea {
+  color: #0b5c8a;
+  background: #e3f2fb;
+}
+
+.delivery-method-chip.delivery-air {
+  color: #6b3fbf;
+  background: #f1ebfd;
+}
+
+.request-thumb {
+  display: grid;
+  flex: none;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 10px;
+  color: #1f6bff;
+  background: #eaf1ff;
+}
+
+.request-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.request-thumb-sm { width: 40px; height: 40px; border-radius: 8px; }
+.request-thumb-md { width: 48px; height: 48px; }
+.request-thumb-lg { width: 64px; height: 64px; border-radius: 12px; }
+
+.request-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.request-cell > span:last-child {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.request-row-meta {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.provider-request-meta .delivery-method-chip {
+  padding-top: 1px;
+  padding-bottom: 1px;
+}
+
+/* Request form */
+.request-modal.shipping-request-modal {
+  width: min(100%, 580px);
+  max-height: calc(100vh - 44px);
+  overflow-y: auto;
+}
+
+.request-modal.shipping-request-modal > * {
+  flex-shrink: 0;
+}
+
+.shipping-request-modal .form-row {
+  align-items: flex-start;
+}
+
+.request-photo-field {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.current-product-photo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid #e3e8f0;
+  border-radius: 10px;
+  background: #fbfcfe;
+}
+
+.current-product-photo > span:nth-child(2) {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+}
+
+.current-product-photo small {
+  color: #718099;
+  font-size: 12px;
+}
+
+.current-product-photo.removed {
+  border-style: dashed;
+  border-color: #f4b7b0;
+  background: #fff8f7;
+}
+
+/* Send offer header with product photo */
+.offer-modal-heading {
+  align-items: flex-start;
+}
+
+.offer-request-summary {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 14px;
+}
+
+.offer-request-summary > div {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.offer-request-summary h2 {
+  margin: 0;
+}
+
+/* Chat with provider (accepted offers) */
+.offer-chat-button {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 14px;
+  border: 1px solid #1f6bff;
+  border-radius: 8px;
+  color: #fff;
+  background: #1f6bff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.offer-chat-button:hover {
+  border-color: #1559e0;
+  background: #1559e0;
+}
+
+.offer-chat-button:focus-visible {
+  outline: 2px solid #5b95ff;
+  outline-offset: 2px;
+}
+
+@media (max-width: 560px) {
+  .shipping-request-modal .form-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .request-thumb-lg {
+    width: 52px;
+    height: 52px;
+  }
+}
+
+/* Match the Send Offer dialog's sizing */
+.shipping-request-modal label,
+.shipping-request-modal .account-field-label {
+  font-size: 13px;
+}
+
+.shipping-request-modal input,
+.shipping-request-modal select,
+.shipping-request-modal textarea {
+  font-size: 14px;
+}
+
+.shipping-request-modal .request-photo-field .account-field-label {
+  font-weight: 700;
+}
