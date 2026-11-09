@@ -492,7 +492,7 @@ router.patch('/:id/status', async (req, res) => {
 
     // Shipment lifecycle: In progress → Purchased → In transit ("shipping") → Delivered.
     // A shipment can move forward to any later stage (e.g. straight to Delivered) but never
-    // back. Delivered and cancelled are final. Admins can still set any status.
+    // back. Delivered and cancelled are final.
     const transitions = {
       open: ['cancelled'],
       offers_received: ['cancelled'],
@@ -503,12 +503,15 @@ router.patch('/:id/status', async (req, res) => {
       cancelled: [],
     };
     if (status === request.status) return res.json({ request });
-    // Shipment progress is updated only by the assigned cargo provider. Customers see it
-    // read-only; the one change they can make is cancelling their request before purchase.
+    // Shipment progress is updated only by the assigned cargo provider. Administrators and
+    // customers see it read-only; customers can only cancel their own request before purchase.
+    if (req.user.role === 'admin') {
+      return res.status(403).json({ error: 'Shipment status is managed by the assigned cargo provider. Administrators have read-only access.' });
+    }
     if (req.user.role === 'customer' && status !== 'cancelled') {
       return res.status(403).json({ error: 'Shipment progress is updated by your cargo provider. You can only cancel the request.' });
     }
-    if (req.user.role !== 'admin' && !transitions[request.status].includes(status)) {
+    if (!transitions[request.status].includes(status)) {
       const final = ['delivered', 'cancelled'].includes(request.status);
       return res.status(409).json({
         error: final
