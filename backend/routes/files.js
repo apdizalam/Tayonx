@@ -6,7 +6,7 @@ const { authenticate } = require('../middleware/authenticate');
 const router = express.Router();
 router.use(authenticate);
 
-// Streams an uploaded file. Profile photos are visible to any signed-in user;
+// Streams an uploaded file. Profile and product photos are visible to any signed-in user;
 // verification documents only to their owner and administrators.
 router.get('/:id', async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ error: 'Invalid file id.' });
@@ -18,7 +18,9 @@ router.get('/:id', async (req, res) => {
 
     const isOwner = file.owner && file.owner.equals(req.user._id);
     const isAdmin = req.user.role === 'admin';
-    if (file.purpose !== 'profile_photo' && !isOwner && !isAdmin) {
+    // Profile and product photos are shown to other signed-in users (e.g. cargo providers quoting a request).
+    const publicPurpose = ['profile_photo', 'product_photo'].includes(file.purpose);
+    if (!publicPurpose && !isOwner && !isAdmin) {
       return res.status(403).json({ error: 'You do not have permission to view this file.' });
     }
 
