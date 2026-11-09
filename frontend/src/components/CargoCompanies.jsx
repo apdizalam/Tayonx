@@ -3,9 +3,9 @@ import Icon from './Icon.jsx';
 import { getProvider } from '../lib/api.js';
 import { ROLE_LABELS } from '../lib/accountFields.js';
 
-// Customer-facing views of verified cargo companies. Privacy: these components only ever
-// receive public profile fields from /api/providers — verification documents, ID/passport
-// photos and business licenses are admin-only and are never requested or shown here.
+// Cargo company directory views. Privacy: these components only ever receive public profile
+// fields from /api/providers — verification documents, ID/passport photos and business
+// licenses are never requested or shown here (admins see them in the user details modal).
 
 function initialsOf(name = '') {
   return name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase() || '?';
@@ -23,22 +23,32 @@ function VerifiedBadge() {
   return <span className="company-verified-badge" title="Verified by Tayonx"><Icon name="shield" size={12} />Verified</span>;
 }
 
-/** Search + type + country filters shared by the picker and the directory. */
+const STATUS_LABELS = { approved: 'Verified', pending: 'Under review', rejected: 'Needs changes', unverified: 'Not verified' };
+
+/** Admin view: the provider's verification status (customers only ever see verified providers). */
+function StatusBadge({ status = 'unverified' }) {
+  if (status === 'approved') return <VerifiedBadge />;
+  return <span className={`verification-chip verification-${status}`}><Icon name="shield" size={12} />{STATUS_LABELS[status] || status}</span>;
+}
+
+/** Search + type + country (+ status for admins) filters shared by the picker and the directory. */
 function useCompanyFilters(providers) {
   const [query, setQuery] = useState('');
   const [type, setType] = useState('all');
   const [country, setCountry] = useState('all');
+  const [status, setStatus] = useState('all');
   const countries = useMemo(() => [...new Set(providers.map((provider) => provider.country).filter(Boolean))].sort(), [providers]);
   const visible = providers.filter((provider) => {
     if (type !== 'all' && provider.role !== type) return false;
     if (country !== 'all' && provider.country !== country) return false;
+    if (status !== 'all' && (provider.verificationStatus || 'approved') !== status) return false;
     const text = `${provider.name} ${provider.country} ${provider.email}`.toLowerCase();
     return text.includes(query.trim().toLowerCase());
   });
-  return { query, setQuery, type, setType, country, setCountry, countries, visible };
+  return { query, setQuery, type, setType, country, setCountry, status, setStatus, countries, visible };
 }
 
-function CompanyFilters({ filters, idPrefix }) {
+function CompanyFilters({ filters, idPrefix, showStatus = false }) {
   return (
     <div className="company-filters">
       <label className="search-box company-search">
@@ -54,6 +64,12 @@ function CompanyFilters({ filters, idPrefix }) {
         <option value="all">All countries</option>
         {filters.countries.map((country) => <option key={country} value={country}>{country}</option>)}
       </select>
+      {showStatus && (
+        <select aria-label="Filter by verification status" className="company-country-filter" value={filters.status} onChange={(event) => filters.setStatus(event.target.value)}>
+          <option value="all">All statuses</option>
+          {Object.entries(STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+        </select>
+      )}
     </div>
   );
 }
@@ -94,18 +110,44 @@ export function CompanyPicker({ providers, loading, error, selectedId, onSelect,
   );
 }
 
-/** Customer "Cargo companies" page: verified companies only, any country. */
-export function CompanyDirectory({ providers, loading, error, onView, onRequest, onRetry }) {
+/** Admin summary tiles: total providers and counts per verification status (click to filter). */
+function CompanySummary({ providers, onFilter, active }) {
+  const count = (status) => providers.filter((provider) => provider.verificationStatus === status).length;
+  const tiles = [
+    ['all', 'All providers', providers.length, 'building'],
+    ['approved', 'Verified', count('approved'), 'shield'],
+    ['pending', 'Under review', count('pending'), 'clock'],
+    ['unverified', 'Not verified', count('unverified') + count('rejected'), 'alert'],
+  ];
+  return (
+    <div className="company-summary">
+      {tiles.map(([status, label, value, icon]) => (
+        <button type="button" key={status} className={`company-summary-tile tone-${status}${active === status ? ' active' : ''}`} aria-pressed={active === status} onClick={() => onFilter(status)}>
+          <span className="company-summary-icon" aria-hidden="true"><Icon name={icon} size={16} /></span>
+          <span><strong>{value}</strong><small>{label}</small></span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * "Cargo companies" page.
+ *  - customer (default): verified companies only, any country; View profile + Send request.
+ *  - admin: every provider with its verification status; View details (+ Review when pending).
+ */
+export function CompanyDirectory({ providers, loading, error, onView, onRequest, onReview, onRetry, admin = false }) {
   const filters = useCompanyFilters(providers);
   return (
     <>
-      <CompanyFilters filters={filters} idPrefix="directory" />
+      {admin && <CompanySummary providers={providers} onFilter={filters.setStatus} active={filters.status} />}
+      <CompanyFilters filters={filters} idPrefix="directory" showStatus={admin} />
       {loading || error || !filters.visible.length
-        ? <ListState loading={loading} error={error} onRetry={onRetry} empty={providers.length ? { title: 'No matching cargo companies', text: 'Try another name, type or country.' } : { title: 'No verified cargo companies yet', text: 'Companies appear here after an administrator verifies them.' }} />
+        ? <ListState loading={loading} error={error} onRetry={onRetry} empty={providers.length ? { title: 'No matching cargo companies', text: `Try another name, type${admin ? ', status' : ''} or country.` } : admin ? { title: 'No cargo providers yet', text: 'Cargo companies and individual providers appear here after they register.' } : { title: 'No verified cargo companies yet', text: 'Companies appear here after an administrator verifies them.' }} />
         : (
           <div className="company-directory-grid">
             {filters.visible.map((provider) => (
-              <article key={provider.id} className="company-directory-card" tabIndex={0} role="button" aria-label={`View ${provider.name} profile`}
+              <article key={provider.id} className="company-directory-card" tabIndex={0} role="button" aria-label={`View ${provider.name} ${admin ? 'details' : 'profile'}`}
                 onClick={() => onView(provider)}
                 onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onView(provider); } }}>
                 <div className="company-directory-head">
@@ -114,16 +156,19 @@ export function CompanyDirectory({ providers, loading, error, onView, onRequest,
                     <strong>{provider.name}</strong>
                     <small>{typeLabel(provider.role)}</small>
                   </div>
-                  <VerifiedBadge />
+                  {admin ? <StatusBadge status={provider.verificationStatus} /> : <VerifiedBadge />}
                 </div>
+                {admin && <p className="company-directory-contact"><Icon name="mail" size={13} /><span>{provider.email}</span>{provider.phone && <><Icon name="phone" size={13} /><span>{provider.phone}</span></>}</p>}
                 <dl className="company-directory-facts">
                   <div><dt><Icon name="globe" size={13} />Country</dt><dd>{provider.country}</dd></div>
                   <div><dt><Icon name="mail" size={13} />Offers sent</dt><dd>{provider.stats.offers}</dd></div>
                   <div><dt><Icon name="check" size={13} />Shipments won</dt><dd>{provider.stats.acceptedOffers}</dd></div>
                 </dl>
                 <div className="company-directory-actions">
-                  <button type="button" className="customer-outline-button" onClick={(event) => { event.stopPropagation(); onView(provider); }}><Icon name="eye" size={14} />View profile</button>
-                  <button type="button" className="small-primary" onClick={(event) => { event.stopPropagation(); onRequest(provider); }}><Icon name="plus" size={14} />Send request</button>
+                  <button type="button" className="customer-outline-button" onClick={(event) => { event.stopPropagation(); onView(provider); }}><Icon name="eye" size={14} />{admin ? 'View details' : 'View profile'}</button>
+                  {admin
+                    ? provider.verificationStatus === 'pending' && onReview && <button type="button" className="small-primary" onClick={(event) => { event.stopPropagation(); onReview(provider); }}><Icon name="shield" size={14} />Review</button>
+                    : <button type="button" className="small-primary" onClick={(event) => { event.stopPropagation(); onRequest(provider); }}><Icon name="plus" size={14} />Send request</button>}
                 </div>
               </article>
             ))}
