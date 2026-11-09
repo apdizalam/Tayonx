@@ -22,6 +22,10 @@ const shippingRequestSchema = new mongoose.Schema({
   destination: { type: String, required: true, trim: true, maxlength: 160 },
   quantity: { type: String, required: true, trim: true, maxlength: 100 },
   details: { type: String, trim: true, maxlength: 2000, default: '' },
+  // "sea" = Ship (Maritime), "air" = Aircraft (Air freight). Older requests have none.
+  deliveryMethod: { type: String, enum: ['sea', 'air', null], default: null },
+  // Optional photo of the product, stored in UploadedFile (purpose "product_photo").
+  productPhoto: { type: mongoose.Schema.Types.ObjectId, ref: 'UploadedFile', default: null },
   status: {
     type: String,
     enum: ['open', 'offers_received', 'in_progress', 'purchased', 'shipping', 'delivered', 'cancelled'],
