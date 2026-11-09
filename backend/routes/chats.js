@@ -15,14 +15,64 @@ function databaseUnavailable(res) {
   return res.status(503).json({ error: 'The chat service is unavailable.' });
 }
 
+const CARGO_ROLES = ['cargo_provider', 'individual_cargo'];
+
+// A customer and a cargo provider may only chat when they have real, current business:
+//  - the provider's offer was accepted (shipment in progress or completed — after-sales support), or
+//  - the provider has a pending offer on a request that is still open for offers, or
+//  - the customer sent the request directly to this provider, it is still open for offers, and
+//    neither side has declined (customer declined their offer / provider declined the request).
+// Declined offers, declined or cancelled requests no longer qualify. Admins can chat with anyone.
+// `businessFilter` (MongoDB) and `hasBusiness` (in memory) must stay in sync.
+const OPEN_STATUSES = ['open', 'offers_received'];
+
+function businessFilter(providerId) {
+  return [
+    { offers: { $elemMatch: { provider: providerId, status: 'accepted' } } },
+    { offers: { $elemMatch: { provider: providerId, status: 'pending' } }, status: { $in: OPEN_STATUSES } },
+    {
+      targetProvider: providerId,
+      status: { $in: OPEN_STATUSES },
+      declinedBy: { $ne: providerId },
+      offers: { $not: { $elemMatch: { provider: providerId, status: 'declined' } } },
+    },
+  ];
+}
+
+function hasBusiness(request, providerId) {
+  const id = String(providerId);
+  const offer = (request.offers || []).find((item) => String(item.provider) === id);
+  if (offer?.status === 'accepted') return true;
+  const open = OPEN_STATUSES.includes(request.status);
+  if (offer?.status === 'pending' && open) return true;
+  return String(request.targetProvider || '') === id && open
+    && !(request.declinedBy || []).some((declined) => String(declined) === id)
+    && offer?.status !== 'declined';
+}
+
 async function canChatBetween(firstUser, secondUser) {
   if (firstUser.role === 'admin' || secondUser.role === 'admin') return true;
-  return Boolean(await ShippingRequest.exists({
-    $or: [
-      { customer: firstUser._id, 'offers.provider': secondUser._id },
-      { customer: secondUser._id, 'offers.provider': firstUser._id },
-    ],
-  }));
+  const customer = [firstUser, secondUser].find((user) => user.role === 'customer');
+  const provider = [firstUser, secondUser].find((user) => CARGO_ROLES.includes(user.role));
+  if (!customer || !provider) return false; // customer↔customer and provider↔provider are never allowed
+  return Boolean(await ShippingRequest.exists({ customer: customer._id, $or: businessFilter(provider._id) }));
+}
+
+/** Ids of the providers (for a customer) or customers (for a provider) the user may chat with. */
+async function businessCounterpartIds(user) {
+  const ids = new Set();
+  if (user.role === 'customer') {
+    const requests = await ShippingRequest.find({ customer: user._id })
+      .select('status targetProvider declinedBy offers.provider offers.status').lean();
+    for (const request of requests) {
+      const candidates = [request.targetProvider, ...(request.offers || []).map((offer) => offer.provider)].filter(Boolean);
+      for (const providerId of candidates) if (hasBusiness(request, providerId)) ids.add(String(providerId));
+    }
+  } else if (CARGO_ROLES.includes(user.role)) {
+    const requests = await ShippingRequest.find({ $or: businessFilter(user._id) }).select('customer').lean();
+    for (const request of requests) ids.add(String(request.customer));
+  }
+  return ids;
 }
 
 function publicContact(user, lastMessage) {
@@ -63,20 +113,8 @@ router.get('/contacts', async (req, res) => {
       });
     }
 
-    const requests = await ShippingRequest.find({
-      $or: [
-        { customer: req.user._id },
-        { 'offers.provider': req.user._id },
-      ],
-    }).select('customer offers.provider').lean();
-    const ids = new Set();
-    for (const request of requests) {
-      if (String(request.customer) === String(req.user._id)) {
-        for (const offer of request.offers || []) ids.add(String(offer.provider));
-      } else {
-        ids.add(String(request.customer));
-      }
-    }
+    // Same rule as canChatBetween: only counterparties with current business, plus support admins.
+    const ids = await businessCounterpartIds(req.user);
 
     const supportAdmins = await User.find({ role: 'admin', _id: { $ne: req.user._id } }).select('_id');
     const contactIds = [...new Set([...ids, ...supportAdmins.map((admin) => String(admin._id))])];
@@ -142,7 +180,15 @@ router.post('/:userId/report', async (req, res) => {
   try {
     const reportedUser = await User.findById(req.params.userId).select('name role');
     if (!reportedUser) return res.status(404).json({ error: 'Conversation user not found.' });
-    if (!await canChatBetween(req.user, reportedUser)) {
+    // Users can report anyone they may chat with, or anyone they have already exchanged messages
+    // with (even if the business has since ended).
+    const talkedBefore = await Chat.exists({
+      $or: [
+        { sender: req.user._id, recipient: reportedUser._id },
+        { sender: reportedUser._id, recipient: req.user._id },
+      ],
+    });
+    if (!talkedBefore && !await canChatBetween(req.user, reportedUser)) {
       return res.status(403).json({ error: 'You can only report a permitted chat conversation.' });
     }
 
@@ -188,7 +234,7 @@ router.get('/:userId', async (req, res) => {
     const contact = await User.findById(req.params.userId).select('name role country');
     if (!contact) return res.status(404).json({ error: 'Conversation user not found.' });
     if (!await canChatBetween(req.user, contact)) {
-      return res.status(403).json({ error: 'You can only message shipment counterparties or an administrator.' });
+      return res.status(403).json({ error: 'You can only message customers or cargo providers you are currently doing business with, or an administrator.' });
     }
 
     const messages = await Chat.find({
