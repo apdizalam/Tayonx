@@ -13,7 +13,7 @@ import { ProtectedAvatar } from './ProtectedFile.jsx';
 import FilePicker from './FilePicker.jsx';
 import { createChatSocket } from '../socket.js';
 import { useFileUrl } from '../lib/useFileUrl.js';
-import { ACCOUNT_TYPES, IMAGE_TYPES, ROLE_LABELS, VERIFICATION_LABELS, cleanText, normalizePhone, validateAccount, validateFile } from '../lib/accountFields.js';
+import { ACCOUNT_TYPES, COUNTRIES, IMAGE_TYPES, ROLE_LABELS, VERIFICATION_LABELS, cleanText, normalizePhone, validateAccount, validateFile } from '../lib/accountFields.js';
 import { calculateOfferPrice, formatUsd, offerBreakdown, parseQuantity, quantityUnitLabel, roundMoney } from '../lib/offerPricing.js';
 import {
   apiRequest,
@@ -201,7 +201,7 @@ function RequestTable({ requests, role, search, busyId, onEdit, onDelete, onSele
               </tr>
             );
           })}
-          {!visibleRequests.length && <tr><td className="empty-table" colSpan="6">{search ? 'No requests match your search.' : 'No shipping requests yet.'}</td></tr>}
+          {!visibleRequests.length && <tr><td className="empty-table" colSpan="6">{search ? 'No requests match your search.' : role === 'provider' ? 'No open requests from your country right now.' : 'No shipping requests yet.'}</td></tr>}
         </tbody>
       </table>
     </div>
@@ -438,7 +438,7 @@ function RequestForm({ request, saving, error, onSubmit, onClose }) {
       <form className="request-modal shipping-request-modal" onSubmit={handleSubmit} noValidate>
         <div className="modal-heading"><div><p className="eyebrow">{request ? 'EDIT SHIPPING REQUEST' : 'NEW SHIPPING REQUEST'}</p><h2>{request ? 'Update your request' : 'What are you looking for?'}</h2></div><button type="button" className="icon-button" aria-label="Close dialog" onClick={onClose}><Icon name="close" /></button></div>
         <label>Product or item<input name="product" value={values.product} onChange={change} maxLength="160" required placeholder="e.g. 50 business laptops" /></label>
-        <div className="form-row"><label>Source country<select name="sourceCountry" value={values.sourceCountry} onChange={change}><option>China</option><option>Turkey</option><option>Other</option></select></label><label>Delivery to<input name="destination" value={values.destination} onChange={change} maxLength="160" required placeholder="City, country" /></label></div>
+        <div className="form-row"><label>Source country<select name="sourceCountry" value={values.sourceCountry} onChange={change}>{[...new Set([...COUNTRIES, values.sourceCountry, 'Other'])].filter(Boolean).map((country) => <option key={country} value={country}>{country}</option>)}</select></label><label>Delivery to<input name="destination" value={values.destination} onChange={change} maxLength="160" required placeholder="City, country" /></label></div>
         <div className="form-row">
           <label>Quantity<input id="request-quantity" name="quantity" value={values.quantity} onChange={change} maxLength="100" required placeholder="e.g. 50 laptops" aria-invalid={Boolean(errors.quantity)} aria-describedby="request-quantity-help" />
             <small id="request-quantity-help" className="offer-field-help">Number of items — providers quote a price per item.</small>
@@ -775,7 +775,7 @@ export default function DashboardWorkspace({ initialRole }) {
   });
   const [adminPeriod, setAdminPeriod] = useState('30 days');
   const [currentTime, setCurrentTime] = useState(dashboardLoadedAt);
-  const [providerCountryFilter, setProviderCountryFilter] = useState('All');
+  const [providerMethodFilter, setProviderMethodFilter] = useState('all');
   const config = roleConfig[initialRole];
   const displayName = user?.name || config.label;
   const customerMode = initialRole === 'customer';
@@ -803,10 +803,12 @@ export default function DashboardWorkspace({ initialRole }) {
   }));
   const activeShipments = requests.filter((request) => ['in_progress', 'purchased', 'shipping'].includes(request.status));
   const pendingOffers = offers.filter((offer) => offer.status === 'pending');
-  const providerCountries = [...new Set(requests.map((request) => request.sourceCountry).filter(Boolean))].sort();
-  const visibleProviderRequests = providerCountryFilter === 'All'
+  // The server only sends providers requests shipped from their profile country;
+  // the dashboard tabs then narrow that list by delivery method.
+  const providerCountry = user?.country || '';
+  const visibleProviderRequests = providerMethodFilter === 'all'
     ? requests
-    : requests.filter((request) => request.sourceCountry === providerCountryFilter);
+    : requests.filter((request) => request.deliveryMethod === providerMethodFilter);
   const providerActiveShipments = offers.filter((offer) => offer.status === 'accepted' && ['in_progress', 'purchased', 'shipping'].includes(offer.request.status));
   const providerCustomerIds = new Set(offers.map((offer) => offer.request.customer?._id || offer.request.customer?.id).filter(Boolean).map(String));
   const providerCurrentMonthOffers = offers.filter((offer) => {
@@ -1281,7 +1283,7 @@ export default function DashboardWorkspace({ initialRole }) {
     }
 
     if (section === 'opportunities') {
-      return <Card><CardHeading title={title} subtitle="Send a real quote or decline requests you cannot fulfil." />{loading ? <p className="empty-table" role="status">Loading matching requests…</p> : renderRequests(requests)}</Card>;
+      return <Card><CardHeading title={title} subtitle={`Requests shipped from ${providerCountry || 'your profile country'}. Send a real quote or decline requests you cannot fulfil.`} action={providerCountry ? <span className="provider-country-scope" title="Based on the country in your profile"><Icon name="globe" size={13} />{providerCountry}</span> : null} />{loading ? <p className="empty-table" role="status">Loading matching requests…</p> : renderRequests(requests)}</Card>;
     }
 
     if (providerMode && section === 'orders') {
@@ -1451,7 +1453,7 @@ export default function DashboardWorkspace({ initialRole }) {
           </div>
           <div className="provider-dashboard-grid">
             <Card className="provider-requests-card">
-              <CardHeading title="New requests for you" action={<div className="provider-request-filters">{['All', ...providerCountries].map((country) => <button className={providerCountryFilter === country ? 'active' : ''} aria-pressed={providerCountryFilter === country} key={country} onClick={() => setProviderCountryFilter(country)}>{country}</button>)}</div>} />
+              <CardHeading title="New requests for you" subtitle={providerCountry ? <span className="provider-country-scope" title="Based on the country in your profile"><Icon name="globe" size={13} />Shipping from {providerCountry}</span> : null} action={<div className="provider-request-filters" role="group" aria-label="Filter by delivery method">{[['all', 'All'], ...Object.entries(DELIVERY_METHODS).map(([value, info]) => [value, info.short])].map(([value, label]) => <button type="button" className={providerMethodFilter === value ? 'active' : ''} aria-pressed={providerMethodFilter === value} key={value} onClick={() => setProviderMethodFilter(value)}>{label}</button>)}</div>} />
               {loading ? <p className="empty-table" role="status">Loading opportunities…</p> : visibleProviderRequests.length ? <div className="provider-request-list">{visibleProviderRequests.slice(0, 8).map((request) => {
                 const age = Math.max(0, dashboardLoadedAt - new Date(request.createdAt || 0).getTime());
                 const timeLabel = age < 60 * 60 * 1000 ? `${Math.max(1, Math.floor(age / 60000))} min ago` : age < 24 * 60 * 60 * 1000 ? `${Math.floor(age / (60 * 60 * 1000))} hr ago` : new Date(request.createdAt).toLocaleDateString();
@@ -1464,7 +1466,7 @@ export default function DashboardWorkspace({ initialRole }) {
                   </div>
                   <div className="provider-request-actions"><button className="customer-outline-button" disabled={busyId === request._id} onClick={() => handleDeclineRequest(request._id)}>Decline</button><button className="small-primary" disabled={busyId === request._id} onClick={() => { setOfferRequest(request); setEditingOffer(null); setFormError(''); }}>Send offer</button></div>
                 </div>;
-              })}</div> : <div className="empty-state"><strong>{requests.length ? `No requests from ${providerCountryFilter}` : 'No new requests right now'}</strong><p>{requests.length ? 'Choose another source country to browse available requests.' : 'New customer requests will appear here when available.'}</p></div>}
+              })}</div> : <div className="empty-state"><strong>{requests.length ? `No ${DELIVERY_METHODS[providerMethodFilter]?.short.toLowerCase() || ''} freight requests right now` : `No new requests from ${providerCountry || 'your country'}`}</strong><p>{requests.length ? 'Choose another delivery method to see the other requests.' : `You only see requests shipped from ${providerCountry || 'the country in your profile'}. New ones will appear here.`}</p></div>}
             </Card>
             <div className="provider-dashboard-aside">
               <Card className="provider-list-card">
