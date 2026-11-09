@@ -6,8 +6,8 @@ import Icon from './Icon.jsx';
 function contactRole(role) {
   return {
     customer: 'Customer',
-    cargo_provider: 'Cargo provider',
-    individual_cargo: 'Individual cargo',
+    cargo_provider: 'Cargo company',
+    individual_cargo: 'Individual',
     admin: 'Tayonx support',
   }[role] || role;
 }
@@ -161,6 +161,17 @@ export default function Chat({ user, initialContactId = '' }) {
     });
   }
 
+  // Close the open conversation (back to "Select a conversation"); the contact list stays.
+  function closeConversation() {
+    selectedContactIdRef.current = '';
+    setSelectedContactId('');
+    setMessages([]);
+    setHistoryError('');
+    setHistoryLoading(false);
+    setDraft('');
+    setReportFeedback('');
+  }
+
   async function submitReport(event) {
     event.preventDefault();
     if (!selectedContactId || reportSaving) return;
@@ -202,14 +213,17 @@ export default function Chat({ user, initialContactId = '' }) {
                 <span className="conversation-copy"><b>{contact.name}</b><small>{contact.lastMessage?.text || contactRole(contact.role)}</small></span>
                 <span className="conversation-meta"><time>{contact.lastMessage?.createdAt ? new Date(contact.lastMessage.createdAt).toLocaleDateString() : ''}</time></span>
               </button>
-            )) : <p className="chat-list-state">Contacts appear here when you share a shipping request or quote. You can also contact Tayonx support.</p>}
+            )) : <p className="chat-list-state">Contacts appear here when you have active business together — a request sent to you, a pending quote, or an accepted shipment. You can always contact Tayonx support.</p>}
       </aside>
       <section className="chat-pane" aria-label="Conversation">
         {selectedContact ? <>
           <div className="chat-heading">
             <ChatAvatar name={selectedContact.name} />
             <span><b>{selectedContact.name}</b><small><i className={connectionState === 'connected' ? 'is-online' : ''} />{contactRole(selectedContact.role)} · {connectionState === 'connected' ? 'Live' : 'Reconnecting'}</small></span>
-            {user.role !== 'admin' && <button type="button" className="customer-outline-button chat-report-button" onClick={() => { setReportError(''); setReportOpen(true); }}>Report</button>}
+            <span className="chat-heading-actions">
+              {user.role !== 'admin' && <button type="button" className="customer-outline-button chat-report-button" onClick={() => { setReportError(''); setReportOpen(true); }}>Report</button>}
+              <button type="button" className="icon-button chat-close-button" aria-label={`Close conversation with ${selectedContact.name}`} title="Close chat" onClick={closeConversation}><Icon name="close" size={18} /></button>
+            </span>
           </div>
           <div className="chat-history" ref={historyRef} aria-live="polite">
             {historyLoading && !messages.length && <p className="chat-list-state" role="status">Loading conversation…</p>}
@@ -228,7 +242,7 @@ export default function Chat({ user, initialContactId = '' }) {
             <button type="submit" className="primary-button" aria-label="Send message" disabled={sending || !draft.trim() || connectionState !== 'connected'}><Icon name="send" size={16} /></button>
           </form>
           {reportFeedback && <p className="chat-report-feedback" role="status">{reportFeedback}<button type="button" className="text-button" onClick={() => setReportFeedback('')}>Dismiss</button></p>}
-        </> : <div className="chat-empty-pane"><Icon name="chat" size={24} /><strong>Select a conversation</strong><span>Choose a contact to read and send messages.</span></div>}
+        </> : <div className="chat-empty-pane"><Icon name="chat" size={24} /><strong>Select a conversation</strong><span>Choose a contact to read and send messages. Only people you are doing business with are listed.</span></div>}
       </section>
       {reportOpen && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !reportSaving) setReportOpen(false); }}>
         <form className="request-modal chat-report-modal" onSubmit={submitReport}>
