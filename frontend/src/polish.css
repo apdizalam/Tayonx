@@ -778,7 +778,448 @@ body {
 }
 
 /* ========================================================================
-   15. Motion
+   15. Customer dashboard: compact, denser overview
+   ======================================================================== */
+.app-shell .customer-dashboard-main {
+  padding-top: 22px;
+  padding-bottom: 22px;
+}
+
+.app-shell .customer-dashboard {
+  gap: 18px;
+}
+
+.app-shell .customer-dashboard .customer-dashboard-grid {
+  gap: 18px;
+}
+
+/* Stat tiles: shorter, tighter, still easy to scan */
+.app-shell .customer-dashboard .customer-stats-grid {
+  gap: 14px;
+}
+
+.app-shell .customer-dashboard .customer-stat-card {
+  min-height: 0;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  border-radius: var(--radius-lg);
+}
+
+.app-shell .customer-dashboard .customer-stat-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+}
+
+.app-shell .customer-dashboard .customer-stat-icon svg {
+  width: 19px;
+  height: 19px;
+}
+
+.app-shell .customer-dashboard .customer-stat-card > div {
+  gap: 0;
+}
+
+.app-shell .customer-dashboard .customer-stat-card strong {
+  font-size: 26px;
+  line-height: 30px;
+}
+
+.app-shell .customer-dashboard .customer-stat-card > div > span {
+  color: var(--neutral-500);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 18px;
+}
+
+/* "N offers ready to review" banner */
+.app-shell .customer-dashboard .offers-notice {
+  min-height: 0;
+  padding: 12px 16px;
+}
+
+/* Card headings */
+.app-shell .customer-dashboard .dashboard-card .card-heading {
+  min-height: 0;
+  padding: 14px 18px;
+}
+
+.app-shell .customer-dashboard .dashboard-card .card-heading h2 {
+  font-size: 16px;
+  line-height: 22px;
+}
+
+.app-shell .customer-dashboard .dashboard-card .card-heading p {
+  font-size: 13px;
+  line-height: 18px;
+}
+
+/* Recent requests: shorter rows, aligned status + actions */
+.app-shell .customer-dashboard .customer-request-header {
+  padding: 9px 18px;
+  font-size: 11px;
+}
+
+.app-shell .customer-dashboard .customer-request-row {
+  min-height: 0;
+  align-items: center;
+  padding: 10px 18px;
+}
+
+@media (min-width: 681px) {
+  .app-shell .customer-dashboard .customer-request-header,
+  .app-shell .customer-dashboard .customer-request-row {
+    grid-template-columns: 40px minmax(0, 1fr) 124px 106px;
+    gap: 12px;
+  }
+
+  .app-shell .customer-dashboard .customer-request-header > span:nth-child(2) {
+    padding-left: 2px;
+  }
+}
+
+.app-shell .customer-dashboard .customer-request-row .request-thumb {
+  width: 40px;
+  height: 40px;
+}
+
+.app-shell .customer-dashboard .customer-row-copy strong {
+  font-size: 14px;
+  line-height: 19px;
+}
+
+.app-shell .customer-dashboard .customer-row-copy small {
+  font-size: 12px;
+  line-height: 17px;
+}
+
+.app-shell .customer-dashboard .customer-request-row .status-badge {
+  justify-self: start;
+}
+
+.app-shell .customer-dashboard .customer-row-actions {
+  display: inline-flex;
+  justify-content: flex-end;
+  gap: 2px;
+}
+
+.app-shell .customer-dashboard .customer-row-actions .icon-button {
+  width: 32px;
+  height: 32px;
+  min-height: 32px;
+}
+
+.app-shell .request-row-clickable {
+  cursor: pointer;
+}
+
+.app-shell .customer-dashboard .request-row-clickable:hover {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.app-shell .request-row-clickable:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+/* Shipment tracking: compact horizontal stepper (the full vertical timeline is in View details) */
+.app-shell .customer-dashboard .customer-tracking-item {
+  padding: 12px 18px 6px;
+}
+
+.app-shell .customer-dashboard .customer-tracking-heading strong {
+  font-size: 14px;
+}
+
+.app-shell .customer-dashboard .customer-tracking-heading small {
+  font-size: 12px;
+}
+
+.app-shell .shipment-tracking.compact {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  padding: 12px 0 8px;
+}
+
+.app-shell .shipment-tracking.compact li {
+  min-height: 0;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+}
+
+.app-shell .shipment-tracking.compact li::before {
+  top: 6px;
+  bottom: auto;
+  left: calc(50% + 10px);
+  width: calc(100% - 20px);
+  height: 2px;
+  border-radius: 2px;
+  background: var(--neutral-200);
+}
+
+.app-shell .shipment-tracking.compact li.complete::before {
+  background: var(--emerald-500);
+}
+
+.app-shell .shipment-tracking.compact li > i {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+}
+
+.app-shell .shipment-tracking.compact li.current > i {
+  box-shadow: 0 0 0 4px rgba(31, 107, 255, 0.18);
+}
+
+.app-shell .shipment-tracking.compact li > span {
+  align-items: center;
+  gap: 0;
+}
+
+.app-shell .shipment-tracking.compact li > span {
+  max-width: 100%;
+  padding: 0 2px;
+}
+
+.app-shell .shipment-tracking.compact strong {
+  overflow-wrap: anywhere;
+  white-space: normal;
+  font-size: 11.5px;
+  line-height: 15px;
+}
+
+.app-shell .shipment-tracking.compact small {
+  color: var(--neutral-500);
+  font-size: 10.5px;
+  line-height: 14px;
+}
+
+/* Recent request rows: two tight text lines + meta */
+.app-shell .customer-dashboard .customer-request-row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+.app-shell .customer-dashboard .customer-row-copy {
+  gap: 1px;
+}
+
+.app-shell .customer-dashboard .request-row-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 0;
+}
+
+.app-shell .customer-dashboard .request-row-meta .delivery-method-chip {
+  min-height: 18px;
+  height: 18px;
+  padding: 0 7px;
+  font-size: 11px;
+}
+
+/* Secondary rows (providers / latest offers) */
+.app-shell .customer-dashboard .customer-company-row,
+.app-shell .customer-dashboard .customer-offer-row {
+  min-height: 0;
+  padding: 10px 18px;
+}
+
+/* ========================================================================
+   16. Customer "My shipping requests" table
+   ======================================================================== */
+.app-shell .customer-requests-table th {
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+
+.app-shell .customer-requests-table td {
+  padding-top: 12px;
+  padding-bottom: 12px;
+  font-size: 14px;
+}
+
+.app-shell .customer-requests-table .request-row-clickable:hover {
+  background: #f1f6ff;
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.app-shell .customer-requests-table .request-cell .table-secondary {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  letter-spacing: 0.02em;
+}
+
+.app-shell .request-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.app-shell .request-chip-row .request-target-chip {
+  margin-top: 0;
+}
+
+.app-shell .request-route {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.app-shell .request-route svg {
+  color: var(--neutral-400);
+}
+
+.app-shell .customer-requests-table .table-date {
+  color: var(--neutral-600);
+  white-space: nowrap;
+}
+
+.app-shell .request-offers-link {
+  display: inline-flex;
+  min-height: 28px;
+  align-items: center;
+  gap: 5px;
+  padding: 0 10px;
+  border: 1px solid #d6e4ff;
+  border-radius: var(--radius-pill);
+  color: var(--blue-700);
+  background: var(--blue-50);
+  cursor: pointer;
+  font-size: 12.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  transition: background var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out);
+}
+
+.app-shell .request-offers-link:hover {
+  border-color: var(--blue-300);
+  background: var(--blue-100);
+}
+
+.app-shell .request-status-cell {
+  display: inline-grid;
+  justify-items: start;
+  gap: 3px;
+}
+
+.app-shell .request-status-cell small {
+  color: var(--neutral-500);
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+
+.app-shell .customer-requests-table th.offer-actions-col,
+.app-shell .customer-requests-table td.offer-actions-col {
+  width: 1%;
+  padding-right: 14px;
+  padding-left: 14px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.app-shell .customer-requests-table .offer-actions {
+  justify-content: flex-start;
+  flex-wrap: nowrap;
+  gap: 6px;
+}
+
+@media (max-width: 1599px) {
+  .app-shell .customer-requests-table .offer-action-btn span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .app-shell .customer-requests-table .offer-action-btn {
+    width: 34px;
+    padding: 0;
+    justify-content: center;
+  }
+}
+
+/* Request details modal */
+.app-shell .request-details-note {
+  margin: 0;
+  color: var(--neutral-700);
+  font-size: 14px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.app-shell .request-progress-section .shipment-tracking {
+  padding: 4px 2px 0;
+}
+
+.app-shell .request-details-footer {
+  flex-wrap: wrap;
+}
+
+@media (max-width: 680px) {
+  .app-shell .customer-dashboard-main {
+    padding-top: 16px;
+    padding-bottom: 16px;
+  }
+
+  .app-shell .customer-dashboard .customer-stat-card {
+    padding: 14px;
+  }
+
+  .app-shell .customer-dashboard .customer-stat-card strong {
+    font-size: 22px;
+    line-height: 26px;
+  }
+
+  .app-shell .request-details-footer button {
+    flex: 1 1 calc(50% - 6px);
+    justify-content: center;
+  }
+
+  /* Recent requests on phones: text on top, status + actions on a second line */
+  .app-shell .customer-dashboard .customer-request-header {
+    display: none;
+  }
+
+  .app-shell .customer-dashboard .customer-request-row {
+    grid-template-areas:
+      "thumb copy copy"
+      "thumb badge actions";
+    grid-template-columns: 40px minmax(0, 1fr) auto;
+    align-items: center;
+    row-gap: 6px;
+  }
+
+  .app-shell .customer-dashboard .customer-request-row > .request-thumb {
+    grid-area: thumb;
+    align-self: start;
+  }
+
+  .app-shell .customer-dashboard .customer-request-row > .customer-row-copy {
+    grid-area: copy;
+  }
+
+  .app-shell .customer-dashboard .customer-request-row > .status-badge {
+    grid-area: badge;
+  }
+
+  .app-shell .customer-dashboard .customer-request-row > .customer-row-actions {
+    grid-area: actions;
+  }
+}
+
+/* ========================================================================
+   17. Motion
    ======================================================================== */
 
 @keyframes tayonx-fade-in {
@@ -822,7 +1263,7 @@ body {
 }
 
 /* ========================================================================
-   16. Small screens
+   18. Small screens
    ======================================================================== */
 
 @media (max-width: 680px) {
