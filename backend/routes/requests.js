@@ -24,6 +24,25 @@ function isCargoProvider(user) {
   return cargoProviderRoles.includes(user.role);
 }
 
+function escapeRegExp(text) {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// Cargo providers only work with requests shipped from their own profile country
+// (e.g. a provider in China sees requests whose source country is China).
+// Matching ignores case and surrounding spaces.
+function providerCountryFilter(user) {
+  const country = typeof user.country === 'string' ? user.country.trim() : '';
+  if (!country) return { _id: null }; // no country on the profile → match nothing
+  return { sourceCountry: new RegExp(`^\\s*${escapeRegExp(country)}\\s*$`, 'i') };
+}
+
+function sameCountry(user, request) {
+  const a = typeof user.country === 'string' ? user.country.trim().toLowerCase() : '';
+  const b = typeof request.sourceCountry === 'string' ? request.sourceCountry.trim().toLowerCase() : '';
+  return Boolean(a) && a === b;
+}
+
 function databaseUnavailable(res) {
   return res.status(503).json({ error: 'The shipping request service is unavailable.' });
 }
@@ -86,6 +105,7 @@ router.get('/', async (req, res) => {
           status: { $in: ['open', 'offers_received'] },
           declinedBy: { $ne: req.user._id },
           'offers.provider': { $ne: req.user._id },
+          ...providerCountryFilter(req.user),
         };
     }
     let query = ShippingRequest.find(filter);
@@ -167,9 +187,10 @@ router.get('/:id', async (req, res) => {
     if (req.user.role === 'customer' && (!request.customer || !request.customer._id.equals(req.user._id))) {
       return res.status(403).json({ error: 'You do not have access to this request.' });
     }
+    // Providers can open a request they already quoted on, or an open request from their own country.
     if (isCargoProvider(req.user)
-      && !['open', 'offers_received'].includes(request.status)
-      && !request.offers.some((offer) => offer.provider?._id.equals(req.user._id))) {
+      && !request.offers.some((offer) => offer.provider?._id.equals(req.user._id))
+      && (!['open', 'offers_received'].includes(request.status) || !sameCountry(req.user, request))) {
       return res.status(404).json({ error: 'Shipping request not found.' });
     }
     if (isCargoProvider(req.user)) {
@@ -251,6 +272,7 @@ router.post('/:id/decline', requireRole(...cargoProviderRoles), async (req, res)
         _id: req.params.id,
         status: { $in: ['open', 'offers_received'] },
         'offers.provider': { $ne: req.user._id },
+        ...providerCountryFilter(req.user),
       },
       { $addToSet: { declinedBy: req.user._id } },
       { returnDocument: 'after' },
@@ -274,6 +296,7 @@ router.post('/:id/offers', requireRole(...cargoProviderRoles), async (req, res) 
       status: { $in: ['open', 'offers_received'] },
       declinedBy: { $ne: req.user._id },
       'offers.provider': { $ne: req.user._id },
+      ...providerCountryFilter(req.user),
     });
     if (!request) return res.status(404).json({ error: 'This request is unavailable or you have already responded.' });
     const { fields, error, field } = readOfferBody(body, request.quantity);
