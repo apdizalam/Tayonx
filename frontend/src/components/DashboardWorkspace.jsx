@@ -11,6 +11,7 @@ import VerificationCenter from './VerificationCenter.jsx';
 import { ProtectedAvatar } from './ProtectedFile.jsx';
 import { createChatSocket } from '../socket.js';
 import { ACCOUNT_TYPES, ROLE_LABELS, VERIFICATION_LABELS, cleanText, normalizePhone, validateAccount } from '../lib/accountFields.js';
+import { formatUsd, parseQuantity, roundMoney } from '../lib/offerPricing.js';
 import {
   apiRequest,
   createOffer,
@@ -191,7 +192,7 @@ function OffersTable({ offers, role, busyId, onEdit, onDelete, onRespond, onStat
             <tr key={offer._id}>
               <td><span className="table-primary">{offer.request.product}</span><span className="table-secondary">{offer.request.id}</span></td>
               <td>{role === 'customer' || role === 'admin' ? offer.provider?.name || 'Cargo provider' : offer.request.customer?.name || 'Customer'}</td>
-              <td><b>{new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(offer.price)}</b></td>
+              <td><b>{formatUsd(offer.price)}</b>{offer.unitPrice && offer.quantityCount ? <span className="table-secondary">{offer.quantityCount.toLocaleString('en-US')} × {formatUsd(offer.unitPrice)}</span> : null}</td>
               <td>{offer.deliveryDays} days</td>
               <td>{role === 'provider' && offer.status === 'accepted' && nextStatus
                 ? <select aria-label="Update shipment progress" value={offer.request.status} disabled={busyId === offer.request.id} onChange={(event) => onStatusChange(offer.request.id, event.target.value)}>
@@ -243,21 +244,101 @@ function RequestForm({ request, saving, error, onSubmit, onClose }) {
   );
 }
 
+/** "units", "laptops", "pcs"… taken from the request's quantity text (e.g. "50 laptops"). */
+function quantityUnitLabel(quantity, count) {
+  const word = String(quantity || '').replace(/^[^\d]*[\d.,]+\s*/, '').split(/[\s(]/)[0];
+  if (word && /^\p{L}/u.test(word)) return word;
+  return count === 1 ? 'unit' : 'units';
+}
+
+/**
+ * Send / update offer. When the request has a numeric quantity the provider enters a unit price
+ * and the total is calculated live (the server recalculates it the same way).
+ */
 function OfferForm({ request, offer, saving, error, onSubmit, onClose }) {
-  const [values, setValues] = useState({ price: offer?.price ?? '', deliveryDays: offer?.deliveryDays ?? '', includes: offer?.includes || '' });
+  const quantity = request?.quantity || offer?.request?.quantity || '';
+  const count = parseQuantity(quantity);
+  const unitLabel = quantityUnitLabel(quantity, count);
+  // Prefill the unit price when editing (older offers only stored a total).
+  const initialUnitPrice = offer?.unitPrice
+    ?? (offer?.price && count && roundMoney(offer.price / count) * count === offer.price ? roundMoney(offer.price / count) : '');
+  const [values, setValues] = useState({
+    unitPrice: initialUnitPrice,
+    price: offer?.price ?? '',
+    deliveryDays: offer?.deliveryDays ?? '',
+    includes: offer?.includes || '',
+  });
+  const [errors, setErrors] = useState({});
+  const unitPrice = Number(values.unitPrice);
+  const unitPriceValid = values.unitPrice !== '' && Number.isFinite(unitPrice) && unitPrice > 0;
+  const total = count && unitPriceValid ? roundMoney(unitPrice * count) : null;
+
   function change(event) {
-    setValues((current) => ({ ...current, [event.target.name]: event.target.value }));
+    const { name, value } = event.target;
+    setValues((current) => ({ ...current, [name]: value }));
+    setErrors((current) => ({ ...current, [name]: '' }));
+  }
+
+  function handleSubmit(event) {
+    event.preventDefault();
+    const next = {};
+    if (count) {
+      if (!unitPriceValid) next.unitPrice = 'Enter a unit price greater than zero.';
+      else if (roundMoney(unitPrice) !== unitPrice) next.unitPrice = 'Use at most 2 decimals (cents).';
+    } else if (!(Number(values.price) > 0)) {
+      next.price = 'Enter a total quote greater than zero.';
+    }
+    const days = Number(values.deliveryDays);
+    if (!Number.isInteger(days) || days < 1 || days > 365) next.deliveryDays = 'Enter 1 to 365 days.';
+    setErrors(next);
+    if (Object.keys(next).length) return;
+    onSubmit(count
+      ? { unitPrice, deliveryDays: days, includes: values.includes }
+      : { price: Number(values.price), deliveryDays: days, includes: values.includes });
   }
 
   return (
     <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-      <form className="request-modal" onSubmit={(event) => { event.preventDefault(); onSubmit(values); }}>
+      <form className="request-modal offer-modal" onSubmit={handleSubmit} noValidate>
         <div className="modal-heading"><div><p className="eyebrow">{offer ? 'UPDATE OFFER' : 'SEND OFFER'}</p><h2>{request?.product || offer?.request?.product}</h2></div><button type="button" className="icon-button" aria-label="Close dialog" onClick={onClose}><Icon name="close" /></button></div>
-        <label>Total quote (USD)<input name="price" type="number" min="0.01" step="0.01" value={values.price} onChange={change} required /></label>
-        <label>Delivery time (days)<input name="deliveryDays" type="number" min="1" max="365" step="1" value={values.deliveryDays} onChange={change} required /></label>
+        <p className="offer-quantity"><Icon name="box" size={15} />Requested quantity: <strong>{quantity || 'not specified'}</strong></p>
+
+        {count ? (
+          <div className="form-row">
+            <label>Unit price (USD)
+              <input name="unitPrice" type="number" min="0.01" step="0.01" inputMode="decimal" value={values.unitPrice} onChange={change} placeholder="e.g. 10" aria-invalid={Boolean(errors.unitPrice)} aria-describedby="offer-unit-help" autoFocus />
+              <small id="offer-unit-help" className="offer-field-help">Price for one item</small>
+              {errors.unitPrice && <span className="offer-field-error" role="alert">{errors.unitPrice}</span>}
+            </label>
+            <label>Total quote (USD)
+              <output className={`offer-total${total === null ? ' empty' : ''}`} htmlFor="unitPrice" aria-live="polite">{total === null ? '—' : formatUsd(total)}</output>
+              <small className="offer-field-help">Calculated automatically</small>
+            </label>
+          </div>
+        ) : (
+          <label>Total quote (USD)
+            <input name="price" type="number" min="0.01" step="0.01" inputMode="decimal" value={values.price} onChange={change} aria-invalid={Boolean(errors.price)} autoFocus />
+            <small className="offer-field-help">This request’s quantity isn’t a number, so enter the total price for the whole order.</small>
+            {errors.price && <span className="offer-field-error" role="alert">{errors.price}</span>}
+          </label>
+        )}
+
+        {count > 0 && (
+          <div className={`offer-calculation${total === null ? ' pending' : ''}`} aria-live="polite">
+            <Icon name="chart" size={16} />
+            {total === null
+              ? <span>Enter a unit price to see the total: <b>{count.toLocaleString('en-US')} {unitLabel} × $…</b></span>
+              : <span>Calculation: <b>{count.toLocaleString('en-US')} {unitLabel} × {formatUsd(unitPrice)} = {formatUsd(total)} total</b></span>}
+          </div>
+        )}
+
+        <label>Delivery time (days)
+          <input name="deliveryDays" type="number" min="1" max="365" step="1" value={values.deliveryDays} onChange={change} aria-invalid={Boolean(errors.deliveryDays)} />
+          {errors.deliveryDays && <span className="offer-field-error" role="alert">{errors.deliveryDays}</span>}
+        </label>
         <label>Included services<textarea name="includes" value={values.includes} onChange={change} maxLength="500" rows="3" placeholder="Shipping, customs, final-mile delivery" /></label>
         {error && <p className="signin-message" role="alert">{error}</p>}
-        <button className="primary-button full-button" disabled={saving} type="submit">{saving ? 'Saving…' : offer ? 'Update offer' : 'Send offer'}</button>
+        <button className="primary-button full-button" disabled={saving} type="submit">{saving ? 'Saving…' : offer ? 'Update offer' : total !== null ? `Send offer · ${formatUsd(total)}` : 'Send offer'}</button>
       </form>
     </div>
   );
@@ -281,6 +362,11 @@ function UserForm({ user, saving, error, onSubmit, onClose }) {
   const [values, setValues] = useState(initial);
   const [localErrors, setErrors] = useState({});
   const roleOptions = [...Object.entries(ACCOUNT_TYPES).map(([value, type]) => [value, type.label]), ...(user?.role === 'admin' ? [['admin', 'Administrator']] : [])];
+  // "Add phone" in the users table opens this dialog focused on the phone field.
+  useEffect(() => {
+    if (user?.focusField) document.getElementById(`user-form-${user.focusField}`)?.focus();
+  }, [user?.focusField]);
+
   // A field error from the server (e.g. duplicate email) shows on that field until the field is edited.
   const errors = error?.field && !Object.hasOwn(localErrors, error.field)
     ? { ...localErrors, [error.field]: error.message }
@@ -485,7 +571,7 @@ export default function DashboardWorkspace({ initialRole }) {
     ...adminOffers.map((offer) => ({
       id: `offer-${offer._id}`,
       title: offer.status === 'accepted' ? `Offer accepted · ${offer.request.product}` : `Offer submitted · ${offer.request.product}`,
-      detail: `${offer.provider?.name || 'Cargo provider'} · ${new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(offer.price)}`,
+      detail: `${offer.provider?.name || 'Cargo provider'} · ${formatUsd(offer.price)}`,
       timestamp: offer.status === 'accepted' ? offer.updatedAt || offer.createdAt : offer.createdAt,
       tone: offer.status === 'accepted' ? 'success' : 'current',
     })),
@@ -686,17 +772,19 @@ export default function DashboardWorkspace({ initialRole }) {
     }
   }
 
-  async function saveOffer(values) {
+  // `payload` comes from OfferForm: { unitPrice } (total calculated by the server) or { price }, plus delivery details.
+  async function saveOffer(payload) {
     setSaving(true);
     setFormError('');
     try {
-      const payload = { price: Number(values.price), deliveryDays: Number(values.deliveryDays), includes: values.includes };
-      if (editingOffer) await updateOffer(editingOffer._id, payload);
-      else await createOffer(offerRequest._id, payload);
+      const result = editingOffer
+        ? await updateOffer(editingOffer._id, payload)
+        : await createOffer(offerRequest._id, payload);
       await refreshData();
       setOfferRequest(null);
       setEditingOffer(null);
-      setMessage(editingOffer ? 'Offer updated.' : 'Offer sent to the customer.');
+      const total = result?.offer?.price ? ` Total quote: ${formatUsd(result.offer.price)}.` : '';
+      setMessage((editingOffer ? 'Offer updated.' : 'Offer sent to the customer.') + total);
     } catch (requestError) {
       setFormError(requestError.message);
     } finally {
@@ -863,7 +951,9 @@ export default function DashboardWorkspace({ initialRole }) {
         {usersLoading ? <p className="empty-table" role="status">Loading registered users…</p> : usersError ? <div className="empty-state"><strong>Could not load registered users</strong><p>{usersError}</p><button className="small-primary" onClick={refreshUsers}>Try again</button></div> : <div className="table-scroll"><table className="data-table admin-users-table"><thead><tr><th>User</th><th>Contact</th><th>Role</th><th>Verification</th><th>Country</th><th>Joined</th><th>Actions</th></tr></thead><tbody>
           {users.map((account) => <tr key={account.id}>
             <td><span className="verification-applicant"><ProtectedAvatar fileId={account.profilePhoto} name={account.name} /><span className="table-primary">{account.name}</span></span></td>
-            <td><span className="table-primary">{account.email}</span><span className="table-secondary">{account.phone || 'No phone'}</span></td>
+            <td><span className="table-primary">{account.email}</span>{account.phone
+              ? <a className="table-secondary table-phone" href={`tel:${account.phone}`}><Icon name="phone" size={12} />{account.phone}</a>
+              : <button type="button" className="table-add-phone" title="This account was created before phone numbers were collected" onClick={() => { setEditingUser({ ...account, focusField: 'phone' }); setUserFormError(null); setUserModalOpen(true); }}><Icon name="plus" size={12} />Add phone</button>}</td>
             <td><span className={`admin-user-role admin-user-role-${account.role}`}>{userRoleLabel(account.role)}</span></td>
             <td>{['cargo_provider', 'individual_cargo'].includes(account.role) ? <VerificationChip status={account.verification?.status} /> : <span className="table-secondary">—</span>}</td>
             <td>{account.country || '—'}</td>
@@ -904,7 +994,7 @@ export default function DashboardWorkspace({ initialRole }) {
     }
 
     if (customerMode && section === 'notifications') {
-      return <Card><CardHeading title="Notifications" subtitle="Updates from your shipping requests." />{loading ? <p className="empty-table" role="status">Loading updates…</p> : pendingOffers.length ? <div className="customer-directory-list">{pendingOffers.map((offer) => <div className="customer-offer-row" key={offer._id}><span className="customer-company-avatar blue"><Icon name="mail" size={15} /></span><span className="customer-row-copy"><strong>New quote for {offer.request.product}</strong><small>{offer.provider?.name || 'Cargo provider'} · {new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(offer.price)} · {offer.deliveryDays} days</small></span><button className="small-primary" onClick={() => { setSelectedRequestId(offer.request.id); setSection('offers'); }}>Review</button></div>)}</div> : <div className="empty-state"><strong>You’re all caught up</strong><p>New provider quotes for your requests will appear here.</p></div>}</Card>;
+      return <Card><CardHeading title="Notifications" subtitle="Updates from your shipping requests." />{loading ? <p className="empty-table" role="status">Loading updates…</p> : pendingOffers.length ? <div className="customer-directory-list">{pendingOffers.map((offer) => <div className="customer-offer-row" key={offer._id}><span className="customer-company-avatar blue"><Icon name="mail" size={15} /></span><span className="customer-row-copy"><strong>New quote for {offer.request.product}</strong><small>{offer.provider?.name || 'Cargo provider'} · {formatUsd(offer.price)} · {offer.deliveryDays} days</small></span><button className="small-primary" onClick={() => { setSelectedRequestId(offer.request.id); setSection('offers'); }}>Review</button></div>)}</div> : <div className="empty-state"><strong>You’re all caught up</strong><p>New provider quotes for your requests will appear here.</p></div>}</Card>;
     }
 
     if (customerMode && section === 'profile') {
@@ -969,7 +1059,7 @@ export default function DashboardWorkspace({ initialRole }) {
               {loading ? <p className="empty-table" role="status">Loading offers…</p> : recentOffers.length ? <div className="customer-compact-list">{recentOffers.map((offer) => <div className="customer-offer-row" key={offer._id}>
                 <span className="customer-company-avatar blue"><Icon name="package" size={15} /></span>
                 <span className="customer-row-copy"><strong>{offer.provider?.name || 'Cargo provider'}</strong><small>{offer.request.product} · {offer.deliveryDays} days</small></span>
-                <span className="customer-offer-amount">{new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(offer.price)}</span>
+                <span className="customer-offer-amount">{formatUsd(offer.price)}{offer.unitPrice && offer.quantityCount ? <small>{offer.quantityCount.toLocaleString('en-US')} × {formatUsd(offer.unitPrice)}</small> : null}</span>
                 {offer.status === 'pending' ? <span className="customer-offer-actions"><button className="small-primary" disabled={busyId === offer._id} onClick={() => handleOfferResponse(offer, 'accepted')}>Accept</button><button className="icon-button table-action" aria-label={`Decline offer from ${offer.provider?.name || 'cargo provider'}`} disabled={busyId === offer._id} onClick={() => handleOfferResponse(offer, 'declined')}><Icon name="close" size={15} /></button></span> : <StatusBadge>{offer.status}</StatusBadge>}
               </div>)}</div> : <div className="empty-state"><strong>No offers yet</strong><p>Provider quotes will appear here when submitted.</p></div>}
             </Card>
@@ -1118,7 +1208,7 @@ export default function DashboardWorkspace({ initialRole }) {
       <div className="app-main">
         <header className="topbar">
           <button className="mobile-menu icon-button" aria-label="Open navigation" onClick={() => setMobileNavOpen(true)}><Icon name="menu" /></button>
-          <div className="customer-topbar-title"><strong>{title}</strong><span>Welcome back, {displayName}</span></div>
+          <div className="customer-topbar-title"><strong>{title}</strong><span className="topbar-welcome">Welcome back, {displayName}{providerMode && user?.verification?.status === 'approved' && <span className="topbar-verified-badge" title={`Verified ${user.role === 'cargo_provider' ? 'cargo company' : 'cargo provider'}`}><Icon name="shield" size={13} />Verified</span>}</span></div>
           <div className="topbar-actions">
             {providerMode && <span className="provider-country-chip"><b>{user?.country?.slice(0, 2).toUpperCase() || '—'}</b>{user?.country || 'Country not set'}</span>}
             {adminMode && section === 'overview' && <div className="admin-period-switch" role="group" aria-label="Filter dashboard period">
