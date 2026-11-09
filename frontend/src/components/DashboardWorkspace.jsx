@@ -6,6 +6,7 @@ import AdminChats from './AdminChats.jsx';
 import AdminSettings from './AdminSettings.jsx';
 import Chat from './Chat.jsx';
 import ConfirmDialog from './ConfirmDialog.jsx';
+import AdminUserDetails from './AdminUserDetails.jsx';
 import AccountFields from './AccountFields.jsx';
 import AdminVerifications from './AdminVerifications.jsx';
 import VerificationCenter from './VerificationCenter.jsx';
@@ -807,6 +808,8 @@ export default function DashboardWorkspace({ initialRole }) {
   const [chatContactId, setChatContactId] = useState('');
   // Offer shown in the details modal (looked up from `offers` so it stays fresh after changes).
   const [viewingOfferId, setViewingOfferId] = useState('');
+  const [viewingUserId, setViewingUserId] = useState('');
+  const closeUserDetails = useCallback(() => setViewingUserId(''), []);
   const [confirmState, setConfirmState] = useState(null);
   const viewingOffer = viewingOfferId ? offers.find((offer) => offer._id === viewingOfferId) || null : null;
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -1185,17 +1188,29 @@ export default function DashboardWorkspace({ initialRole }) {
       setError('You cannot delete your own administrator account.');
       return;
     }
-    if (!window.confirm(`Delete user "${account.name}"? This cannot be undone.`)) return;
-    setBusyId(account.id);
-    setError('');
-    setMessage('');
-    deleteUser(account.id)
-      .then(() => {
-        setUsers((current) => current.filter((item) => item.id !== account.id));
-        setMessage('User deleted successfully.');
-      })
-      .catch((requestError) => setError(requestError.message))
-      .finally(() => setBusyId(''));
+    askToConfirm({
+      title: 'Delete this user?',
+      message: `${account.name} (${account.email}) will be permanently deleted. This can’t be undone.`,
+      confirmLabel: 'Delete user',
+      tone: 'danger',
+      run: async () => {
+        setBusyId(account.id);
+        setError('');
+        setMessage('');
+        try {
+          await deleteUser(account.id);
+          setUsers((current) => current.filter((item) => item.id !== account.id));
+          setViewingUserId((current) => (current === account.id ? '' : current));
+          setMessage('User deleted successfully.');
+          return true;
+        } catch (requestError) {
+          setError(requestError.message);
+          return false;
+        } finally {
+          setBusyId('');
+        }
+      },
+    });
   }
 
   function deleteShippingRequest(request) {
@@ -1372,19 +1387,20 @@ export default function DashboardWorkspace({ initialRole }) {
 
     if (adminMode && section === 'users') {
       return <Card className="admin-users-card"><CardHeading title="Users" subtitle={`${users.length} registered account${users.length === 1 ? '' : 's'}`} action={<button className="primary-button" onClick={() => { setEditingUser(null); setUserFormError(null); setUserModalOpen(true); }}><Icon name="plus" size={15} />Create user</button>} />
-        {usersLoading ? <p className="empty-table" role="status">Loading registered users…</p> : usersError ? <div className="empty-state"><strong>Could not load registered users</strong><p>{usersError}</p><button className="small-primary" onClick={refreshUsers}>Try again</button></div> : <div className="table-scroll"><table className="data-table admin-users-table"><thead><tr><th>User</th><th>Contact</th><th>Role</th><th>Verification</th><th>Country</th><th>Joined</th><th>Actions</th></tr></thead><tbody>
-          {users.map((account) => <tr key={account.id}>
+        {usersLoading ? <p className="empty-table" role="status">Loading registered users…</p> : usersError ? <div className="empty-state"><strong>Could not load registered users</strong><p>{usersError}</p><button className="small-primary" onClick={refreshUsers}>Try again</button></div> : <div className="table-scroll"><table className="data-table admin-users-table"><thead><tr><th>User</th><th>Contact</th><th>Role</th><th>Verification</th><th>Country</th><th>Joined</th><th className="offer-actions-col" scope="col">Actions</th></tr></thead><tbody>
+          {users.map((account) => <tr key={account.id} className="user-row-clickable" onClick={() => setViewingUserId(account.id)}>
             <td><span className="verification-applicant"><ProtectedAvatar fileId={account.profilePhoto} name={account.name} /><span className="table-primary">{account.name}</span></span></td>
             <td><span className="table-primary">{account.email}</span>{account.phone
-              ? <a className="table-secondary table-phone" href={`tel:${account.phone}`}><Icon name="phone" size={12} />{account.phone}</a>
-              : <button type="button" className="table-add-phone" title="This account was created before phone numbers were collected" onClick={() => { setEditingUser({ ...account, focusField: 'phone' }); setUserFormError(null); setUserModalOpen(true); }}><Icon name="plus" size={12} />Add phone</button>}</td>
+              ? <a className="table-secondary table-phone" href={`tel:${account.phone}`} onClick={(event) => event.stopPropagation()}><Icon name="phone" size={12} />{account.phone}</a>
+              : <button type="button" className="table-add-phone" title="This account was created before phone numbers were collected" onClick={(event) => { event.stopPropagation(); setEditingUser({ ...account, focusField: 'phone' }); setUserFormError(null); setUserModalOpen(true); }}><Icon name="plus" size={12} />Add phone</button>}</td>
             <td><span className={`admin-user-role admin-user-role-${account.role}`}>{userRoleLabel(account.role)}</span></td>
             <td>{['cargo_provider', 'individual_cargo'].includes(account.role) ? <VerificationChip status={account.verification?.status} /> : <span className="table-secondary">—</span>}</td>
             <td>{account.country || '—'}</td>
             <td>{account.createdAt ? new Date(account.createdAt).toLocaleDateString() : '—'}</td>
-            <td><div className="table-buttons">
-              <button className="icon-button table-action" aria-label={`Edit ${account.name}`} disabled={busyId === account.id} onClick={() => { setEditingUser(account); setUserFormError(null); setUserModalOpen(true); }}><Icon name="edit" size={16} /></button>
-              <button className="icon-button table-action" aria-label={`Delete ${account.name}`} disabled={busyId === account.id || account.id === user?.id} onClick={() => removeUser(account)}><Icon name="trash" size={16} /></button>
+            <td className="offer-actions-col" onClick={(event) => event.stopPropagation()}><div className="table-buttons offer-actions user-actions">
+              <button type="button" className="offer-action-btn view" aria-label={`View details for ${account.name}`} title="View details" onClick={() => setViewingUserId(account.id)}><Icon name="eye" size={15} /><span>View</span></button>
+              <button type="button" className="offer-action-btn edit" aria-label={`Edit ${account.name}`} title="Edit user" disabled={busyId === account.id} onClick={() => { setEditingUser(account); setUserFormError(null); setUserModalOpen(true); }}><Icon name="edit" size={15} /><span>Edit</span></button>
+              <button type="button" className="offer-action-btn delete" aria-label={`Delete ${account.name}`} title={account.id === user?.id ? 'You cannot delete your own account' : 'Delete user'} disabled={busyId === account.id || account.id === user?.id} onClick={() => removeUser(account)}><Icon name="trash" size={15} /><span>Delete</span></button>
             </div></td>
           </tr>)}
           {!users.length && <tr><td className="empty-table" colSpan="7">No registered users found.</td></tr>}
@@ -1614,6 +1630,7 @@ export default function DashboardWorkspace({ initialRole }) {
                 setSelectedRequestId('');
                 setChatContactId('');
                 setViewingOfferId('');
+                setViewingUserId('');
                 setMobileNavOpen(false);
               }}>
                 <Icon name={icon} size={16} /><span>{label}</span>
@@ -1698,6 +1715,17 @@ export default function DashboardWorkspace({ initialRole }) {
       )}
       {requestModalOpen && <RequestForm request={editingRequest} saving={saving} error={formError} onSubmit={saveRequest} onClose={() => { setRequestModalOpen(false); setEditingRequest(null); setFormError(''); }} />}
       {(offerRequest || editingOffer) && <OfferForm request={offerRequest || editingOffer?.request} offer={editingOffer} saving={saving} error={formError} onSubmit={saveOffer} onClose={() => { setOfferRequest(null); setEditingOffer(null); setFormError(''); }} />}
+      {adminMode && viewingUserId && users.some((account) => account.id === viewingUserId) && (
+        <AdminUserDetails
+          account={users.find((account) => account.id === viewingUserId)}
+          isSelf={viewingUserId === user?.id}
+          busy={busyId === viewingUserId}
+          onClose={closeUserDetails}
+          onEdit={(account) => { setViewingUserId(''); setEditingUser(account); setUserFormError(null); setUserModalOpen(true); }}
+          onDelete={removeUser}
+          onReviewVerification={() => { setViewingUserId(''); setSection('verifications'); }}
+        />
+      )}
       {userModalOpen && <UserForm key={editingUser?.id || 'new'} user={editingUser} saving={saving} error={userFormError} onSubmit={saveUser} onClose={() => { setUserModalOpen(false); setEditingUser(null); setUserFormError(null); }} />}
       {confirmState && (
         <ConfirmDialog

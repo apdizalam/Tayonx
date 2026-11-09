@@ -73,6 +73,10 @@ export function getUsers(options) {
   return apiRequest('/api/users', options);
 }
 
+export function getUserDetails(id, options) {
+  return apiRequest(`/api/users/${encodeURIComponent(id)}`, options);
+}
+
 export function createUser(values) {
   return apiRequest('/api/users', { method: 'POST', body: values });
 }
