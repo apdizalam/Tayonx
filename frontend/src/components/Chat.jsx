@@ -27,11 +27,15 @@ function sortMessages(messages) {
     .sort((first, second) => new Date(first.createdAt) - new Date(second.createdAt));
 }
 
-export default function Chat({ user }) {
+/**
+ * `initialContactId` (optional) opens that conversation directly, e.g. from an accepted offer;
+ * otherwise the most recent conversation is selected.
+ */
+export default function Chat({ user, initialContactId = '' }) {
   const [contacts, setContacts] = useState([]);
   const [contactsLoading, setContactsLoading] = useState(true);
   const [contactsError, setContactsError] = useState('');
-  const [selectedContactId, setSelectedContactId] = useState('');
+  const [selectedContactId, setSelectedContactId] = useState(initialContactId);
   const [messages, setMessages] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState('');
@@ -46,7 +50,7 @@ export default function Chat({ user }) {
   const [reportFeedback, setReportFeedback] = useState('');
   const socketRef = useRef(null);
   const historyRef = useRef(null);
-  const selectedContactIdRef = useRef('');
+  const selectedContactIdRef = useRef(initialContactId);
   const selectedContact = contacts.find((contact) => contact.id === selectedContactId);
 
   useEffect(() => {
