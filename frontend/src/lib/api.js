@@ -1,5 +1,29 @@
 export const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
+// When the backend is briefly down (e.g. nodemon restarting it after a save), the dev proxy
+// answers 503 and direct requests fail with a network error. Read-only GET requests are
+// retried a few times (~4 s in total) so a page loaded during a restart still works.
+// Requests that change data (POST/PUT/PATCH/DELETE) are never retried.
+const RESTART_RETRY_DELAYS = [400, 800, 1200, 1600];
+const sleep = (ms, signal) => new Promise((resolve, reject) => {
+  const timer = setTimeout(resolve, ms);
+  signal?.addEventListener('abort', () => { clearTimeout(timer); reject(signal.reason || new DOMException('Aborted', 'AbortError')); }, { once: true });
+});
+
+async function fetchWithRestartRetry(url, init) {
+  const canRetry = !init.method || init.method.toUpperCase() === 'GET';
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      const response = await fetch(url, init);
+      const restarting = [502, 503, 504].includes(response.status);
+      if (!canRetry || !restarting || attempt >= RESTART_RETRY_DELAYS.length) return response;
+    } catch (error) {
+      if (error.name === 'AbortError' || !canRetry || attempt >= RESTART_RETRY_DELAYS.length) throw error;
+    }
+    await sleep(RESTART_RETRY_DELAYS[attempt], init.signal);
+  }
+}
+
 export async function apiRequest(path, options = {}) {
   const headers = new Headers(options.headers || {});
   const token = localStorage.getItem('token');
@@ -11,7 +35,7 @@ export async function apiRequest(path, options = {}) {
     body = JSON.stringify(body);
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, { ...options, headers, body });
+  const response = await fetchWithRestartRetry(`${API_BASE_URL}${path}`, { ...options, headers, body });
   if (response.status === 204) return null;
 
   const result = await response.json().catch(() => ({}));
@@ -152,7 +176,7 @@ export async function loadFileUrl(fileId, options = {}) {
   const headers = new Headers();
   const token = localStorage.getItem('token');
   if (token) headers.set('Authorization', `Bearer ${token}`);
-  const response = await fetch(`${API_BASE_URL}/api/files/${encodeURIComponent(fileId)}`, { ...options, headers });
+  const response = await fetchWithRestartRetry(`${API_BASE_URL}/api/files/${encodeURIComponent(fileId)}`, { ...options, headers });
   if (!response.ok) {
     const result = await response.json().catch(() => ({}));
     const error = new Error(result.error || 'The file could not be loaded.');
