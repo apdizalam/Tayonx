@@ -91,10 +91,16 @@ function statusLabel(status) {
 }
 
 /** Visible status text, e.g. "offers_received" -> "Offers received" (presentation only). */
+const STATUS_TEXT = { shipping: 'In transit' };
 function displayStatus(status) {
+  if (STATUS_TEXT[status]) return STATUS_TEXT[status];
   const label = statusLabel(String(status || ''));
   return label.charAt(0).toUpperCase() + label.slice(1);
 }
+
+// Shipment lifecycle after an offer is accepted. Providers can move forward to any later
+// stage (never back); "delivered" is final. Mirrors the transitions in backend/routes/requests.js.
+const SHIPMENT_STAGES = ['in_progress', 'purchased', 'shipping', 'delivered'];
 
 function formatRelativeTime(value, referenceTime) {
   const timestamp = new Date(value || 0).getTime();
@@ -195,7 +201,7 @@ function RequestTable({ requests, role, search, busyId, onEdit, onDelete, onSele
                   {role === 'admin' && <select aria-label={`Update status for ${request.product}`} value={request.status} disabled={busyId === request._id} onChange={(event) => onStatusChange(request._id, event.target.value)}>
                     {shipmentStatuses.map((status) => <option value={status} key={status}>{displayStatus(status)}</option>)}
                   </select>}
-                  {role === 'customer' && (canCancel || canComplete) && <select aria-label={`Update status for ${request.product}`} value={request.status} disabled={busyId === request._id} onChange={(event) => onStatusChange(request._id, event.target.value)}>
+                  {role === 'customer' && (canCancel || canComplete) && <select aria-label={`Update status for ${request.product}`} value={request.status} disabled={busyId === request._id} onChange={(event) => onStatusChange(request._id, event.target.value, request.product)}>
                     <option value={request.status}>{displayStatus(request.status)}</option>
                     <option value={canComplete ? 'delivered' : 'cancelled'}>{canComplete ? 'Mark delivered' : 'Cancel request'}</option>
                   </select>}
@@ -302,7 +308,9 @@ function OffersTable({ offers, role, busyId, onView, onEdit, onDelete, onRespond
       <table className="data-table offers-table">
         <thead><tr><th>Request</th><th>{role === 'customer' || role === 'admin' ? 'Cargo provider' : 'Customer'}</th><th>Quote</th><th>Delivery</th><th>Status / shipment</th><th className="offer-actions-col" scope="col">Actions</th></tr></thead>
         <tbody>{offers.map((offer) => {
-          const nextStatus = { in_progress: 'purchased', purchased: 'shipping', shipping: 'delivered' }[offer.request.status];
+          const stageIndex = SHIPMENT_STAGES.indexOf(offer.request.status);
+          // The provider can still update progress until the shipment is delivered.
+          const nextStatus = stageIndex >= 0 && stageIndex < SHIPMENT_STAGES.length - 1;
           return (
             <tr key={offer._id} className={onView ? 'offer-row-clickable' : undefined} onClick={onView ? () => onView(offer) : undefined}>
               <td><span className="request-cell"><RequestThumb photoId={offer.request.productPhoto} product={offer.request.product} size="sm" /><span><span className="table-primary">{offer.request.product}</span><span className="table-secondary">{offer.request.quantity}</span><DeliveryMethodChip method={offer.request.deliveryMethod} compact /></span></span></td>
@@ -310,8 +318,8 @@ function OffersTable({ offers, role, busyId, onView, onEdit, onDelete, onRespond
               <td><OfferPriceBreakdown offer={offer} /></td>
               <td>{offer.deliveryDays} days</td>
               <td onClick={(event) => event.stopPropagation()}>{role === 'provider' && offer.status === 'accepted' && nextStatus
-                ? <select aria-label="Update shipment progress" value={offer.request.status} disabled={busyId === offer.request.id} onChange={(event) => onStatusChange(offer.request.id, event.target.value)}>
-                  <option value={offer.request.status}>{displayStatus(offer.request.status)}</option><option value={nextStatus}>{displayStatus(nextStatus)}</option>
+                ? <select className="shipment-status-select" aria-label={`Update shipment progress for ${offer.request.product}`} value={offer.request.status} disabled={busyId === offer.request.id} onChange={(event) => onStatusChange(offer.request.id, event.target.value, offer.request.product)}>
+                  {SHIPMENT_STAGES.map((stage, index) => <option key={stage} value={stage} disabled={index < stageIndex}>{displayStatus(stage)}</option>)}
                 </select>
                 : <StatusBadge>{role === 'provider' && offer.status === 'accepted' ? offer.request.status : offer.status}</StatusBadge>}</td>
               <td className="offer-actions-col"><OfferActions offer={offer} role={role} busy={busyId === offer._id} onView={onView} onEdit={onEdit} onDelete={onDelete} onRespond={onRespond} onReconsider={onReconsider} onRemove={onRemove} onChat={onChat} /></td>
@@ -924,6 +932,12 @@ export default function DashboardWorkspace({ initialRole }) {
     count: requests.filter((request) => request.status === status).length,
   }));
   const activeShipments = requests.filter((request) => ['in_progress', 'purchased', 'shipping'].includes(request.status));
+  // Shipment tracking card: active shipments first, then recently delivered ones (shown as completed).
+  const lastChange = (request) => new Date(request.statusHistory?.at?.(-1)?.at || request.updatedAt || 0).getTime();
+  const trackedShipments = [
+    ...activeShipments,
+    ...requests.filter((request) => request.status === 'delivered').sort((first, second) => lastChange(second) - lastChange(first)),
+  ];
   const pendingOffers = offers.filter((offer) => offer.status === 'pending');
   // The server only sends providers requests shipped from their profile country;
   // the dashboard tabs then narrow that list by delivery method.
@@ -1345,8 +1359,22 @@ export default function DashboardWorkspace({ initialRole }) {
     performMutation(offer._id, () => respondToOffer(offer._id, 'pending'), `Offer from ${offer.provider?.name || 'the provider'} is pending again.`);
   }
 
-  function handleStatusChange(id, status) {
-    performMutation(id, () => updateShipmentStatus(id, status), `Shipment status changed to ${statusLabel(status)}.`);
+  function handleStatusChange(id, status, product = '') {
+    const run = () => performMutation(id, () => updateShipmentStatus(id, status), status === 'delivered'
+      ? `${product ? `“${product}”` : 'Shipment'} marked as delivered.`
+      : `Shipment status changed to ${displayStatus(status).toLowerCase()}.`);
+    // Delivered is the final stage and can't be undone, so ask first (admins can still change anything).
+    if (status === 'delivered' && !adminMode) {
+      askToConfirm({
+        title: 'Mark as delivered?',
+        message: `${product ? `“${product}”` : 'This shipment'} will be marked as delivered and the shipment will be completed for the customer and the cargo provider. This can’t be changed afterwards.`,
+        confirmLabel: 'Mark delivered',
+        tone: 'primary',
+        run,
+      });
+      return;
+    }
+    run();
   }
 
   // Accepted offer → open the direct chat with the other party
@@ -1571,18 +1599,26 @@ export default function DashboardWorkspace({ initialRole }) {
               </div> : <div className="empty-state"><strong>No shipping requests yet</strong><p>Create a request to receive quotes from cargo providers.</p><button className="small-primary" onClick={openCreateRequest}>Create request</button></div>}
             </Card>
             <Card className="customer-tracking-card">
-              <CardHeading title="Shipment tracking" subtitle="Live progress for your active shipments" />
-              {loading ? <p className="empty-table" role="status">Loading shipment progress…</p> : activeShipments.length ? <div className="customer-tracking-list">{activeShipments.slice(0, 3).map((request) => {
-                const stageIndex = { in_progress: 0, purchased: 1, shipping: 2, delivered: 3 }[request.status] ?? 0;
+              <CardHeading title="Shipment tracking" subtitle="Live progress for your shipments" />
+              {loading ? <p className="empty-table" role="status">Loading shipment progress…</p> : trackedShipments.length ? <div className="customer-tracking-list">{trackedShipments.slice(0, 3).map((request) => {
+                const stageIndex = Math.max(0, SHIPMENT_STAGES.indexOf(request.status));
+                const delivered = request.status === 'delivered';
                 const stages = ['Offer accepted', 'Item purchased', 'In transit', 'Delivered'];
-                return <section className="customer-tracking-item" key={request._id}>
-                  <div className="customer-tracking-heading"><span><strong>{request.product}</strong><small>{request.destination} · {displayStatus(request.status)}</small></span><span className="customer-row-actions">
-                    <button className="icon-button table-action" aria-label={`Edit ${request.product}`} onClick={() => { setEditingRequest(request); setRequestModalOpen(true); setFormError(''); }}><Icon name="edit" size={15} /></button>
+                // When each stage was reached (requests accepted before this was recorded have no dates).
+                const reachedAt = (stage) => [...(request.statusHistory || [])].reverse().find((entry) => entry.status === stage)?.at;
+                const shortDate = (value) => new Date(value).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+                return <section className={`customer-tracking-item${delivered ? ' delivered' : ''}`} key={request._id}>
+                  <div className="customer-tracking-heading"><span><strong>{request.product}</strong><small>{request.destination} · {delivered ? <span className="tracking-delivered-label"><Icon name="check" size={12} />Delivered{reachedAt('delivered') ? ` ${shortDate(reachedAt('delivered'))}` : ''}</span> : displayStatus(request.status)}</small></span><span className="customer-row-actions">
+                    {!delivered && <button className="icon-button table-action" aria-label={`Edit ${request.product}`} onClick={() => { setEditingRequest(request); setRequestModalOpen(true); setFormError(''); }}><Icon name="edit" size={15} /></button>}
                     <button className="icon-button table-action" aria-label={`Delete ${request.product}`} disabled={busyId === request._id} onClick={() => deleteShippingRequest(request)}><Icon name="trash" size={15} /></button>
                   </span></div>
-                  <ol className="shipment-tracking">{stages.map((stage, index) => <li className={index < stageIndex ? 'complete' : index === stageIndex ? 'current' : ''} key={stage}><i /><span><strong>{stage}</strong>{index === stageIndex && <small>Current status</small>}</span></li>)}</ol>
+                  <ol className="shipment-tracking">{stages.map((stage, index) => {
+                    const done = delivered || index < stageIndex;
+                    const when = reachedAt(SHIPMENT_STAGES[index]);
+                    return <li className={done ? 'complete' : index === stageIndex ? 'current' : ''} key={stage}><i /><span><strong>{stage}</strong>{!delivered && index === stageIndex ? <small>Current status{when ? ` · since ${shortDate(when)}` : ''}</small> : done && when ? <small>{shortDate(when)}</small> : null}</span></li>;
+                  })}</ol>
                 </section>;
-              })}</div> : <div className="empty-state"><strong>No active shipments</strong><p>Accepted offers will appear here as your shipments progress.</p></div>}
+              })}</div> : <div className="empty-state"><strong>No shipments yet</strong><p>Accepted offers will appear here as your shipments progress.</p></div>}
             </Card>
           </div>
           <div className="customer-dashboard-grid customer-dashboard-grid-secondary">
