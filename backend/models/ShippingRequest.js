@@ -35,6 +35,13 @@ const shippingRequestSchema = new mongoose.Schema({
   // The verified cargo company/provider the customer chose for this request.
   // Requests without one (older requests) are open to verified providers in the source country.
   targetProvider: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null, index: true },
+  // When each shipment stage was reached (in_progress → purchased → shipping → delivered, or cancelled).
+  statusHistory: [{
+    _id: false,
+    status: { type: String, required: true },
+    at: { type: Date, default: Date.now },
+    by: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  }],
   declinedBy: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   offers: [offerSchema],
 }, { timestamps: true });
