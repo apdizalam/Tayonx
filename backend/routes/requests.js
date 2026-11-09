@@ -288,17 +288,15 @@ router.post('/:id/offers', requireRole(...cargoProviderRoles), async (req, res) 
   }
 });
 
-router.put('/offers/:offerId', requireRole(...cargoProviderRoles, 'admin'), async (req, res) => {
+// Only the provider who sent an offer can edit it. Administrators have read-only access to offers.
+router.put('/offers/:offerId', requireRole(...cargoProviderRoles), async (req, res) => {
   if (!validId(req.params.offerId)) return res.status(400).json({ error: 'Invalid offer id.' });
   if (mongoose.connection.readyState !== 1) return databaseUnavailable(res);
 
   const body = req.body && typeof req.body === 'object' ? req.body : {};
 
   try {
-    const filter = req.user.role === 'admin'
-      ? { 'offers._id': req.params.offerId }
-      : { 'offers._id': req.params.offerId, 'offers.provider': req.user._id };
-    const request = await ShippingRequest.findOne(filter);
+    const request = await ShippingRequest.findOne({ 'offers._id': req.params.offerId, 'offers.provider': req.user._id });
     if (!request) return res.status(404).json({ error: 'Offer not found.' });
     const offer = request.offers.id(req.params.offerId);
     if (offer.status !== 'pending') return res.status(409).json({ error: 'Only pending offers can be edited.' });
@@ -312,20 +310,34 @@ router.put('/offers/:offerId', requireRole(...cargoProviderRoles, 'admin'), asyn
   }
 });
 
-router.delete('/offers/:offerId', requireRole(...cargoProviderRoles, 'admin'), async (req, res) => {
+// Remove an offer:
+//  - the provider can withdraw their own pending offer;
+//  - the customer can remove a pending or declined offer from their own request.
+// Accepted offers are never removed (the shipment is underway). Administrators are read-only.
+router.delete('/offers/:offerId', requireRole(...cargoProviderRoles, 'customer'), async (req, res) => {
   if (!validId(req.params.offerId)) return res.status(400).json({ error: 'Invalid offer id.' });
   if (mongoose.connection.readyState !== 1) return databaseUnavailable(res);
 
   try {
-    const filter = req.user.role === 'admin'
-      ? { 'offers._id': req.params.offerId }
+    const isCustomer = req.user.role === 'customer';
+    const filter = isCustomer
+      ? { 'offers._id': req.params.offerId, customer: req.user._id }
       : { 'offers._id': req.params.offerId, 'offers.provider': req.user._id };
     const request = await ShippingRequest.findOne(filter);
     if (!request) return res.status(404).json({ error: 'Offer not found.' });
     const offer = request.offers.id(req.params.offerId);
-    if (offer.status !== 'pending') return res.status(409).json({ error: 'Only pending offers can be deleted.' });
+    if (!isCustomer && !offer.provider.equals(req.user._id)) return res.status(404).json({ error: 'Offer not found.' });
+    const removable = isCustomer ? ['pending', 'declined'] : ['pending'];
+    if (!removable.includes(offer.status)) {
+      return res.status(409).json({ error: offer.status === 'accepted' ? 'Accepted offers cannot be removed while the shipment is in progress.' : 'Only pending offers can be withdrawn.' });
+    }
+    if (request.status === 'cancelled') return res.status(409).json({ error: 'This request was cancelled.' });
     request.offers.pull(req.params.offerId);
-    request.status = request.offers.some((item) => item.status === 'pending') ? 'offers_received' : 'open';
+    // Only re-derive the status while the request is still collecting offers
+    // (removing a declined offer must not reopen a shipment that is in progress).
+    if (['open', 'offers_received'].includes(request.status)) {
+      request.status = request.offers.some((item) => item.status === 'pending') ? 'offers_received' : 'open';
+    }
     await request.save();
     return res.status(204).end();
   } catch (error) {
@@ -333,20 +345,39 @@ router.delete('/offers/:offerId', requireRole(...cargoProviderRoles, 'admin'), a
   }
 });
 
-router.patch('/offers/:offerId/status', requireRole('customer', 'admin'), async (req, res) => {
+// The customer decides on offers for their own request:
+//   pending  -> accepted | declined
+//   declined -> pending   ("reconsider"), only while the request has no accepted offer.
+// Administrators have read-only access to offers.
+router.patch('/offers/:offerId/status', requireRole('customer'), async (req, res) => {
   const { status } = req.body || {};
-  if (!['accepted', 'declined'].includes(status)) return res.status(400).json({ error: 'Choose accepted or declined.' });
+  if (!['accepted', 'declined', 'pending'].includes(status)) return res.status(400).json({ error: 'Choose accepted, declined or pending.' });
   if (!validId(req.params.offerId)) return res.status(400).json({ error: 'Invalid offer id.' });
   if (mongoose.connection.readyState !== 1) return databaseUnavailable(res);
 
   try {
     const request = await ShippingRequest.findOne({ 'offers._id': req.params.offerId });
     if (!request) return res.status(404).json({ error: 'Offer not found.' });
-    if (req.user.role === 'customer' && !request.customer.equals(req.user._id)) {
+    if (!request.customer.equals(req.user._id)) {
       return res.status(403).json({ error: 'Only the request owner can respond to this offer.' });
     }
     const offer = request.offers.id(req.params.offerId);
-    if (offer.status !== 'pending' || request.status === 'cancelled') {
+    if (request.status === 'cancelled') {
+      return res.status(409).json({ error: 'This request was cancelled.' });
+    }
+
+    if (status === 'pending') {
+      if (offer.status !== 'declined') return res.status(409).json({ error: 'Only declined offers can be reconsidered.' });
+      if (!['open', 'offers_received'].includes(request.status) || request.offers.some((item) => item.status === 'accepted')) {
+        return res.status(409).json({ error: 'You already accepted another offer for this request.' });
+      }
+      offer.status = 'pending';
+      request.status = 'offers_received';
+      await request.save();
+      return res.json({ offer: { ...offer.toObject(), request: request.id }, requestStatus: request.status });
+    }
+
+    if (offer.status !== 'pending') {
       return res.status(409).json({ error: 'This offer can no longer be changed.' });
     }
 
