@@ -23,7 +23,7 @@ async function authenticate(req, res, next) {
       return res.status(401).json({ error: 'Session is invalid or expired.' });
     }
 
-    const user = await User.findById(payload.sub).select('name email role country');
+    const user = await User.findById(payload.sub).select('name email role country verification.status');
     if (!user) {
       return res.status(401).json({ error: 'Session is invalid or expired.' });
     }
