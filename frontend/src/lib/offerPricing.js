@@ -12,6 +12,36 @@ export function roundMoney(value) {
   return Math.round(value * 100) / 100;
 }
 
+/** Product subtotal = quantity × price per item; total = subtotal + delivery fee (same as the server). */
+export function calculateOfferPrice(quantityCount, unitPrice, deliveryFee = 0) {
+  const subtotal = roundMoney(quantityCount * unitPrice);
+  return { subtotal, total: roundMoney(subtotal + deliveryFee) };
+}
+
+/** "laptops", "pcs", "units"… taken from a quantity such as "50 laptops". */
+export function quantityUnitLabel(quantity, count) {
+  const word = String(quantity || '').replace(/^[^\d]*[\d.,]+\s*/, '').split(/[\s(]/)[0];
+  if (word && /^\p{L}/u.test(word)) return word;
+  return count === 1 ? 'unit' : 'units';
+}
+
+/**
+ * The stored price breakdown of an offer. Older offers may only have a total (`price`),
+ * or a unit price without a separate delivery fee.
+ */
+export function offerBreakdown(offer) {
+  const hasUnits = Boolean(offer?.unitPrice && offer?.quantityCount);
+  const subtotal = offer?.subtotal ?? (hasUnits ? roundMoney(offer.unitPrice * offer.quantityCount) : null);
+  return {
+    hasUnits,
+    unitPrice: offer?.unitPrice ?? null,
+    quantityCount: offer?.quantityCount ?? null,
+    subtotal,
+    deliveryFee: offer?.deliveryFee ?? null,
+    total: offer?.price ?? 0,
+  };
+}
+
 const usd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
 
 /** "$1,250.50", or "$10" for whole dollars. */
