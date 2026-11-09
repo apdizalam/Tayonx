@@ -11,6 +11,9 @@ const { authenticate, requireRole } = require('../middleware/authenticate');
 const router = express.Router();
 const CARGO_ROLES = ['cargo_provider', 'individual_cargo'];
 const VERIFIED_FILTER = { role: { $in: CARGO_ROLES }, 'verification.status': 'approved' };
+// Customers only ever see verified providers; administrators see every provider so they can
+// monitor and review them (still without documents — those are in /api/users/:id).
+const listFilter = (user) => (user.role === 'admin' ? { role: { $in: CARGO_ROLES } } : VERIFIED_FILTER);
 const PUBLIC_FIELDS = 'name email phone role country verification.status verification.reviewedAt createdAt';
 
 router.use(authenticate, requireRole('customer', 'admin'));
@@ -28,6 +31,7 @@ function publicProvider(user, stats = {}) {
     email: user.email,
     phone: user.phone || '',
     verified: user.verification?.status === 'approved',
+    verificationStatus: user.verification?.status || 'unverified',
     verifiedAt: user.verification?.reviewedAt || null,
     memberSince: user.createdAt,
     stats: {
@@ -55,11 +59,11 @@ async function providerStats(ids) {
   return new Map(rows.map((row) => [String(row._id), row]));
 }
 
-// GET /api/providers — every verified cargo company / individual provider, any country.
+// GET /api/providers — verified providers from any country (admins: every provider, with status).
 router.get('/', async (req, res) => {
   if (mongoose.connection.readyState !== 1) return databaseUnavailable(res);
   try {
-    const providers = await User.find(VERIFIED_FILTER).select(PUBLIC_FIELDS).sort({ name: 1 });
+    const providers = await User.find(listFilter(req.user)).select(PUBLIC_FIELDS).sort({ name: 1 });
     const stats = await providerStats(providers.map((provider) => provider._id));
     return res.json({ providers: providers.map((provider) => publicProvider(provider, stats.get(String(provider._id)))) });
   } catch (error) {
@@ -73,7 +77,7 @@ router.get('/:id', async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ error: 'Invalid cargo company id.' });
   if (mongoose.connection.readyState !== 1) return databaseUnavailable(res);
   try {
-    const provider = await User.findOne({ _id: req.params.id, ...VERIFIED_FILTER }).select(PUBLIC_FIELDS);
+    const provider = await User.findOne({ _id: req.params.id, ...listFilter(req.user) }).select(PUBLIC_FIELDS);
     if (!provider) return res.status(404).json({ error: 'Cargo company not found.' });
     const stats = await providerStats([provider._id]);
     return res.json({ provider: publicProvider(provider, stats.get(String(provider._id))) });
