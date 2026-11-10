@@ -2569,6 +2569,84 @@ body {
   color: var(--emerald-800);
 }
 
+/* Closed chats: collapsible list under the conversations, each with a Re-open action. */
+.app-shell .closed-chats {
+  margin-top: auto;
+  padding: 8px 8px 10px;
+  border-top: 1px solid var(--border);
+}
+
+.app-shell .closed-chats-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: var(--radius-md);
+  color: var(--ink-soft, #475569);
+  background: transparent;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.app-shell .closed-chats-toggle:hover {
+  background: var(--surface-muted, #f1f5f9);
+}
+
+.app-shell .closed-chats-toggle span {
+  flex: 1;
+  text-align: left;
+}
+
+.app-shell .closed-chats-toggle b {
+  min-width: 20px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  color: var(--ink-soft, #475569);
+  background: var(--surface-muted, #f1f5f9);
+  font-size: 11.5px;
+}
+
+.app-shell .closed-chats-toggle > .icon:last-child {
+  transform: rotate(90deg);
+  transition: transform 0.15s ease;
+}
+
+.app-shell .closed-chats-toggle.open > .icon:last-child {
+  transform: rotate(-90deg);
+}
+
+.app-shell .closed-chat-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  opacity: 0.92;
+}
+
+.app-shell .closed-chat-row .conversation-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.app-shell .closed-chat-row .conversation-copy b,
+.app-shell .closed-chat-row .conversation-copy small {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.app-shell .closed-chat-row .closed-chat-reopen {
+  flex: none;
+  min-height: 30px;
+  padding: 4px 10px;
+  font-size: 12.5px;
+}
+
 /* ---- Admin moderation (Chats & reports) ---- */
 .app-shell .moderation-shell {
   display: flex;

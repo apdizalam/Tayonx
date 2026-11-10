@@ -59,7 +59,6 @@ const roleConfig = {
       ['messages', 'Chat', 'chat'],
       ['notifications', 'Notifications', 'bell'],
       ['profile', 'Profile', 'user'],
-      ['new-request', 'New request', 'plus'],
     ],
   },
   provider: {
@@ -1964,11 +1963,6 @@ export default function DashboardWorkspace({ initialRole }) {
               {adminMode && sectionId === 'settings' && <span className="sidebar-section-label">SYSTEM</span>}
           {providerMode && sectionId === 'company' && <span className="sidebar-section-label">{isIndividualProvider ? 'ACCOUNT' : 'COMPANY'}</span>}
           <button className={`nav-item${section === sectionId ? ' active' : ''}`} onClick={() => {
-                if (sectionId === 'new-request') {
-                  openCreateRequest();
-                  setMobileNavOpen(false);
-                  return;
-                }
                 if (sectionId === 'users' && section !== 'users') {
                   setUsersLoading(true);
                   setUsersError('');
@@ -2018,7 +2012,6 @@ export default function DashboardWorkspace({ initialRole }) {
             {adminMode && <button className="admin-export-button" onClick={exportRequests} disabled={loading}><Icon name="download" size={13} />Export</button>}
             {(section === 'requests' || section === 'opportunities') && <label className="search-box"><Icon name="search" size={17} /><input aria-label="Search requests" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search requests…" /></label>}
             {user && <NotificationBell items={notifications} seen={notificationSeen} now={currentTime} onAction={openNotification} onDismiss={dismissNotification} onMarkAllRead={() => markNotificationsSeen(notifications)} onViewAll={() => setSection('notifications')} />}
-            {customerMode && section === 'overview' && <button className="primary-button" onClick={openCreateRequest}><Icon name="plus" size={16} />New request</button>}
             <Avatar name={displayName} className={`topbar-avatar${providerMode || adminMode ? ' provider-topbar-avatar' : ''}`} />
           </div>
         </header>
