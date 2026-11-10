@@ -81,6 +81,20 @@ export default function Chat({ user, initialContactId = '' }) {
       .catch(() => {});
   }, []);
 
+  // Keep the lists current while the chat is open: a closed thread the server restored (new message
+  // or a request/offer update between you) moves back to the active list without a page reload.
+  useEffect(() => {
+    const refresh = () => {
+      if (document.visibilityState === 'visible') reloadContactsRef.current?.();
+    };
+    const timer = window.setInterval(refresh, 45000);
+    window.addEventListener('focus', refresh);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener('focus', refresh);
+    };
+  }, []);
+
   useEffect(() => {
     const controller = new AbortController();
     // `include` re-opens the thread we were sent to (e.g. from an offer's Chat button) if it was closed.
@@ -136,6 +150,8 @@ export default function Chat({ user, initialContactId = '' }) {
         setMessages((current) => sortMessages([...current, message]));
       }
     });
+    // The server restored a closed thread (a request or offer update between you and a contact).
+    socket.on('chat_threads_changed', () => reloadContactsRef.current?.());
     socket.connect();
     return () => {
       socket.removeAllListeners();
@@ -209,8 +225,9 @@ export default function Chat({ user, initialContactId = '' }) {
       await closeChat(contact.id);
       setContacts((current) => current.filter((item) => item.id !== contact.id));
       setClosedContacts((current) => [{ ...contact, closedAt: new Date().toISOString() }, ...current.filter((item) => item.id !== contact.id)]);
+      setClosedOpen(true);
       clearSelection();
-      setListFeedback(`Chat with ${contact.name} closed. It re-opens when a new message arrives, or from Closed chats.`);
+      setListFeedback(`Chat with ${contact.name} moved to Closed chats. Your messages are kept — click it to re-open, or it re-opens when a new message arrives.`);
     } catch (requestError) {
       if (requestError.missingRoute) {
         // Older server without thread state: still close the open conversation, keep it in the list.
@@ -308,11 +325,11 @@ export default function Chat({ user, initialContactId = '' }) {
               <Icon name="arrow" size={14} />
             </button>
             {closedOpen && closedContacts.map((contact) => (
-              <div className="closed-chat-row" key={contact.id}>
+              <button type="button" className="closed-chat-row" key={contact.id} onClick={() => reopenContact(contact)} aria-label={`Re-open chat with ${contact.name}`} title="Re-open this chat">
                 <ChatAvatar name={contact.name} />
                 <span className="conversation-copy"><b>{contact.name}</b><small>{contact.lastMessage?.text || contactRole(contact.role)}</small></span>
-                <button type="button" className="secondary-button closed-chat-reopen" onClick={() => reopenContact(contact)} aria-label={`Re-open chat with ${contact.name}`}>Re-open</button>
-              </div>
+                <span className="closed-chat-reopen" aria-hidden="true">Re-open</span>
+              </button>
             ))}
           </div>
         )}
@@ -324,8 +341,8 @@ export default function Chat({ user, initialContactId = '' }) {
             <span><b>{selectedContact.name}</b><small><i className={connectionState === 'connected' ? 'is-online' : ''} />{contactRole(selectedContact.role)} · {connectionState === 'connected' ? 'Live' : 'Reconnecting'}</small></span>
             <span className="chat-heading-actions">
               {user.role !== 'admin' && <button type="button" className="customer-outline-button chat-report-button" onClick={() => { setReportError(''); setReportOpen(true); }}>Report</button>}
-              <button type="button" className="icon-button chat-delete-button" aria-label={`Delete chat with ${selectedContact.name}`} title="Delete chat" disabled={threadBusy} onClick={() => setDeleteConfirm(true)}><Icon name="trash" size={16} /></button>
-              <button type="button" className="icon-button chat-close-button" aria-label={`Close chat with ${selectedContact.name}`} title="Close chat (it re-opens when a new message arrives)" disabled={threadBusy} onClick={closeConversation}><Icon name="close" size={18} /></button>
+              <button type="button" className="icon-button chat-delete-button" aria-label={`Delete chat with ${selectedContact.name}`} title="Delete chat permanently" disabled={threadBusy} onClick={() => setDeleteConfirm(true)}><Icon name="trash" size={16} /></button>
+              <button type="button" className="icon-button chat-close-button" aria-label={`Close chat with ${selectedContact.name}`} title="Close chat — moves it to Closed chats and keeps all messages" disabled={threadBusy} onClick={closeConversation}><Icon name="close" size={18} /></button>
             </span>
           </div>
           <div className="chat-history" ref={historyRef} aria-live="polite">
@@ -349,8 +366,8 @@ export default function Chat({ user, initialContactId = '' }) {
       </section>
       {deleteConfirm && selectedContact && (
         <ConfirmDialog
-          title="Delete this chat?"
-          message={`Your conversation with ${selectedContact.name} will be removed from your messages. ${selectedContact.name} keeps their copy, and a new message from either of you starts a fresh chat.`}
+          title="Delete this chat permanently?"
+          message={`All messages in your conversation with ${selectedContact.name} will be permanently deleted from your account. This cannot be undone. To keep the history, use Close (X) instead. ${selectedContact.name} keeps their own copy, and a new message from either of you starts a fresh chat.`}
           confirmLabel="Delete chat"
           tone="danger"
           busy={threadBusy}
