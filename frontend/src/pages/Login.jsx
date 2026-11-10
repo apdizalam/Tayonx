@@ -9,6 +9,12 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 const dashboardPaths = { admin: '/admin/dashboard', customer: '/customer/dashboard', cargo_provider: '/cargo/dashboard', individual_cargo: '/cargo/dashboard' };
 // "Remember me" keeps only the email address on this device; the password is never stored.
 const REMEMBER_KEY = 'tayonx:remember-email';
+const HERO_FEATURES = [
+  ['shield', 'Verified providers', 'Every cargo company is document-checked before it can quote.'],
+  ['ship', 'Live tracking', 'Follow each shipment from purchase to in transit to delivered.'],
+  ['mail', 'Instant quotes', 'Receive, compare and accept offers in one place.'],
+  ['globe', 'Global connectivity', 'Work with providers across countries and routes, by sea or air.'],
+];
 
 function rememberedEmail() {
   try {
@@ -81,7 +87,7 @@ export default function LoginPage() {
 
   return (
     <main className="login-scene">
-      <div className="login-shell">
+      <div className="login-shell login-form-column">
         <form className="login-card" onSubmit={handleSubmit}>
           <Link className="login-logo" to="/login" aria-label="Tayonx home"><img src={logo} alt="Tayonx" /></Link>
           <header className="login-header">
@@ -134,6 +140,30 @@ export default function LoginPage() {
         </form>
         <p className="login-footnote">Connect · Request · Ship · Get it done</p>
       </div>
+
+      <section className="login-hero" aria-labelledby="login-hero-title">
+        <div className="login-hero-content">
+          <p className="login-hero-eyebrow"><span aria-hidden="true" />Tayonx cargo marketplace</p>
+          <h2 id="login-hero-title">Next-Generation Cargo &amp; Logistics Management</h2>
+          <p className="login-hero-lead">
+            One workspace to request shipments, compare quotes from verified cargo providers and follow every order
+            from purchase to delivery — with real-time tracking and direct chat at each step.
+          </p>
+          <ul className="login-features">
+            {HERO_FEATURES.map(([icon, title, text]) => (
+              <li key={title}>
+                <span className="login-feature-icon"><Icon name={icon} size={19} /></span>
+                <span><b>{title}</b><small>{text}</small></span>
+              </li>
+            ))}
+          </ul>
+          <ol className="login-journey" aria-label="How Tayonx works">
+            {['Request', 'Quote', 'Ship', 'Deliver'].map((step, index) => (
+              <li key={step}><span>{index + 1}</span>{step}</li>
+            ))}
+          </ol>
+        </div>
+      </section>
     </main>
   );
 }
