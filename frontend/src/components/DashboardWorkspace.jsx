@@ -1,13 +1,19 @@
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import logo from '../assets/tayonx-logo.png';
 import Icon from './Icon.jsx';
-import AdminChats from './AdminChats.jsx';
-import AdminSettings from './AdminSettings.jsx';
 import Chat from './Chat.jsx';
 import ConfirmDialog from './ConfirmDialog.jsx';
 import AdminUserDetails from './AdminUserDetails.jsx';
-import AdminAnalytics from './AdminAnalytics.jsx';
+// Report/analytics pages are loaded on demand to keep the main bundle small.
+const AdminAnalytics = lazy(() => import('./AdminAnalytics.jsx'));
+const AdminChats = lazy(() => import('./AdminChats.jsx'));
+const AdminSettings = lazy(() => import('./AdminSettings.jsx'));
+const AdminReports = lazy(() => import('./AdminReports.jsx'));
+const ProviderReports = lazy(() => import('./ProviderReports.jsx'));
+const pageFallback = <p className="empty-table" role="status">Loading…</p>;
+import { NotificationBell, NotificationList } from './NotificationsCenter.jsx';
+import { buildNotifications, readIds, writeIds } from '../lib/notifications.js';
 import { CompanyDirectory, CompanyPicker, CompanyProfileModal } from './CargoCompanies.jsx';
 import AccountFields from './AccountFields.jsx';
 import AdminVerifications from './AdminVerifications.jsx';
@@ -62,8 +68,10 @@ const roleConfig = {
       ['overview', 'Dashboard', 'home'],
       ['opportunities', 'Requests', 'box'],
       ['offers', 'My offers', 'mail'],
-      ['orders', 'Orders & shipping', 'package'],
+      // "Orders & shipping" duplicated My offers (now filterable by Shipments); replaced by Reports.
+      ['reports', 'Reports & earnings', 'chart'],
       ['messages', 'Chats', 'chat'],
+      ['notifications', 'Notifications', 'bell'],
       ['company', 'Company profile', 'building'],
       ['settings', 'Settings', 'user'],
     ],
@@ -77,8 +85,10 @@ const roleConfig = {
       ['offers', 'Offers', 'mail'],
       ['users', 'Users', 'users'],
       ['verifications', 'Verifications', 'shield'],
+      ['notifications', 'Notifications', 'bell'],
       ['messages', 'Chats & reports', 'chat'],
       ['analytics', 'Analytics', 'chart'],
+      ['reports', 'Reports & exports', 'file'],
       ['settings', 'Settings', 'user'],
     ],
   },
@@ -744,13 +754,6 @@ function OfferPriceBreakdown({ offer }) {
   );
 }
 
-/** One-line price text for compact lists, e.g. "$600 (50 × $10 + $100 delivery)". */
-function offerPriceText(offer) {
-  const price = offerBreakdown(offer);
-  if (!price.hasUnits) return formatUsd(price.total);
-  const delivery = price.deliveryFee === null ? '' : price.deliveryFee > 0 ? ` + ${formatUsd(price.deliveryFee)} delivery` : ', free delivery';
-  return `${formatUsd(price.total)} (${price.quantityCount.toLocaleString('en-US')} × ${formatUsd(price.unitPrice)}${delivery})`;
-}
 
 function blankIfMissing(value) {
   return value === null || value === undefined ? '' : String(value);
@@ -1046,6 +1049,10 @@ export default function DashboardWorkspace({ initialRole }) {
   const [adminRequestGroup, setAdminRequestGroup] = useState('all');
   const [currentTime, setCurrentTime] = useState(dashboardLoadedAt);
   const [providerMethodFilter, setProviderMethodFilter] = useState('all');
+  const [providerOfferFilter, setProviderOfferFilter] = useState('all');
+  // Notifications: ids the user has seen / dismissed (remembered per user in this browser).
+  const [notificationSeen, setNotificationSeen] = useState(() => new Set());
+  const [notificationDismissed, setNotificationDismissed] = useState(() => new Set());
   const config = roleConfig[initialRole];
   // Cargo providers see their exact account type: "Cargo Company" or "Individual".
   const isIndividualProvider = initialRole === 'provider' && user?.role === 'individual_cargo';
@@ -1065,14 +1072,14 @@ export default function DashboardWorkspace({ initialRole }) {
     opportunities: 'Matching requests',
     offers: customerMode ? 'Offers to review' : adminMode ? 'All marketplace offers' : 'My offers',
     companies: 'Cargo companies',
-    messages: 'Chat',
+    messages: adminMode ? 'Chats & reports' : 'Chat',
     notifications: 'Notifications',
     profile: 'Profile',
     users: 'Users',
     verifications: 'Verifications',
     analytics: 'Analytics',
     settings: 'Settings',
-    orders: 'Orders & shipping',
+    reports: adminMode ? 'Reports & exports' : 'Reports & earnings',
     company: 'Company profile',
   })[section], [section, adminMode, customerMode]);
   const requestStatusCounts = shipmentStatuses.map((status) => ({
@@ -1126,6 +1133,51 @@ export default function DashboardWorkspace({ initialRole }) {
   const adminCustomers = new Set(adminCustomerIds);
   const adminProviders = new Set(adminProviderIds);
   const adminPendingOffers = adminOffers.filter((offer) => offer.status === 'pending');
+
+  // ---- Notifications (all roles) ----
+  const notifications = useMemo(
+    () => buildNotifications({ role: initialRole, requests, offers, now: currentTime, pendingVerifications })
+      .filter((item) => !notificationDismissed.has(item.id)),
+    [initialRole, requests, offers, currentTime, pendingVerifications, notificationDismissed],
+  );
+  const unreadNotifications = notifications.filter((item) => !notificationSeen.has(item.id)).length;
+  const userId = user?.id || '';
+  useEffect(() => {
+    if (!userId) return;
+    setNotificationSeen(readIds(userId, 'seen'));
+    setNotificationDismissed(readIds(userId, 'dismissed'));
+  }, [userId]);
+
+  function markNotificationsSeen(items) {
+    setNotificationSeen((current) => {
+      const next = new Set(current);
+      items.forEach((item) => next.add(item.id));
+      if (userId) writeIds(userId, 'seen', next);
+      return next;
+    });
+  }
+
+  function dismissNotification(item) {
+    setNotificationDismissed((current) => {
+      const next = new Set(current).add(item.id);
+      if (userId) writeIds(userId, 'dismissed', next);
+      return next;
+    });
+  }
+
+  // Follow a notification's action: open the request details, or the right section/filter.
+  function openNotification(item) {
+    markNotificationsSeen([item]);
+    const action = item.action || {};
+    setMobileNavOpen(false);
+    if (action.section) {
+      if (providerMode && action.section === 'offers' && action.offerId) setProviderOfferFilter('shipments');
+      if (customerMode && action.requestId) setSelectedRequestId(action.requestId);
+      setSection(action.section);
+      return;
+    }
+    if (action.requestId && (customerMode || adminMode)) setViewingRequestId(action.requestId);
+  }
   const adminRecentRequests = [...adminRequests]
     .sort((first, second) => new Date(second.createdAt || 0) - new Date(first.createdAt || 0))
     .slice(0, 4);
@@ -1152,22 +1204,6 @@ export default function DashboardWorkspace({ initialRole }) {
   const recentRequests = [...requests]
     .sort((first, second) => new Date(second.createdAt || 0) - new Date(first.createdAt || 0))
     .slice(0, 5);
-  const recentOffers = offers.slice(0, 4);
-  const quotedProviders = [...offers.reduce((providers, offer) => {
-    const provider = offer.provider;
-    if (!provider) return providers;
-    const key = String(provider._id || provider.id || provider.name || '');
-    if (!key) return providers;
-    const existing = providers.get(key) || {
-      id: key,
-      name: provider.name || 'Cargo provider',
-      offers: 0,
-      requestId: offer.request?.id,
-    };
-    existing.offers += 1;
-    providers.set(key, existing);
-    return providers;
-  }, new Map()).values()];
 
   // Customers: load verified cargo companies for the directory and the New Request flow.
   useEffect(() => {
@@ -1615,15 +1651,23 @@ export default function DashboardWorkspace({ initialRole }) {
 
   function renderContent() {
     if (section === 'offers') {
+      // Providers can filter My offers (Shipments = accepted offers, the former Orders & shipping view).
+      const providerTabs = [
+        ['all', 'All', () => true],
+        ['pending', 'Pending', (offer) => offer.status === 'pending'],
+        ['shipments', 'Shipments', (offer) => offer.status === 'accepted'],
+        ['declined', 'Declined', (offer) => offer.status === 'declined'],
+      ];
+      const activeProviderTab = providerTabs.find(([id]) => id === providerOfferFilter) || providerTabs[0];
       const selectedOffers = customerMode && selectedRequestId
         ? offers.filter((offer) => offer.request.id === selectedRequestId)
-        : offers;
+        : providerMode ? offers.filter(activeProviderTab[2]) : offers;
       const offersSubtitle = customerMode
         ? 'Click an offer to see the full breakdown, then accept, decline or chat with the provider.'
         : adminMode
           ? 'Read-only overview of every offer on the marketplace. Click an offer to audit its details.'
-          : 'Manage pending quotes and update accepted shipment progress.';
-      return <Card><CardHeading title={title} subtitle={offersSubtitle} action={adminMode ? <span className="offer-readonly-chip"><Icon name="eye" size={14} />Read-only</span> : null} />{loading ? <p className="empty-table" role="status">Loading offers…</p> : <OffersTable
+          : 'Manage pending quotes and update shipment progress. Use Shipments for accepted orders.';
+      return <Card><CardHeading title={title} subtitle={offersSubtitle} action={adminMode ? <span className="offer-readonly-chip"><Icon name="eye" size={14} />Read-only</span> : null} />{providerMode && <div className="admin-request-tabs provider-offer-tabs" role="tablist" aria-label="Filter my offers">{providerTabs.map(([id, label, match]) => <button type="button" role="tab" key={id} aria-selected={activeProviderTab[0] === id} className={`admin-request-tab tone-${id === 'shipments' ? 'delivered' : id === 'declined' ? 'cancelled' : id === 'pending' ? 'awaiting' : 'all'}${activeProviderTab[0] === id ? ' active' : ''}`} onClick={() => setProviderOfferFilter(id)}><span>{label}</span><b>{loading ? '—' : offers.filter(match).length}</b></button>)}</div>}{loading ? <p className="empty-table" role="status">Loading offers…</p> : <OffersTable
         offers={selectedOffers}
         role={initialRole}
         busyId={busyId}
@@ -1642,9 +1686,12 @@ export default function DashboardWorkspace({ initialRole }) {
       return <Card><CardHeading title={title} subtitle={`Requests shipped from ${providerCountry || 'your profile country'}. Send a real quote or decline requests you cannot fulfil.`} action={providerCountry ? <span className="provider-country-scope" title="Based on the country in your profile"><Icon name="globe" size={13} />{providerCountry}</span> : null} />{providerGate || (loading ? <p className="empty-table" role="status">Loading matching requests…</p> : renderRequests(requests))}</Card>;
     }
 
-    if (providerMode && section === 'orders') {
-      const orders = offers.filter((offer) => offer.status === 'accepted');
-      return <Card><CardHeading title="Orders & shipping" subtitle="Accepted offers and their live shipment status." />{loading ? <p className="empty-table" role="status">Loading accepted orders…</p> : orders.length ? <OffersTable offers={orders} role="provider" busyId={busyId} onView={(offer) => setViewingOfferId(offer._id)} onEdit={(offer) => { setEditingOffer(offer); setOfferRequest(null); setFormError(''); }} onDelete={deleteCargoOffer} onStatusChange={handleStatusChange} onChat={openChatWithProvider} /> : <div className="empty-state"><strong>No accepted orders yet</strong><p>When a customer accepts one of your offers, the order and shipping progress will appear here.</p><button className="small-primary" onClick={() => setSection('opportunities')}>Browse requests</button></div>}</Card>;
+    if (providerMode && section === 'reports') {
+      return <Suspense fallback={pageFallback}><ProviderReports offers={offers} loading={loading} now={currentTime} onViewShipments={() => { setProviderOfferFilter('shipments'); setSection('offers'); }} /></Suspense>;
+    }
+
+    if (adminMode && section === 'reports') {
+      return <Suspense fallback={pageFallback}><AdminReports requests={requests} offers={offers} loading={loading} now={currentTime} /></Suspense>;
     }
 
     if (section === 'messages' && user && !adminMode) {
@@ -1713,15 +1760,15 @@ export default function DashboardWorkspace({ initialRole }) {
     }
 
     if (adminMode && section === 'analytics') {
-      return <AdminAnalytics requests={requests} offers={offers} period={adminPeriod} rangeStart={adminRangeStart} now={currentTime} loading={loading} />;
+      return <Suspense fallback={pageFallback}><AdminAnalytics requests={requests} offers={offers} period={adminPeriod} rangeStart={adminRangeStart} now={currentTime} loading={loading} /></Suspense>;
     }
 
     if (adminMode && section === 'settings') {
-      return <AdminSettings />;
+      return <Suspense fallback={pageFallback}><AdminSettings /></Suspense>;
     }
 
     if (adminMode && section === 'messages') {
-      return <AdminChats />;
+      return <Suspense fallback={pageFallback}><AdminChats /></Suspense>;
     }
 
     if (customerMode && section === 'companies') {
@@ -1730,8 +1777,15 @@ export default function DashboardWorkspace({ initialRole }) {
       </Card>;
     }
 
-    if (customerMode && section === 'notifications') {
-      return <Card><CardHeading title="Notifications" subtitle="Updates from your shipping requests." />{loading ? <p className="empty-table" role="status">Loading updates…</p> : pendingOffers.length ? <div className="customer-directory-list">{pendingOffers.map((offer) => <div className="customer-offer-row" key={offer._id}><span className="customer-company-avatar blue"><Icon name="mail" size={15} /></span><span className="customer-row-copy"><strong>New quote for {offer.request.product}</strong><small>{offer.provider?.name || 'Cargo provider'} · {offerPriceText(offer)} · {offer.deliveryDays} days</small></span><button className="small-primary" onClick={() => { setSelectedRequestId(offer.request.id); setSection('offers'); }}>Review</button></div>)}</div> : <div className="empty-state"><strong>You’re all caught up</strong><p>New provider quotes for your requests will appear here.</p></div>}</Card>;
+    if (section === 'notifications') {
+      const subtitle = customerMode ? 'New quotes, shipment milestones and reminders when it’s time to receive your order.'
+        : providerMode ? 'New orders, dispatch milestones and reminders when deliveries are due.'
+          : 'Overdue and due-today shipments, requests without offers and pending verifications.';
+      const urgent = notifications.filter((item) => ['danger', 'warning'].includes(item.tone)).length;
+      return <Card className="notifications-card"><CardHeading title="Notifications" subtitle={subtitle} action={unreadNotifications > 0 ? <button type="button" className="customer-outline-button" onClick={() => markNotificationsSeen(notifications)}><Icon name="check" size={14} />Mark all as read</button> : null} />
+        {!loading && notifications.length > 0 && <div className="notification-summary"><span><b>{notifications.length}</b> total</span><span className="unread"><b>{unreadNotifications}</b> unread</span>{urgent > 0 && <span className="urgent"><b>{urgent}</b> need attention</span>}</div>}
+        {loading ? <p className="empty-table" role="status">Loading updates…</p> : <NotificationList items={notifications} seen={notificationSeen} now={currentTime} onAction={openNotification} onDismiss={dismissNotification} />}
+      </Card>;
     }
 
     if (customerMode && section === 'profile') {
@@ -1787,19 +1841,12 @@ export default function DashboardWorkspace({ initialRole }) {
               })}</div> : <div className="empty-state"><strong>No shipments yet</strong><p>Accepted offers will appear here as your shipments progress.</p></div>}
             </Card>
           </div>
-          <div className="customer-dashboard-grid customer-dashboard-grid-secondary">
-            <Card className="customer-list-card">
-              <CardHeading title="Cargo providers" subtitle="Companies that have quoted on your requests" action={<button className="link-button" onClick={() => setSection('offers')}>View offers <Icon name="arrow" size={15} /></button>} />
-              {loading ? <p className="empty-table" role="status">Loading providers…</p> : quotedProviders.length ? <div className="customer-compact-list">{quotedProviders.slice(0, 4).map((provider) => <div className="customer-company-row" key={provider.id}><Avatar name={provider.name} className="customer-company-avatar navy" /><span className="customer-row-copy"><strong>{provider.name}</strong><small>{provider.offers} quote{provider.offers === 1 ? '' : 's'} on your requests</small></span><button className="customer-outline-button" disabled={!provider.requestId} onClick={() => { setSelectedRequestId(provider.requestId); setSection('offers'); }}>Offers</button></div>)}</div> : <div className="empty-state"><strong>No provider quotes yet</strong><p>Providers will appear here when they respond to your requests.</p></div>}
-            </Card>
-            <Card className="customer-list-card">
-              <CardHeading title="Latest offers" subtitle="Compare quotes and respond to providers" action={<button className="link-button" onClick={() => setSection('offers')}>View all <Icon name="arrow" size={15} /></button>} />
-              {loading ? <p className="empty-table" role="status">Loading offers…</p> : recentOffers.length ? <div className="customer-compact-list">{recentOffers.map((offer) => <div className="customer-offer-row" key={offer._id}>
-                <span className="customer-company-avatar blue"><Icon name="package" size={15} /></span>
-                <span className="customer-row-copy"><strong>{offer.provider?.name || 'Cargo provider'}</strong><small>{offer.request.product} · {offer.deliveryDays} days</small></span>
-                <span className="customer-offer-amount"><OfferPriceBreakdown offer={offer} /></span>
-                {offer.status === 'pending' ? <span className="customer-offer-actions"><button className="small-primary" disabled={busyId === offer._id} onClick={() => handleOfferResponse(offer, 'accepted')}>Accept</button><button className="icon-button table-action" aria-label={`Decline offer from ${offer.provider?.name || 'cargo provider'}`} disabled={busyId === offer._id} onClick={() => handleOfferResponse(offer, 'declined')}><Icon name="close" size={15} /></button></span> : <StatusBadge>{offer.status}</StatusBadge>}
-              </div>)}</div> : <div className="empty-state"><strong>No offers yet</strong><p>Provider quotes will appear here when submitted.</p></div>}
+          {/* The old "Cargo providers" and "Latest offers" cards duplicated the Cargo companies and
+              Offers pages; this row now shows timely alerts instead. */}
+          <div className="customer-dashboard-grid customer-dashboard-grid-secondary customer-alerts-row">
+            <Card className="customer-list-card customer-alerts-card">
+              <CardHeading title="Updates & alerts" subtitle="Quotes, shipment milestones and reminders when it’s time to receive your order" action={<button className="link-button" onClick={() => setSection('notifications')}>View all <Icon name="arrow" size={15} /></button>} />
+              {loading ? <p className="empty-table" role="status">Loading updates…</p> : <NotificationList items={notifications} seen={notificationSeen} now={currentTime} onAction={openNotification} onDismiss={dismissNotification} limit={4} empty={{ title: 'No new updates', text: 'We’ll let you know about new quotes, shipment progress and deliveries.' }} />}
             </Card>
           </div>
         </div>
@@ -1936,7 +1983,7 @@ export default function DashboardWorkspace({ initialRole }) {
                 setMobileNavOpen(false);
               }}>
                 <Icon name={icon} size={16} /><span>{label}</span>
-                {customerMode && sectionId === 'notifications' && pendingOffers.length > 0 && <span className="nav-count">{pendingOffers.length}</span>}
+                {sectionId === 'notifications' && unreadNotifications > 0 && <span className="nav-count" aria-label={`${unreadNotifications} unread`}>{unreadNotifications}</span>}
                 {providerMode && sectionId === 'opportunities' && requests.length > 0 && <span className="nav-count">{requests.length}</span>}
                 {adminMode && sectionId === 'verifications' && pendingVerifications > 0 && <span className="nav-count nav-count-alert" aria-label={`${pendingVerifications} pending`}>{pendingVerifications}</span>}
                 {providerMode && sectionId === 'settings' && ['unverified', 'rejected'].includes(user?.verification?.status) && <span className="nav-dot" aria-label="Verification needed" />}
@@ -1970,7 +2017,7 @@ export default function DashboardWorkspace({ initialRole }) {
             </div>}
             {adminMode && <button className="admin-export-button" onClick={exportRequests} disabled={loading}><Icon name="download" size={13} />Export</button>}
             {(section === 'requests' || section === 'opportunities') && <label className="search-box"><Icon name="search" size={17} /><input aria-label="Search requests" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search requests…" /></label>}
-            {customerMode && <button className="notification-button" aria-label={`${pendingOffers.length} pending offer notifications`} title="Notifications" onClick={() => setSection('notifications')}><Icon name="bell" size={16} />{pendingOffers.length > 0 && <i />}</button>}
+            {user && <NotificationBell items={notifications} seen={notificationSeen} now={currentTime} onAction={openNotification} onDismiss={dismissNotification} onMarkAllRead={() => markNotificationsSeen(notifications)} onViewAll={() => setSection('notifications')} />}
             {customerMode && section === 'overview' && <button className="primary-button" onClick={openCreateRequest}><Icon name="plus" size={16} />New request</button>}
             <Avatar name={displayName} className={`topbar-avatar${providerMode || adminMode ? ' provider-topbar-avatar' : ''}`} />
           </div>
