@@ -138,7 +138,6 @@ export default function LoginPage() {
 
           <p className="login-signup">New to Tayonx? <Link to="/register">Create an account</Link></p>
         </form>
-        <p className="login-footnote">Connect · Request · Ship · Get it done</p>
       </div>
 
       <section className="login-hero" aria-labelledby="login-hero-title">

@@ -1,8 +1,8 @@
 /* ==========================================================================
    Sign-in page: two-column split screen.
-   Left  — the sign-in card on a light, high-contrast column.
-   Right — hero panel over a container-port scene with staggered entry animations.
-   Stacks into one column (form first) on small screens.
+   Left  — hero panel over a container-port scene with staggered entry animations.
+   Right — the sign-in card on a light, high-contrast column.
+   The form comes first in the markup, so small screens stack it above the hero.
    Scoped to .login-scene so it never affects the dashboards.
    ========================================================================== */
 
@@ -16,48 +16,48 @@
   display: grid;
   min-height: 100vh;
   min-height: 100dvh;
-  grid-template-columns: minmax(420px, 0.92fr) 1.08fr;
+  grid-template-columns: 1.05fr minmax(540px, 0.95fr);
   color: var(--login-ink);
   background: #f3f6fb;
   font-family: inherit;
 }
 
-/* ---- Left column: form ---- */
+/* ---- Right column: form ---- */
 .login-scene .login-form-column {
   position: relative;
+  order: 2;
   display: flex;
   min-width: 0;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 18px;
-  padding: 48px clamp(24px, 5vw, 72px);
+  padding: 56px clamp(28px, 5vw, 80px);
   background:
-    radial-gradient(circle at 0% 0%, rgba(31, 111, 224, 0.08), transparent 45%),
-    radial-gradient(circle at 100% 100%, rgba(31, 111, 224, 0.06), transparent 40%),
+    radial-gradient(circle at 100% 0%, rgba(31, 111, 224, 0.08), transparent 45%),
+    radial-gradient(circle at 0% 100%, rgba(31, 111, 224, 0.06), transparent 40%),
     #f3f6fb;
 }
 
 .login-scene .login-card {
   display: flex;
   width: 100%;
-  max-width: 430px;
+  max-width: 520px;
   flex-direction: column;
-  gap: 16px;
-  padding: 36px 34px 26px;
+  gap: 20px;
+  padding: 52px 48px 40px;
   border: 1px solid var(--login-border);
-  border-radius: 20px;
+  border-radius: 24px;
   background: #fff;
-  box-shadow: 0 1px 2px rgba(15, 27, 45, 0.04), 0 24px 60px rgba(15, 27, 45, 0.1);
-  animation: login-slide-right 0.6s var(--login-ease) both;
+  box-shadow: 0 1px 2px rgba(15, 27, 45, 0.04), 0 28px 70px rgba(15, 27, 45, 0.12);
+  animation: login-slide-left 0.6s var(--login-ease) both;
 }
 
 /* The logo file has a white background, so it sits on a matching white tile. */
 .login-scene .login-logo {
   display: inline-flex;
   align-self: center;
-  margin-bottom: 2px;
-  padding: 10px 18px;
+  margin-bottom: 4px;
+  padding: 12px 22px;
   border: 1px solid rgba(15, 27, 45, 0.08);
   border-radius: 14px;
   background: #fff;
@@ -66,7 +66,7 @@
 
 .login-scene .login-logo img {
   display: block;
-  width: 150px;
+  width: 180px;
   height: auto;
 }
 
@@ -82,16 +82,16 @@
 .login-scene .login-header h1 {
   margin: 0;
   color: var(--login-ink);
-  font-size: 26px;
+  font-size: 30px;
   font-weight: 700;
   letter-spacing: -0.02em;
   line-height: 1.2;
 }
 
 .login-scene .login-header p {
-  margin: 6px 0 0;
+  margin: 8px 0 0;
   color: var(--login-muted);
-  font-size: 14.5px;
+  font-size: 15.5px;
   line-height: 1.45;
 }
 
@@ -99,20 +99,20 @@
 .login-scene .login-field {
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 8px;
   margin: 0;
   color: var(--login-ink);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
 }
 
 .login-scene .login-input {
   position: relative;
   display: flex;
-  height: 48px;
+  height: 56px;
   align-items: center;
-  gap: 10px;
-  padding: 0 14px;
+  gap: 12px;
+  padding: 0 16px;
   border: 1px solid rgba(15, 27, 45, 0.16);
   border-radius: 12px;
   color: #7a889b;
@@ -147,7 +147,7 @@
   background: transparent;
   box-shadow: none;
   font: inherit;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 500;
 }
 
@@ -202,14 +202,14 @@
   gap: 8px;
   margin: 0;
   color: #34445a;
-  font-size: 13.5px;
+  font-size: 14.5px;
   font-weight: 500;
   cursor: pointer;
 }
 
 .login-scene .login-remember input {
-  width: 17px;
-  height: 17px;
+  width: 18px;
+  height: 18px;
   margin: 0;
   accent-color: var(--login-blue);
   cursor: pointer;
@@ -222,7 +222,7 @@
   color: var(--login-blue);
   background: none;
   font: inherit;
-  font-size: 13.5px;
+  font-size: 14.5px;
   font-weight: 600;
   text-decoration: none;
   cursor: pointer;
@@ -272,18 +272,18 @@
 .login-scene .login-submit {
   display: inline-flex;
   width: 100%;
-  height: 50px;
+  height: 56px;
   align-items: center;
   justify-content: center;
   gap: 10px;
-  margin-top: 4px;
+  margin-top: 6px;
   border: 0;
-  border-radius: 12px;
+  border-radius: 14px;
   color: #fff;
   background: linear-gradient(180deg, #2a7cf0 0%, var(--login-blue) 100%);
   box-shadow: 0 10px 24px rgba(31, 111, 224, 0.3);
   font: inherit;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -334,27 +334,18 @@
 }
 
 .login-scene .login-signup {
-  margin: 2px 0 0;
-  padding-top: 16px;
+  margin: 4px 0 0;
+  padding-top: 20px;
   border-top: 1px solid var(--login-border);
   color: var(--login-muted);
-  font-size: 13.5px;
+  font-size: 14.5px;
   text-align: center;
 }
 
-.login-scene .login-footnote {
-  margin: 0;
-  color: #8592a5;
-  font-size: 11.5px;
-  letter-spacing: 0.14em;
-  text-align: center;
-  text-transform: uppercase;
-  animation: login-fade 0.6s 0.35s ease-out both;
-}
-
-/* ---- Right column: hero ---- */
+/* ---- Left column: hero ---- */
 .login-scene .login-hero {
   position: relative;
+  order: 1;
   display: flex;
   min-width: 0;
   align-items: center;
@@ -543,8 +534,8 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
-@keyframes login-slide-right {
-  from { opacity: 0; transform: translateX(-22px); }
+@keyframes login-slide-left {
+  from { opacity: 0; transform: translateX(22px); }
   to { opacity: 1; transform: translateX(0); }
 }
 
@@ -570,7 +561,12 @@
 /* ---- Responsive ---- */
 @media (max-width: 1100px) {
   .login-scene {
-    grid-template-columns: minmax(380px, 1fr) 1fr;
+    grid-template-columns: 1fr minmax(480px, 1fr);
+  }
+
+  .login-scene .login-form-column {
+    padding-right: 28px;
+    padding-left: 28px;
   }
 
   /* Narrower hero: compact two-column feature tiles (titles only). */
@@ -584,10 +580,33 @@
   }
 }
 
+/* Short laptop screens: same card width and control sizes, a little less vertical space. */
+@media (max-height: 820px) and (min-width: 861px) {
+  .login-scene .login-form-column {
+    padding-top: 28px;
+    padding-bottom: 28px;
+  }
+
+  .login-scene .login-card {
+    gap: 16px;
+    padding: 40px 44px 30px;
+  }
+
+  .login-scene .login-hero {
+    padding-top: 40px;
+    padding-bottom: 40px;
+  }
+}
+
 /* One column: the form first, the hero below it. */
 @media (max-width: 860px) {
   .login-scene {
     grid-template-columns: 1fr;
+  }
+
+  .login-scene .login-form-column,
+  .login-scene .login-hero {
+    order: 0;
   }
 
   .login-scene .login-form-column {
@@ -630,21 +649,26 @@
   }
 
   .login-scene .login-card {
-    gap: 14px;
-    padding: 26px 20px 22px;
-    border-radius: 18px;
+    gap: 16px;
+    padding: 32px 22px 26px;
+    border-radius: 20px;
   }
 
   .login-scene .login-logo img {
-    width: 130px;
+    width: 150px;
   }
 
   .login-scene .login-header h1 {
-    font-size: 22px;
+    font-size: 24px;
   }
 
   .login-scene .login-header p {
-    font-size: 13.5px;
+    font-size: 14px;
+  }
+
+  .login-scene .login-input,
+  .login-scene .login-submit {
+    height: 52px;
   }
 
   .login-scene .login-hero {
