@@ -122,8 +122,20 @@ export function deleteUser(id) {
   return apiRequest(`/api/users/${encodeURIComponent(id)}`, { method: 'DELETE' });
 }
 
-export function getChatContacts(options) {
-  return apiRequest('/api/chats/contacts', options);
+// `include` re-opens a closed thread the user is navigating to (e.g. an offer's Chat button).
+export function getChatContacts(options = {}) {
+  const { include, ...rest } = options;
+  return apiRequest(`/api/chats/contacts${include ? `?include=${encodeURIComponent(include)}` : ''}`, rest);
+}
+
+/** Close (hide) a chat thread for the current user until a new message arrives or it is reopened. */
+export function closeChat(userId) {
+  return apiRequest(`/api/chats/${encodeURIComponent(userId)}/close`, { method: 'POST' });
+}
+
+/** Delete the conversation history for the current user only (the other side keeps theirs). */
+export function deleteChat(userId) {
+  return apiRequest(`/api/chats/${encodeURIComponent(userId)}`, { method: 'DELETE' });
 }
 
 export function getChatHistory(userId, options) {
