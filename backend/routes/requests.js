@@ -5,6 +5,7 @@ const UploadedFile = require('../models/UploadedFile');
 const User = require('../models/User');
 const { authenticate, requireRole } = require('../middleware/authenticate');
 const { parseQuantity, readOfferBody, repriceOffer } = require('../lib/offerPricing');
+const { restoreClosedThreads } = require('../lib/chatThreads');
 const {
   IMAGE_TYPES,
   acceptUploads,
@@ -182,6 +183,7 @@ router.post('/', requireRole('customer'), acceptUploads(['productPhoto']), async
     if (targetError) return res.status(400).json({ error: targetError, field: 'targetProvider' });
     if (photo) photoId = await saveUploadedFile(photo, { owner: req.user._id, purpose: 'product_photo' });
     const request = await ShippingRequest.create({ ...fields, targetProvider, productPhoto: photoId, customer: req.user._id });
+    if (targetProvider) await restoreClosedThreads(req.app, req.user._id, targetProvider);
     await request.populate([{ path: 'customer', select: 'name' }, TARGET_POPULATE]);
     return res.status(201).json({ request });
   } catch (createError) {
@@ -360,6 +362,7 @@ router.post('/:id/offers', requireRole(...cargoProviderRoles), async (req, res) 
     request.status = 'offers_received';
     await request.save();
     const offer = request.offers[request.offers.length - 1];
+    await restoreClosedThreads(req.app, request.customer, req.user._id);
     return res.status(201).json({ offer: { ...offer.toObject(), request: request.id } });
   } catch (error) {
     return handleServerError(res, error);
@@ -452,6 +455,7 @@ router.patch('/offers/:offerId/status', requireRole('customer'), async (req, res
       offer.status = 'pending';
       request.status = 'offers_received';
       await request.save();
+      await restoreClosedThreads(req.app, request.customer, offer.provider);
       return res.json({ offer: { ...offer.toObject(), request: request.id }, requestStatus: request.status });
     }
 
@@ -470,6 +474,7 @@ router.patch('/offers/:offerId/status', requireRole('customer'), async (req, res
       request.status = request.offers.some((item) => item.status === 'pending') ? 'offers_received' : 'open';
     }
     await request.save();
+    await restoreClosedThreads(req.app, request.customer, offer.provider);
     return res.json({ offer: { ...offer.toObject(), request: request.id }, requestStatus: request.status });
   } catch (error) {
     return handleServerError(res, error);
@@ -522,6 +527,8 @@ router.patch('/:id/status', async (req, res) => {
     request.status = status;
     request.statusHistory.push({ status, at: new Date(), by: req.user._id });
     await request.save();
+    const acceptedOffer = request.offers.find((offer) => offer.status === 'accepted');
+    if (acceptedOffer) await restoreClosedThreads(req.app, request.customer, acceptedOffer.provider);
     return res.json({ request });
   } catch (error) {
     return handleServerError(res, error);
