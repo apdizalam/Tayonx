@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { getAdminChats, getAdminConversation, updateChatReport } from '../lib/api.js';
 import Icon from './Icon.jsx';
 
-// Admin "Chats & reports": moderation queue (chat reports) and a conversation directory with a
+// Admin "Support & Disputes": dispute queue (chat reports) and a conversation directory with a
 // message-log inspector. Admins see full message history (users' "delete chat" only hides it on
 // their own side), so reported conversations can always be reviewed.
 
@@ -135,8 +135,8 @@ export default function AdminChats() {
       <section className="dashboard-card moderation-shell">
         <header className="moderation-header">
           <div>
-            <h2>Chats &amp; reports</h2>
-            <p>Review reported conversations and audit marketplace chats. Message history is always kept for moderation.</p>
+            <h2>Support &amp; Disputes</h2>
+            <p>Audit conversations between customers, cargo providers and Tayonx support, and resolve reported issues. Message history is always kept for review.</p>
           </div>
           <button type="button" className="customer-outline-button" onClick={() => loadChats()} disabled={loading}><Icon name="refresh" size={14} />Refresh</button>
         </header>
