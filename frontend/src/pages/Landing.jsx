@@ -65,6 +65,71 @@ const FAQ = [
   ['I run a cargo company. How do I join?', 'Create a cargo company or individual provider account, upload your verification documents, and start sending offers once you are approved.'],
 ];
 
+/** A small window frame for the step illustrations (a simplified Tayonx screen). */
+function MiniWindow({ title, children }) {
+  return (
+    <div className="landing-mini" aria-hidden="true">
+      <div className="landing-mini-bar"><i /><i /><i /><span>{title}</span></div>
+      <div className="landing-mini-body">{children}</div>
+    </div>
+  );
+}
+
+/** Illustrations of the Tayonx screens behind each "How it works" step. */
+function StepVisual({ step }) {
+  if (step === 0) {
+    return (
+      <MiniWindow title="New request">
+        <div className="mini-field"><small>Product</small><b>Solar panels</b></div>
+        <div className="mini-row">
+          <div className="mini-field"><small>Quantity</small><b>40 units</b></div>
+          <div className="mini-field"><small>Route</small><b>China → Berbera</b></div>
+        </div>
+        <div className="mini-row mini-chips"><span className="active"><Icon name="ship" size={11} />Sea</span><span><Icon name="plane" size={11} />Air</span></div>
+        <div className="mini-company"><span className="mini-avatar">BF</span><b>Berbera Freight</b><em><Icon name="shield" size={10} />Verified</em></div>
+        <span className="mini-button">Send request</span>
+      </MiniWindow>
+    );
+  }
+  if (step === 1) {
+    return (
+      <MiniWindow title="Offers · 3">
+        {[['BF', 'Berbera Freight', '18 days', '$2,500', true], ['SC', 'Shenzhen Cargo', '21 days', '$2,610'], ['HC', 'Horn Cargo Co', '14 days', '$2,780']].map(([initials, name, days, price, best]) => (
+          <div key={name} className={`mini-offer${best ? ' best' : ''}`}>
+            <span className="mini-avatar">{initials}</span>
+            <span className="mini-offer-copy"><b>{name}</b><small>{days} · sea</small></span>
+            <b>{price}</b>
+          </div>
+        ))}
+      </MiniWindow>
+    );
+  }
+  if (step === 2) {
+    return (
+      <MiniWindow title="Offer details">
+        <div className="mini-company"><span className="mini-avatar">BF</span><b>Berbera Freight</b><em className="ok"><Icon name="check" size={10} />Accepted</em></div>
+        <div className="mini-breakdown">
+          <span><small>Goods (40 × $55)</small><b>$2,200</b></span>
+          <span><small>Delivery fee</small><b>$300</b></span>
+          <span className="total"><small>Total</small><b>$2,500</b></span>
+        </div>
+        <div className="mini-declined"><span>Shenzhen Cargo</span><em>Declined</em></div>
+        <div className="mini-declined"><span>Horn Cargo Co</span><em>Declined</em></div>
+      </MiniWindow>
+    );
+  }
+  return (
+    <MiniWindow title="Shipment REQ-8A340A">
+      <div className="mini-track-head"><b>Solar panels</b><em>Due in 2 days</em></div>
+      <ol className="mini-timeline">
+        {[['clock', 'In progress', 'Mon'], ['package', 'Purchased', 'Wed'], ['ship', 'In transit', 'Today'], ['check', 'Delivered', '—']].map(([icon, label, when], index) => (
+          <li key={label} className={index < 3 ? 'done' : ''}><span><Icon name={icon} size={10} /></span><b>{label}</b><small>{when}</small></li>
+        ))}
+      </ol>
+    </MiniWindow>
+  );
+}
+
 function readUser() {
   try {
     return localStorage.getItem('token') ? JSON.parse(localStorage.getItem('user') || 'null') : null;
@@ -248,10 +313,12 @@ export default function LandingPage() {
             <ol className="landing-steps">
               {STEPS.map(([icon, title, text], index) => (
                 <li key={title} data-reveal style={{ '--delay': `${index * 80}ms` }}>
-                  <span className="landing-step-number">{String(index + 1).padStart(2, '0')}</span>
-                  <span className="landing-icon-tile"><Icon name={icon} size={20} /></span>
-                  <h3>{title}</h3>
-                  <p>{text}</p>
+                  <StepVisual step={index} />
+                  <div className="landing-step-body">
+                    <span className="landing-step-label"><span className="landing-step-icon"><Icon name={icon} size={14} /></span>Step {String(index + 1).padStart(2, '0')}</span>
+                    <h3>{title}</h3>
+                    <p>{text}</p>
+                  </div>
                 </li>
               ))}
             </ol>
