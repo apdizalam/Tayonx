@@ -85,9 +85,9 @@ const roleConfig = {
       ['users', 'Users', 'users'],
       ['verifications', 'Verifications', 'shield'],
       ['notifications', 'Notifications', 'bell'],
-      ['messages', 'Chats & reports', 'chat'],
+      ['messages', 'Support & Disputes', 'headphones'],
       ['analytics', 'Analytics', 'chart'],
-      ['reports', 'Reports & exports', 'file'],
+      ['reports', 'Data Exports', 'download'],
       ['settings', 'Settings', 'user'],
     ],
   },
@@ -1071,14 +1071,14 @@ export default function DashboardWorkspace({ initialRole }) {
     opportunities: 'Matching requests',
     offers: customerMode ? 'Offers to review' : adminMode ? 'All marketplace offers' : 'My offers',
     companies: 'Cargo companies',
-    messages: adminMode ? 'Chats & reports' : 'Chat',
+    messages: adminMode ? 'Support & Disputes' : 'Chat',
     notifications: 'Notifications',
     profile: 'Profile',
     users: 'Users',
     verifications: 'Verifications',
     analytics: 'Analytics',
     settings: 'Settings',
-    reports: adminMode ? 'Reports & exports' : 'Reports & earnings',
+    reports: adminMode ? 'Data Exports' : 'Reports & earnings',
     company: 'Company profile',
   })[section], [section, adminMode, customerMode]);
   const requestStatusCounts = shipmentStatuses.map((status) => ({
@@ -2009,7 +2009,7 @@ export default function DashboardWorkspace({ initialRole }) {
                 }}
               >{period}</button>)}
             </div>}
-            {adminMode && <button className="admin-export-button" onClick={exportRequests} disabled={loading}><Icon name="download" size={13} />Export</button>}
+            {adminMode && (section === 'overview' || section === 'requests') && <button className="admin-export-button" onClick={exportRequests} disabled={loading}><Icon name="download" size={13} />Export</button>}
             {(section === 'requests' || section === 'opportunities') && <label className="search-box"><Icon name="search" size={17} /><input aria-label="Search requests" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search requests…" /></label>}
             {user && <NotificationBell items={notifications} seen={notificationSeen} now={currentTime} onAction={openNotification} onDismiss={dismissNotification} onMarkAllRead={() => markNotificationsSeen(notifications)} onViewAll={() => setSection('notifications')} />}
             <Avatar name={displayName} className={`topbar-avatar${providerMode || adminMode ? ' provider-topbar-avatar' : ''}`} />
