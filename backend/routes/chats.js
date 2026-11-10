@@ -166,6 +166,8 @@ router.get('/contacts', async (req, res) => {
       ]),
     ]);
     const messagesByContact = new Map(recentMessages.map((entry) => [String(entry._id), entry.lastMessage]));
+    // Closed (not deleted) threads, so the user can re-open one from the "Closed chats" list.
+    const closed = [];
     const contacts = users
       .map((contact) => {
         const state = states.get(String(contact._id));
@@ -174,7 +176,12 @@ router.get('/contacts', async (req, res) => {
         if (lastMessage && state?.clearedAt && new Date(lastMessage.createdAt) <= new Date(state.clearedAt)) lastMessage = null;
         // Closed threads stay hidden until a newer message arrives.
         const hidden = Boolean(state?.hiddenAt) && !(lastMessage && new Date(lastMessage.createdAt) > new Date(state.hiddenAt));
-        return hidden ? null : publicContact(contact, lastMessage);
+        if (hidden) {
+          const deleted = state.clearedAt && new Date(state.clearedAt) >= new Date(state.hiddenAt);
+          if (!deleted) closed.push({ ...publicContact(contact, lastMessage), closedAt: state.hiddenAt });
+          return null;
+        }
+        return publicContact(contact, lastMessage);
       })
       .filter(Boolean)
       .sort((first, second) => {
@@ -182,7 +189,8 @@ router.get('/contacts', async (req, res) => {
         const secondDate = new Date(second.lastMessage?.createdAt || 0).getTime();
         return secondDate - firstDate || first.name.localeCompare(second.name);
       });
-    return res.json({ contacts });
+    closed.sort((first, second) => new Date(second.closedAt) - new Date(first.closedAt));
+    return res.json({ contacts, closed });
   } catch (error) {
     console.error('Chat contacts error:', error);
     return res.status(500).json({ error: 'Chat contacts could not be loaded.' });
