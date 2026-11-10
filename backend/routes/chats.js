@@ -2,6 +2,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const Chat = require('../models/Chat');
 const ChatReport = require('../models/ChatReport');
+const ChatThreadState = require('../models/ChatThreadState');
 const ShippingRequest = require('../models/ShippingRequest');
 const User = require('../models/User');
 const { authenticate } = require('../middleware/authenticate');
@@ -13,6 +14,29 @@ router.use(authenticate);
 
 function databaseUnavailable(res) {
   return res.status(503).json({ error: 'The chat service is unavailable.' });
+}
+
+/** Map of contactId → this user's thread state (hiddenAt / clearedAt). */
+async function threadStates(userId) {
+  const states = await ChatThreadState.find({ user: userId }).lean();
+  return new Map(states.map((state) => [String(state.contact), state]));
+}
+
+/** Re-open a closed thread for this user (e.g. when they open it or a chat button links to it). */
+function reopenThread(userId, contactId) {
+  return ChatThreadState.updateOne({ user: userId, contact: contactId, hiddenAt: { $ne: null } }, { $set: { hiddenAt: null } });
+}
+
+function validContactId(req, res) {
+  if (!mongoose.isValidObjectId(req.params.userId)) {
+    res.status(400).json({ error: 'Invalid conversation user id.' });
+    return false;
+  }
+  if (String(req.user._id) === req.params.userId) {
+    res.status(400).json({ error: 'You cannot open a conversation with yourself.' });
+    return false;
+  }
+  return true;
 }
 
 const CARGO_ROLES = ['cargo_provider', 'individual_cargo'];
@@ -105,20 +129,21 @@ router.get('/contacts', async (req, res) => {
   if (mongoose.connection.readyState !== 1) return databaseUnavailable(res);
 
   try {
+    let contactIds;
     if (req.user.role === 'admin') {
-      const users = await User.find({ _id: { $ne: req.user._id } }).select('name role country');
-      return res.json({
-        contacts: users.map((contact) => publicContact(contact, null))
-          .sort((first, second) => first.name.localeCompare(second.name)),
-      });
+      contactIds = (await User.find({ _id: { $ne: req.user._id } }).select('_id')).map((user) => String(user._id));
+    } else {
+      // Same rule as canChatBetween: only counterparties with current business, plus support admins.
+      const ids = await businessCounterpartIds(req.user);
+      const supportAdmins = await User.find({ role: 'admin', _id: { $ne: req.user._id } }).select('_id');
+      contactIds = [...new Set([...ids, ...supportAdmins.map((admin) => String(admin._id))])];
     }
-
-    // Same rule as canChatBetween: only counterparties with current business, plus support admins.
-    const ids = await businessCounterpartIds(req.user);
-
-    const supportAdmins = await User.find({ role: 'admin', _id: { $ne: req.user._id } }).select('_id');
-    const contactIds = [...new Set([...ids, ...supportAdmins.map((admin) => String(admin._id))])];
     if (!contactIds.length) return res.json({ contacts: [] });
+
+    // ?include=<id> re-opens a closed thread the user is navigating to (e.g. an offer's Chat button).
+    const include = typeof req.query.include === 'string' && mongoose.isValidObjectId(req.query.include) ? req.query.include : '';
+    if (include && contactIds.includes(include)) await reopenThread(req.user._id, include);
+    const states = await threadStates(req.user._id);
 
     const [users, recentMessages] = await Promise.all([
       User.find({ _id: { $in: contactIds } }).select('name role country'),
@@ -141,7 +166,17 @@ router.get('/contacts', async (req, res) => {
       ]),
     ]);
     const messagesByContact = new Map(recentMessages.map((entry) => [String(entry._id), entry.lastMessage]));
-    const contacts = users.map((contact) => publicContact(contact, messagesByContact.get(String(contact._id))))
+    const contacts = users
+      .map((contact) => {
+        const state = states.get(String(contact._id));
+        let lastMessage = messagesByContact.get(String(contact._id)) || null;
+        // Deleted (cleared) history is not previewed.
+        if (lastMessage && state?.clearedAt && new Date(lastMessage.createdAt) <= new Date(state.clearedAt)) lastMessage = null;
+        // Closed threads stay hidden until a newer message arrives.
+        const hidden = Boolean(state?.hiddenAt) && !(lastMessage && new Date(lastMessage.createdAt) > new Date(state.hiddenAt));
+        return hidden ? null : publicContact(contact, lastMessage);
+      })
+      .filter(Boolean)
       .sort((first, second) => {
         const firstDate = new Date(first.lastMessage?.createdAt || 0).getTime();
         const secondDate = new Date(second.lastMessage?.createdAt || 0).getTime();
@@ -237,11 +272,15 @@ router.get('/:userId', async (req, res) => {
       return res.status(403).json({ error: 'You can only message customers or cargo providers you are currently doing business with, or an administrator.' });
     }
 
+    // Opening a closed thread re-opens it; messages the user deleted stay hidden for them.
+    await reopenThread(req.user._id, contact._id);
+    const state = await ChatThreadState.findOne({ user: req.user._id, contact: contact._id }).lean();
     const messages = await Chat.find({
       $or: [
         { sender: req.user._id, recipient: contact._id },
         { sender: contact._id, recipient: req.user._id },
       ],
+      ...(state?.clearedAt ? { createdAt: { $gt: state.clearedAt } } : {}),
     })
       .sort({ createdAt: -1 })
       .limit(historyLimit)
@@ -254,6 +293,44 @@ router.get('/:userId', async (req, res) => {
   } catch (error) {
     console.error('Chat history error:', error);
     return res.status(500).json({ error: 'Chat history could not be loaded.' });
+  }
+});
+
+// "Close chat": hide this thread from the user's list until a new message arrives or they reopen it.
+router.post('/:userId/close', async (req, res) => {
+  if (!validContactId(req, res)) return undefined;
+  if (mongoose.connection.readyState !== 1) return databaseUnavailable(res);
+  try {
+    if (!await User.exists({ _id: req.params.userId })) return res.status(404).json({ error: 'Conversation user not found.' });
+    await ChatThreadState.updateOne(
+      { user: req.user._id, contact: req.params.userId },
+      { $set: { hiddenAt: new Date() } },
+      { upsert: true },
+    );
+    return res.json({ closed: true });
+  } catch (error) {
+    console.error('Chat close error:', error);
+    return res.status(500).json({ error: 'The chat could not be closed.' });
+  }
+});
+
+// "Delete chat": clear the conversation history for this user only and close the thread.
+// Messages are kept for the other participant and for administrator review of reports.
+router.delete('/:userId', async (req, res) => {
+  if (!validContactId(req, res)) return undefined;
+  if (mongoose.connection.readyState !== 1) return databaseUnavailable(res);
+  try {
+    if (!await User.exists({ _id: req.params.userId })) return res.status(404).json({ error: 'Conversation user not found.' });
+    const now = new Date();
+    await ChatThreadState.updateOne(
+      { user: req.user._id, contact: req.params.userId },
+      { $set: { hiddenAt: now, clearedAt: now } },
+      { upsert: true },
+    );
+    return res.status(204).end();
+  } catch (error) {
+    console.error('Chat delete error:', error);
+    return res.status(500).json({ error: 'The chat could not be deleted.' });
   }
 });
 
