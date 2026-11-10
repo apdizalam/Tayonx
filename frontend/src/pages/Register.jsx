@@ -26,7 +26,11 @@ const fieldInputIds = { profilePhoto: 'register-photo' };
 
 export default function RegisterPage() {
   const navigate = useNavigate();
-  const [role, setRole] = useState('customer');
+  // `/register?role=cargo_provider` (e.g. from the landing page) preselects the account type.
+  const [role, setRole] = useState(() => {
+    const requested = new URLSearchParams(window.location.search).get('role');
+    return requested && ACCOUNT_TYPES[requested] ? requested : 'customer';
+  });
   const [values, setValues] = useState(emptyValues);
   const [errors, setErrors] = useState({});
   const [message, setMessage] = useState('');
@@ -103,7 +107,7 @@ export default function RegisterPage() {
   return (
     <main className="signup-page">
       <aside className="signup-welcome">
-        <Link className="signup-brand" to="/login" aria-label="Tayonx home"><img src={logo} alt="Tayonx" /></Link>
+        <Link className="signup-brand" to="/" aria-label="Tayonx home"><img src={logo} alt="Tayonx" /></Link>
         <div className="signup-welcome-copy">
           <h1>Connect. Request. Chat. Get it done.</h1>
           <p>One account to source products from abroad, or to serve customers in Somaliland and beyond.</p>

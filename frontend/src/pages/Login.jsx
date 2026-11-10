@@ -89,7 +89,7 @@ export default function LoginPage() {
     <main className="login-scene">
       <div className="login-shell login-form-column">
         <form className="login-card" onSubmit={handleSubmit}>
-          <Link className="login-logo" to="/login" aria-label="Tayonx home"><img src={logo} alt="Tayonx" /></Link>
+          <Link className="login-logo" to="/" aria-label="Tayonx home"><img src={logo} alt="Tayonx" /></Link>
           <header className="login-header">
             <h1>Welcome to Tayonx</h1>
             <p>Sign in to manage your shipments and cargo operations.</p>
