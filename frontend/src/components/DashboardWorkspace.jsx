@@ -59,7 +59,6 @@ const roleConfig = {
       ['messages', 'Chat', 'chat'],
       ['notifications', 'Notifications', 'bell'],
       ['profile', 'Profile', 'user'],
-      ['new-request', 'New request', 'plus'],
     ],
   },
   provider: {
@@ -1964,11 +1963,6 @@ export default function DashboardWorkspace({ initialRole }) {
               {adminMode && sectionId === 'settings' && <span className="sidebar-section-label">SYSTEM</span>}
           {providerMode && sectionId === 'company' && <span className="sidebar-section-label">{isIndividualProvider ? 'ACCOUNT' : 'COMPANY'}</span>}
           <button className={`nav-item${section === sectionId ? ' active' : ''}`} onClick={() => {
-                if (sectionId === 'new-request') {
-                  openCreateRequest();
-                  setMobileNavOpen(false);
-                  return;
-                }
                 if (sectionId === 'users' && section !== 'users') {
                   setUsersLoading(true);
                   setUsersError('');

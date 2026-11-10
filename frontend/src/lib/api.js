@@ -40,8 +40,14 @@ export async function apiRequest(path, options = {}) {
 
   const result = await response.json().catch(() => ({}));
   if (!response.ok) {
-    const error = new Error(result.error || result.message || 'The request could not be completed.');
+    // A 404 with no JSON message means the running server has no such route (an outdated backend).
+    const missingRoute = response.status === 404 && !result.error && !result.message;
+    const fallback = missingRoute
+      ? 'This action is not available on the server yet. Restart the backend so it loads the latest update, then try again.'
+      : 'The request could not be completed.';
+    const error = new Error(result.error || result.message || fallback);
     error.status = response.status;
+    error.missingRoute = missingRoute;
     if (typeof result.field === 'string') error.field = result.field;
     throw error;
   }

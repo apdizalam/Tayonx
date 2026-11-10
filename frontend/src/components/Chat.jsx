@@ -36,6 +36,9 @@ export default function Chat({ user, initialContactId = '' }) {
   const [contacts, setContacts] = useState([]);
   const [contactsLoading, setContactsLoading] = useState(true);
   const [contactsError, setContactsError] = useState('');
+  // Threads this user closed: listed under "Closed chats" so they can be re-opened at any time.
+  const [closedContacts, setClosedContacts] = useState([]);
+  const [closedOpen, setClosedOpen] = useState(false);
   const [selectedContactId, setSelectedContactId] = useState(initialContactId);
   const [messages, setMessages] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -71,7 +74,10 @@ export default function Chat({ user, initialContactId = '' }) {
   // thread that is not in the list (it was closed or deleted), so it re-appears automatically.
   useEffect(() => {
     reloadContactsRef.current = () => getChatContacts()
-      .then(({ contacts: availableContacts }) => setContacts(availableContacts || []))
+      .then(({ contacts: availableContacts, closed }) => {
+        setContacts(availableContacts || []);
+        setClosedContacts(closed || []);
+      })
       .catch(() => {});
   }, []);
 
@@ -79,9 +85,10 @@ export default function Chat({ user, initialContactId = '' }) {
     const controller = new AbortController();
     // `include` re-opens the thread we were sent to (e.g. from an offer's Chat button) if it was closed.
     getChatContacts({ signal: controller.signal, include: initialContactId || undefined })
-      .then(({ contacts: availableContacts }) => {
+      .then(({ contacts: availableContacts, closed }) => {
         const nextContacts = availableContacts || [];
         setContacts(nextContacts);
+        setClosedContacts(closed || []);
         const currentContactId = selectedContactIdRef.current;
         const nextContactId = currentContactId && nextContacts.some((contact) => contact.id === currentContactId)
           ? currentContactId
@@ -182,7 +189,6 @@ export default function Chat({ user, initialContactId = '' }) {
     });
   }
 
-  // Close the open conversation (back to "Select a conversation"); the contact list stays.
   // Deselect the open conversation (back to "Select a conversation").
   function clearSelection() {
     selectedContactIdRef.current = '';
@@ -202,10 +208,17 @@ export default function Chat({ user, initialContactId = '' }) {
     try {
       await closeChat(contact.id);
       setContacts((current) => current.filter((item) => item.id !== contact.id));
+      setClosedContacts((current) => [{ ...contact, closedAt: new Date().toISOString() }, ...current.filter((item) => item.id !== contact.id)]);
       clearSelection();
-      setListFeedback(`Chat with ${contact.name} closed. It re-opens automatically when a new message arrives.`);
+      setListFeedback(`Chat with ${contact.name} closed. It re-opens when a new message arrives, or from Closed chats.`);
     } catch (requestError) {
-      setHistoryError(requestError.message);
+      if (requestError.missingRoute) {
+        // Older server without thread state: still close the open conversation, keep it in the list.
+        clearSelection();
+        setListFeedback(`Chat with ${contact.name} closed.`);
+      } else {
+        setHistoryError(requestError.message);
+      }
     } finally {
       setThreadBusy(false);
     }
@@ -219,6 +232,7 @@ export default function Chat({ user, initialContactId = '' }) {
     try {
       await deleteChat(contact.id);
       setContacts((current) => current.filter((item) => item.id !== contact.id));
+      setClosedContacts((current) => current.filter((item) => item.id !== contact.id));
       setDeleteConfirm(false);
       clearSelection();
       setListFeedback(`Chat with ${contact.name} deleted from your messages.`);
@@ -228,6 +242,25 @@ export default function Chat({ user, initialContactId = '' }) {
     } finally {
       setThreadBusy(false);
     }
+  }
+
+  function selectContact(contact) {
+    setListFeedback('');
+    selectedContactIdRef.current = contact.id;
+    setSelectedContactId(contact.id);
+    setMessages([]);
+    setHistoryLoading(true);
+    setHistoryError('');
+    setDraft('');
+  }
+
+  // Re-open a closed thread: loading its history re-opens it on the server as well.
+  function reopenContact(contact) {
+    const restored = { ...contact };
+    delete restored.closedAt;
+    setClosedContacts((current) => current.filter((item) => item.id !== contact.id));
+    setContacts((current) => (current.some((item) => item.id === contact.id) ? current : [restored, ...current]));
+    selectContact(restored);
   }
 
   async function submitReport(event) {
@@ -259,21 +292,30 @@ export default function Chat({ user, initialContactId = '' }) {
                 type="button"
                 className={`conversation-row${selectedContactId === contact.id ? ' selected' : ''}`}
                 key={contact.id}
-                onClick={() => {
-                  setListFeedback('');
-                  selectedContactIdRef.current = contact.id;
-                  setSelectedContactId(contact.id);
-                  setMessages([]);
-                  setHistoryLoading(true);
-                  setHistoryError('');
-                  setDraft('');
-                }}
+                onClick={() => selectContact(contact)}
               >
                 <ChatAvatar name={contact.name} />
                 <span className="conversation-copy"><b>{contact.name}</b><small>{contact.lastMessage?.text || contactRole(contact.role)}</small></span>
                 <span className="conversation-meta"><time>{contact.lastMessage?.createdAt ? new Date(contact.lastMessage.createdAt).toLocaleDateString() : ''}</time></span>
               </button>
             )) : <p className="chat-list-state">Contacts appear here when you have active business together — a request sent to you, a pending quote, or an accepted shipment. You can always contact Tayonx support.</p>}
+        {!contactsLoading && closedContacts.length > 0 && (
+          <div className="closed-chats">
+            <button type="button" className={`closed-chats-toggle${closedOpen ? ' open' : ''}`} aria-expanded={closedOpen} onClick={() => setClosedOpen((open) => !open)}>
+              <Icon name="clock" size={14} />
+              <span>Closed chats</span>
+              <b>{closedContacts.length}</b>
+              <Icon name="arrow" size={14} />
+            </button>
+            {closedOpen && closedContacts.map((contact) => (
+              <div className="closed-chat-row" key={contact.id}>
+                <ChatAvatar name={contact.name} />
+                <span className="conversation-copy"><b>{contact.name}</b><small>{contact.lastMessage?.text || contactRole(contact.role)}</small></span>
+                <button type="button" className="secondary-button closed-chat-reopen" onClick={() => reopenContact(contact)} aria-label={`Re-open chat with ${contact.name}`}>Re-open</button>
+              </div>
+            ))}
+          </div>
+        )}
       </aside>
       <section className="chat-pane" aria-label="Conversation">
         {selectedContact ? <>
