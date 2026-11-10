@@ -2647,7 +2647,7 @@ body {
   font-size: 12.5px;
 }
 
-/* ---- Admin moderation (Chats & reports) ---- */
+/* ---- Admin Support & Disputes (chat audits and reports) ---- */
 .app-shell .moderation-shell {
   display: flex;
   flex-direction: column;

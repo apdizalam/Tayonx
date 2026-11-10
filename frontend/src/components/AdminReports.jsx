@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
 import Icon from './Icon.jsx';
 import { getUsers } from '../lib/api.js';
-import { formatUsd } from '../lib/offerPricing.js';
+import { offerBreakdown } from '../lib/offerPricing.js';
 import { daysUntil, shipmentDates } from '../lib/notifications.js';
 import { ROLE_LABELS, VERIFICATION_LABELS } from '../lib/accountFields.js';
 
-// Admin "Reports & exports": operational metrics plus exportable datasets (requests, offers,
-// shipments, provider performance, users) for a chosen date range. Exports are CSV (one per
-// dataset, or one combined file) and the page can be printed / saved as PDF.
+// Admin "Data Exports": downloadable system data for a chosen date range — requests, offers,
+// shipments, financial records, provider performance and users. Each dataset downloads as an
+// Excel-ready CSV (or all of them in one file), and the page can be saved as PDF.
+// Charts and platform metrics live on the Analytics page, not here.
 
 const DAY = 24 * 60 * 60 * 1000;
 const ACTIVE = ['in_progress', 'purchased', 'shipping'];
@@ -71,6 +72,30 @@ export default function AdminReports({ requests, offers, loading, now }) {
     const dates = shipmentDates(request, acceptedFor(request));
     return dates && daysUntil(dates.dueAt, now) < 0;
   });
+  // Financial records: accepted orders by acceptance date (cancelled orders excluded).
+  const financialRows = requests
+    .filter((request) => request.status !== 'cancelled')
+    .map((request) => {
+      const accepted = acceptedFor(request);
+      const dates = accepted && shipmentDates(request, accepted);
+      return dates && inRange(dates.acceptedAt) ? { request, accepted, acceptedAt: dates.acceptedAt } : null;
+    })
+    .filter(Boolean)
+    .sort((first, second) => time(second.acceptedAt) - time(first.acceptedAt))
+    .map(({ request, accepted, acceptedAt }) => {
+      const breakdown = offerBreakdown(accepted);
+      const total = Number(breakdown.total) || 0;
+      const fee = Number(breakdown.deliveryFee) || 0;
+      const goods = Number(breakdown.subtotal ?? Math.max(total - fee, 0));
+      return {
+        cells: [isoDate(acceptedAt), `REQ-${request._id.slice(-6).toUpperCase()}`, request.customer?.name || '', accepted.provider?.name || '',
+          request.product, request.quantity, goods.toFixed(2), fee.toFixed(2), total.toFixed(2), statusText(request.status)],
+        goods,
+        fee,
+        total,
+      };
+    });
+  const financialTotals = financialRows.reduce((sum, row) => ({ goods: sum.goods + row.goods, fee: sum.fee + row.fee, total: sum.total + row.total }), { goods: 0, fee: 0, total: 0 });
   const noOffers = requests.filter((request) => ['open', 'offers_received'].includes(request.status) && !request.offers?.length && now - time(request.createdAt) >= 3 * DAY);
 
   const providerRows = [...periodOffers.reduce((map, offer) => {
@@ -115,6 +140,12 @@ export default function AdminReports({ requests, offers, loading, now }) {
           dates ? isoDate(dates.acceptedAt) : '', dates ? isoDate(dates.dueAt) : '', statusText(request.status), dueText(request, accepted, now)];
       }),
     },
+    financial: {
+      label: 'Financial records', icon: 'chart',
+      header: ['Accepted', 'Reference', 'Customer', 'Provider', 'Product', 'Quantity', 'Goods value (USD)', 'Delivery fee (USD)', 'Total (USD)', 'Shipment status'],
+      rows: financialRows.map((row) => row.cells),
+      totals: ['Total', '', '', '', '', '', financialTotals.goods.toFixed(2), financialTotals.fee.toFixed(2), financialTotals.total.toFixed(2), ''],
+    },
     providers: {
       label: 'Provider performance', icon: 'building',
       header: ['Provider', 'Offers', 'Accepted', 'Declined', 'Win rate', 'Delivered', 'Accepted value (USD)'],
@@ -128,42 +159,34 @@ export default function AdminReports({ requests, offers, loading, now }) {
     },
   };
   const active = datasets[dataset];
+  const withTotals = (set) => [set.header, ...set.rows, ...(set.totals && set.rows.length ? [set.totals] : [])];
   const stamp = new Date(now).toISOString().slice(0, 10);
 
   function exportDataset(key) {
     const set = datasets[key];
-    download(`tayonx-${key}-${stamp}.csv`, [set.header, ...set.rows]);
+    download(`tayonx-${key}-${stamp}.csv`, withTotals(set));
   }
 
   function exportAll() {
     const summary = [
-      ['Tayonx operations report', rangeLabel, `Generated ${new Date(now).toLocaleString()}`],
+      ['Tayonx data export', rangeLabel, `Generated ${new Date(now).toLocaleString()}`],
       [],
       ['Metric', 'Value'],
       ['Requests', periodRequests.length], ['Offers', periodOffers.length], ['Accepted offers', acceptedOffers.length],
       ['Acceptance rate', `${periodOffers.length ? Math.round((acceptedOffers.length / periodOffers.length) * 100) : 0}%`],
-      ['Accepted value (USD)', value.toFixed(2)], ['Delivered', periodRequests.filter((request) => request.status === 'delivered').length],
+      ['Accepted value (USD)', value.toFixed(2)], ['Financial records total (USD)', financialTotals.total.toFixed(2)], ['Delivered', periodRequests.filter((request) => request.status === 'delivered').length],
       ['Overdue shipments (now)', overdue.length], ['Requests without offers 3+ days (now)', noOffers.length],
     ];
-    const sections = Object.values(datasets).flatMap((set) => [[], [set.label.toUpperCase()], set.header, ...set.rows]);
-    download(`tayonx-report-${stamp}.csv`, [...summary, ...sections]);
+    const sections = Object.values(datasets).flatMap((set) => [[], [set.label.toUpperCase()], ...withTotals(set)]);
+    download(`tayonx-data-export-${stamp}.csv`, [...summary, ...sections]);
   }
-
-  const metrics = [
-    ['Requests', periodRequests.length, 'box', 'blue'],
-    ['Offers', periodOffers.length, 'mail', 'blue'],
-    ['Acceptance rate', `${periodOffers.length ? Math.round((acceptedOffers.length / periodOffers.length) * 100) : 0}%`, 'check', 'green'],
-    ['Accepted value', formatUsd(value), 'chart', 'green'],
-    ['Overdue shipments', overdue.length, 'alert', overdue.length ? 'red' : 'navy'],
-    ['No offers 3+ days', noOffers.length, 'clock', noOffers.length ? 'amber' : 'navy'],
-  ];
 
   return (
     <div className="admin-reports analytics-dashboard">
       <section className="dashboard-card analytics-card reports-toolbar">
         <div>
-          <h2>Reports &amp; exports</h2>
-          <p>Operational metrics and complete system data for {rangeLabel.toLowerCase()}. Export any dataset as CSV or print the report.</p>
+          <h2>Data Exports</h2>
+          <p>Download system data and financial records for {rangeLabel.toLowerCase()} as Excel-ready sheets, or save the page as PDF. Charts and platform metrics are on the Analytics page.</p>
         </div>
         <div className="reports-toolbar-actions">
           <label className="reports-range">
@@ -173,30 +196,21 @@ export default function AdminReports({ requests, offers, loading, now }) {
             </select>
           </label>
           {range === 'custom' && <span className="reports-custom-range"><input type="date" aria-label="From date" value={customFrom} onChange={(event) => setCustomFrom(event.target.value)} /><span>–</span><input type="date" aria-label="To date" value={customTo} onChange={(event) => setCustomTo(event.target.value)} /></span>}
-          <button type="button" className="customer-outline-button" onClick={() => window.print()}><Icon name="file" size={14} />Print / PDF</button>
-          <button type="button" className="primary-button" onClick={exportAll} disabled={loading}><Icon name="download" size={14} />Export full report</button>
+          <button type="button" className="customer-outline-button" onClick={() => window.print()}><Icon name="file" size={14} />Save as PDF</button>
+          <button type="button" className="primary-button" onClick={exportAll} disabled={loading}><Icon name="download" size={14} />Download all data (Excel)</button>
         </div>
       </section>
 
-      <div className="analytics-kpi-grid">
-        {metrics.map(([label, metric, icon, tone]) => (
-          <article className={`analytics-kpi tone-${tone === 'blue' ? 'blue' : tone}`} key={label}>
-            <span className="analytics-kpi-icon" aria-hidden="true"><Icon name={icon} size={17} /></span>
-            <span className="analytics-kpi-body"><span className="analytics-kpi-label">{label}</span><strong>{loading ? '—' : metric}</strong></span>
-          </article>
-        ))}
-      </div>
-
       <section className="dashboard-card analytics-card reports-dataset-card">
         <div className="reports-dataset-head">
-          <div className="admin-request-tabs" role="tablist" aria-label="Report datasets">
+          <div className="admin-request-tabs" role="tablist" aria-label="Export datasets">
             {Object.entries(datasets).map(([key, set]) => (
               <button type="button" role="tab" key={key} aria-selected={dataset === key} className={`admin-request-tab${dataset === key ? ' active' : ''}`} onClick={() => setDataset(key)}>
                 <Icon name={set.icon} size={13} /><span>{set.label}</span><b>{set.rows.length}</b>
               </button>
             ))}
           </div>
-          <button type="button" className="customer-outline-button" onClick={() => exportDataset(dataset)} disabled={!active.rows.length}><Icon name="download" size={14} />Export {active.label.toLowerCase()} (CSV)</button>
+          <button type="button" className="customer-outline-button" onClick={() => exportDataset(dataset)} disabled={!active.rows.length}><Icon name="download" size={14} />Download {active.label.toLowerCase()} (Excel)</button>
         </div>
         {dataset === 'users' && usersError && <p className="admin-inline-error" role="alert">{usersError}</p>}
         {active.rows.length ? (
@@ -208,7 +222,7 @@ export default function AdminReports({ requests, offers, loading, now }) {
                 <tr key={index}>{row.map((cell, cellIndex) => <td key={cellIndex}>{cell === '' ? '—' : cell}</td>)}</tr>
               ))}</tbody>
             </table>
-            {active.rows.length > 100 && <p className="analytics-empty">Showing the first 100 of {active.rows.length} rows — the CSV export contains all of them.</p>}
+            {active.rows.length > 100 && <p className="analytics-empty">Showing the first 100 of {active.rows.length} rows — the download contains all of them.</p>}
           </div>
         ) : <p className="analytics-empty">{loading ? 'Loading data…' : `No ${active.label.toLowerCase()} in this date range.`}</p>}
       </section>
