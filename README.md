@@ -94,6 +94,8 @@ flowchart LR
 
 <p align="center">
   <img src="docs/screenshots/phone-landing.webp" alt="Landing page on a phone" width="300" />
+  &nbsp;&nbsp;
+  <img src="docs/screenshots/phone-customer-dashboard.webp" alt="Customer dashboard on a phone" width="300" />
 </p>
 
 > The screenshots use demo data (example companies and customers) on a local test database.
