@@ -41,13 +41,9 @@ Customers buy from abroad and ship with verified cargo companies. They send a re
 
 ## How it works
 
-```mermaid
-flowchart LR
-    A[Customer sends a request] --> B[Verified cargo companies send offers]
-    B --> C[Customer compares and accepts the best offer]
-    C --> D[Cargo company buys and ships the goods]
-    D --> E[Customer tracks the order to delivery]
-```
+<p align="center">
+  <img src="docs/diagrams/how-it-works.svg" alt="How Tayonx works: the customer sends a request, verified cargo companies send offers, the customer accepts the best offer, the cargo company buys and ships the goods, and the customer tracks it to delivery" width="100%" />
+</p>
 
 1. **Send a request.** The customer describes the product, quantity, source country and destination, by sea or air. They can send it to one verified cargo company or leave it open for providers in that country.
 2. **Compare offers.** Cargo companies reply with a price per item, a delivery fee, the total and a delivery time.
@@ -140,21 +136,9 @@ flowchart LR
 
 ## Shipment lifecycle
 
-```mermaid
-stateDiagram-v2
-    direction LR
-    [*] --> open: request created
-    open --> offers_received: first offer
-    offers_received --> in_progress: customer accepts an offer
-    in_progress --> purchased: provider buys the goods
-    purchased --> shipping: in transit
-    shipping --> delivered
-    open --> cancelled
-    offers_received --> cancelled
-    in_progress --> cancelled
-    delivered --> [*]
-    cancelled --> [*]
-```
+<p align="center">
+  <img src="docs/diagrams/shipment-lifecycle.svg" alt="Shipment lifecycle: open, offers received, in progress, purchased, in transit (shipping), delivered. Open, offers received and in progress can be cancelled." width="100%" />
+</p>
 
 - Only the **assigned cargo company** moves a shipment forward. It can skip stages but never go back.
 - **Customers** can only cancel, and only before the goods are purchased. **Admins** see the status read-only.
