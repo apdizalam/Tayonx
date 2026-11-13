@@ -329,7 +329,7 @@ Every endpoint except register and login needs a `Bearer` token. See **[backend/
 - Verification documents and photos are served only to people allowed to see them.
 - Chat is limited to people with current business together (a direct request, a pending offer or an accepted shipment) plus support admins.
 - Messages are never removed from the database, so reported conversations can always be reviewed.
-
+ abdisalan
 ---
 
 ## Author
