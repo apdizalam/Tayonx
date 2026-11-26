@@ -1,11 +1,11 @@
 # Backend setup
 
-1. Copy `.env.example` to `.env` and set `MONGO_URI`, a private `JWT_SECRET` of at least 32 characters, and `ADMIN_PASSWORD`.
+1. Copy `.env.example` to `.env` and set `MONGO_URI` and a random `JWT_SECRET` of at least 32 characters. The API refuses to start if either is missing or still a placeholder.
 2. Install dependencies with `npm install`.
-3. Create or update the admin account with `npm run seed:admin`.
-4. Start the API with `npm start`.
+3. Set `ADMIN_EMAIL` and `ADMIN_PASSWORD` (at least 12 characters) in `.env`, then run `npm run seed:admin`. It creates the admin account, or updates the password of an existing one without changing its id. There are no built-in defaults, and the password is hashed and never printed.
+4. Start the API with `npm start`. Run the tests with `npm test`.
 
-The seed command uses `admin@tayonx.com` by default. Override it with `ADMIN_EMAIL` if needed. Passwords are hashed before they are stored; the seed command never prints the password.
+Sign-in is rate limited: 10 failed attempts per IP every 15 minutes (`429` after that), and 20 sign-ups per IP per hour. Behind a hosting proxy, set `TRUST_PROXY=1` so the limits see real client IPs.
 
 The frontend signs in through `POST /api/auth/login` and validates sessions through `GET /api/auth/me`. Set `VITE_API_URL` in the frontend environment if the API is not at `http://localhost:5000`.
 
