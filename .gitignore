@@ -1,0 +1,17 @@
+# Tayonx repo-wide ignores (backend/ and frontend/ have their own as well)
+
+# dependencies
+node_modules/
+
+# environment files: never commit secrets
+.env
+.env.*
+!.env.example
+
+# build output and logs
+dist/
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db

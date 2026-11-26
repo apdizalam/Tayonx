@@ -18,6 +18,7 @@ const {
   saveUploadedFile,
   uploadedFile,
 } = require('../lib/uploads');
+const { loginLimiter, registerLimiter } = require('../lib/rateLimit');
 
 const router = express.Router();
 const tokenLifetime = '1h';
@@ -39,7 +40,7 @@ function sendAuthError(res, error) {
 }
 
 // Public sign-up. Accepts JSON or multipart/form-data (customers may attach a profile photo).
-router.post('/register', acceptUploads(['profilePhoto']), async (req, res) => {
+router.post('/register', registerLimiter, acceptUploads(['profilePhoto']), async (req, res) => {
   const body = req.body && typeof req.body === 'object' ? req.body : {};
   const role = normalizeRole(body.role || 'customer');
   if (!ACCOUNT_ROLES.includes(role)) {
@@ -88,7 +89,7 @@ router.post('/register', acceptUploads(['profilePhoto']), async (req, res) => {
   }
 });
 
-router.post('/login', async (req, res) => {
+router.post('/login', loginLimiter, async (req, res) => {
   const email = typeof req.body.email === 'string' ? req.body.email.trim().toLowerCase() : '';
   const password = typeof req.body.password === 'string' ? req.body.password : '';
 
