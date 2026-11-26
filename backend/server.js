@@ -4,6 +4,10 @@ const cors = require('cors');
 const http = require('http');
 const { Server } = require('socket.io');
 require('dotenv').config();
+const { assertEnv } = require('./lib/env');
+
+// Stop early with a clear message if MONGO_URI or JWT_SECRET is missing or unsafe.
+assertEnv();
 const authRoutes = require('./routes/auth');
 const requestRoutes = require('./routes/requests');
 const userRoutes = require('./routes/users');
@@ -15,6 +19,9 @@ const providerRoutes = require('./routes/providers');
 const registerChatSocket = require('./socket');
 
 const app = express();
+app.disable('x-powered-by');
+// Behind a hosting proxy (Render, Railway, ...) set TRUST_PROXY=1 so rate limits see the real client IP.
+if (process.env.TRUST_PROXY) app.set('trust proxy', Number(process.env.TRUST_PROXY) || 1);
 const server = http.createServer(app);
 
 const allowedOrigins = process.env.FRONTEND_ORIGIN
@@ -28,7 +35,7 @@ app.use(cors({
   credentials: true
 }));
 
-app.use(express.json());
+app.use(express.json({ limit: '100kb' }));
 app.use('/api/auth', authRoutes);
 app.use('/api/requests', requestRoutes);
 app.use('/api/users', userRoutes);
@@ -51,7 +58,7 @@ app.set('io', io);
 // MongoDB Atlas Connection
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log('✅ MongoDB Atlas connected successfully!'))
-  .catch((err) => console.error('❌ Database connection error:', err));
+  .catch((err) => console.error('❌ Database connection error:', err.message));
 
 registerChatSocket(io);
 
