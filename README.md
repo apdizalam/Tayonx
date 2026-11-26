@@ -35,6 +35,7 @@ Customers buy from abroad and ship with verified cargo companies. They send a re
 - [API overview](#api-overview)
 - [Real-time events](#real-time-events)
 - [Security and privacy](#security-and-privacy)
+- [Status and limitations](#status-and-limitations)
 - [Author](#author)
 
 ---
@@ -54,45 +55,18 @@ Customers buy from abroad and ship with verified cargo companies. They send a re
 
 ## Screenshots
 
-### Public pages
+<table>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/landing.webp" alt="Tayonx landing page" /><br /><sub><b>Landing page:</b> how the marketplace works, for customers and cargo companies.</sub></td>
+    <td width="50%"><img src="docs/screenshots/customer-dashboard.webp" alt="Customer dashboard with recent requests and shipment tracking" /><br /><sub><b>Customer dashboard:</b> recent requests and live shipment tracking.</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/customer-offers.webp" alt="Offers to review with price breakdowns and accept or decline actions" /><br /><sub><b>Offers to review:</b> price per item, delivery fee, total and delivery time, with accept or decline.</sub></td>
+    <td width="50%"><img src="docs/screenshots/chat.webp" alt="Real-time chat between a customer and a cargo company" /><br /><sub><b>Real-time chat:</b> customers and cargo companies talk directly while doing business together.</sub></td>
+  </tr>
+</table>
 
-| Landing page | Sign in |
-|---|---|
-| <img src="docs/screenshots/landing.webp" alt="Landing page" /> | <img src="docs/screenshots/sign-in.webp" alt="Sign-in page" /> |
-
-### Customer
-
-| Dashboard | Offers to review |
-|---|---|
-| <img src="docs/screenshots/customer-dashboard.webp" alt="Customer dashboard with recent requests and shipment tracking" /> | <img src="docs/screenshots/customer-offers.webp" alt="Offers to review with price breakdowns and accept or decline actions" /> |
-
-| Verified cargo companies | Chat |
-|---|---|
-| <img src="docs/screenshots/customer-cargo-companies.webp" alt="Directory of verified cargo companies" /> | <img src="docs/screenshots/chat.webp" alt="Real-time chat between a customer and a cargo company" /> |
-
-### Cargo company
-
-| Dashboard | Reports & earnings |
-|---|---|
-| <img src="docs/screenshots/provider-dashboard.webp" alt="Cargo company dashboard with new requests and customer activity" /> | <img src="docs/screenshots/provider-reports.webp" alt="Monthly earnings, revenue breakdown and order counts" /> |
-
-### Admin
-
-| Dashboard | Analytics |
-|---|---|
-| <img src="docs/screenshots/admin-dashboard.webp" alt="Admin dashboard" /> | <img src="docs/screenshots/admin-analytics.webp" alt="Admin analytics charts" /> |
-
-| Support & Disputes | Data Exports |
-|---|---|
-| <img src="docs/screenshots/admin-support-disputes.webp" alt="Reported conversations and dispute resolution" /> | <img src="docs/screenshots/admin-data-exports.webp" alt="Downloadable datasets and financial records" /> |
-
-### On a phone
-
-<p align="center">
-  <img src="docs/screenshots/phone-landing.webp" alt="Landing page on a phone" width="300" />
-  &nbsp;&nbsp;
-  <img src="docs/screenshots/phone-customer-dashboard.webp" alt="Customer dashboard on a phone" width="300" />
-</p>
+More screens (cargo company reports, admin analytics, disputes, data exports and phone views) are in [`docs/screenshots/`](docs/screenshots/).
 
 > The screenshots use demo data (example companies and customers) on a local test database.
 
@@ -217,9 +191,10 @@ Copy `backend/.env.example` to `backend/.env` and fill in your own values:
 | `MONGO_URI` | Your MongoDB connection string |
 | `JWT_SECRET` | A random secret, at least 32 characters |
 | `FRONTEND_ORIGIN` | Frontend URL allowed by CORS (default `http://localhost:5173`) |
-| `ADMIN_EMAIL` / `ADMIN_NAME` / `ADMIN_PASSWORD` | The admin account created by the seed script |
+| `TRUST_PROXY` | Set to `1` when the API runs behind a hosting proxy, so rate limits see real client IPs |
+| `ADMIN_EMAIL` / `ADMIN_NAME` / `ADMIN_PASSWORD` | The admin account created by the seed script. There are no defaults; the password needs at least 12 characters |
 
-Create the admin account, then start the API:
+The API refuses to start if `MONGO_URI` or `JWT_SECRET` is missing or still a placeholder. Create the admin account, then start the API:
 
 ```bash
 npm run seed:admin
@@ -255,7 +230,8 @@ Open `http://localhost:5173`. In development, Vite forwards `/api` and `/socket.
 |---|---|---|
 | `backend` | `npm run dev` | Start the API with auto-reload (nodemon) |
 | `backend` | `npm start` | Start the API |
-| `backend` | `npm run seed:admin` | Create the admin account from `.env` |
+| `backend` | `npm run seed:admin` | Create the admin account from `.env`, or reset its password |
+| `backend` | `npm test` | Run the backend tests (`node:test`) |
 | `frontend` | `npm run dev` | Start the Vite dev server |
 | `frontend` | `npm run build` | Build for production into `frontend/dist` |
 | `frontend` | `npm run lint` | Lint with Oxlint |
@@ -308,13 +284,27 @@ Every endpoint except register and login needs a `Bearer` token. See **[backend/
 
 ## Security and privacy
 
-- Passwords are hashed with bcrypt; sessions use signed JWTs.
+- Passwords are hashed with bcrypt; sessions use signed JWTs that expire after one hour.
+- The API checks its configuration at startup and will not run without a database URL and a strong JWT secret.
+- There are no built-in admin credentials: the first admin is created from your own `.env` values, and the password is never printed.
+- Sign-in is rate limited (10 failed attempts per IP every 15 minutes), and so is sign-up.
 - Every route checks the user's role, and shipment status changes follow strict rules.
-- Verification documents and photos are served only to people allowed to see them.
+- Uploaded files are checked by their real content type (not the file name), limited to 5 MB, and served only to people allowed to see them.
 - Chat is limited to people with current business together (a direct request, a pending offer or an accepted shipment) plus support admins.
 - Messages are never removed from the database, so reported conversations can always be reviewed.
-  
--——-
+- `.env` files are git-ignored; only `backend/.env.example` with placeholders is committed.
+
+---
+
+## Status and limitations
+
+- No public deployment is linked from this repository yet; the screenshots come from a local test database with demo data.
+- **No online payments yet.** Prices, fees and earnings are recorded and reported, but money changes hands outside the platform. The platform fee rate is a stored setting that payments would apply once they exist.
+- Uploaded photos and documents are stored inside MongoDB, which suits small files (up to 5 MB) but not large-scale storage.
+- Real-time chat runs on a single server instance; running several instances would need a Socket.IO adapter (for example Redis).
+- The backend has unit tests for configuration and admin seeding; most routes and the frontend do not have automated tests yet.
+
+---
 
 ## Author
 
